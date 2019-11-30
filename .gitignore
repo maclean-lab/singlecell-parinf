@@ -3,7 +3,10 @@
 *.png
 *.pkl
 *.p
+slurm-*.out
+run_*.sh
 core.*
 
 __pycache__/
 .vscode/
+result-*/
