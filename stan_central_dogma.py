@@ -28,7 +28,7 @@ def main():
     print("Data loaded.")
 
     # set parameters
-    num_chains = 2
+    num_chains = 4
     num_iters = 1000
     warmup = 1000
     thin = 1
