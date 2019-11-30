@@ -1,0 +1,9 @@
+*.jl
+*.csv
+*.png
+*.pkl
+*.p
+core.*
+
+__pycache__/
+.vscode/
