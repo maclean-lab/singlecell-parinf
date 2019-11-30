@@ -1,1 +1,1 @@
-# Parameter inference for calcium mode using pystan
+# Parameter inference for calcium model using pystan
