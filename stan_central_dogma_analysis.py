@@ -14,7 +14,7 @@ def central_dogma_ode(t, y, theta):
     return dydt
 
 def main():
-    result_dir = "../../result/stan-central-dogma-gaussian-prior-hpc-1"
+    result_dir = "../../result/stan-central-dogma-hpc-2"
     y0 = np.zeros(2)
     with open("timePointsCentralDogma.p", "rb") as f:
         ts = pickle.load(f, encoding="bytes")
@@ -23,7 +23,7 @@ def main():
     y_ref = y_ref.squeeze()
 
     num_chains = 4
-    model_name = "central_dogma_model_gaussian_prior"
+    model_name = "central_dogma_model"
     analyzer = StanSampleAnalyzer(result_dir, model_name, num_chains,
                                   central_dogma_ode, ts, 1, y0, y_ref=y_ref)
     analyzer.run_analysis()

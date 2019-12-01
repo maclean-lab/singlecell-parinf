@@ -1,7 +1,15 @@
 #!/usr/bin/env python
 import sys, os.path, pickle
 import numpy as np
+import scipy.signal
 from stan_helpers import StanSession
+
+def filter_trajectory(x):
+    sos = scipy.signal.butter(5, 1, btype="lowpass", analog=True,
+                              output="sos")
+    x_filtered = scipy.signal.sosfilt(sos, x)
+
+    return x_filtered
 
 def main():
     # load model
@@ -14,16 +22,16 @@ def main():
 
     # load data
     y_raw = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
-    t0 = 221
+    t0, t_end = 221, 1000
     y0 = np.array([0, 0, 0.7, y_raw[0, t0]])
-    y = y_raw[:, t0 + 1:]
-    T = y.shape[1]
-    ts = np.arange(t0 + 1, t0 + T + 1)
+    y = y_raw[0, t0 + 1:]
+    T = y.size
+    ts = np.linspace(t0 + 1, t_end, t_end - t0)
     calcium_data = {
         "N": 4,
         "T": T,
         "y0": y0,
-        "y": y[0, :],
+        "y": y,
         "t0": t0,
         "ts": ts,
     }
