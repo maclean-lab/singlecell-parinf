@@ -38,7 +38,7 @@ model {
     real y_hat[T, N];
     sigma ~ cauchy(0, 0.05);
     for (j in 1:4) {
-        theta[j] ~ uniform(0.0, 100.0);
+        theta[j] ~ uniform(0.0, 10.0);
     }
     y_hat = integrate_ode_rk45(sho, y0, t0, ts, theta, x_r, x_i);
     for (t in 1:T) {

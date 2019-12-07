@@ -85,7 +85,7 @@ class StanSampleAnalyzer():
         self.y0 = y0
         self.y_ref = y_ref
 
-    def run_analysis(self):
+    def simulate_chains(self):
         """analyze each sample file"""
         for chain in range(self.num_chains):
             # load sample file
@@ -131,7 +131,41 @@ class StanSampleAnalyzer():
         if self.y_ref.size > 0:
             plt.plot(self.timesteps, self.y_ref, "ko", fillstyle="none")
 
-        fig_name = os.path.join(self.result_dir,
-                                "trajectories_{}.png".format(chain_idx))
-        plt.savefig(fig_name)
+        figure_name = os.path.join(self.result_dir,
+                                   "trajectories_{}.png".format(chain_idx))
+        plt.savefig(figure_name)
         plt.close()
+
+    def plot_trace(self):
+        for chain in range(self.num_chains):
+            # load sample file
+            sample_file = os.path.join(
+                self.result_dir, "{}_{}.csv".format(self.model_name, chain))
+            samples = pd.read_csv(sample_file, index_col=False, comment="#")
+            samples = samples.to_numpy()
+
+            sigma = samples[:, self.theta_0_col - 1]
+            theta = samples[:, self.theta_0_col:]
+
+            plt.clf()
+            num_subplot_rows = theta.shape[1] + 1
+            plt.figure(figsize=(6, num_subplot_rows*2))
+
+            # plot sigma
+            plt.subplot(num_subplot_rows, 1, 1)
+            plt.plot(sigma)
+            plt.title("sigma")
+
+            # plot theta
+            for idx in range(1, num_subplot_rows):
+                plt.subplot(num_subplot_rows, 1, idx + 1)
+                plt.plot(theta[:, idx - 1])
+                plt.title("theta[{}]".format(idx - 1))
+
+            plt.tight_layout()
+
+            # save plot
+            figure_name = os.path.join(self.result_dir,
+                                       "parameter_trace_{}.png".format(chain))
+            plt.savefig(figure_name)
+            plt.close()

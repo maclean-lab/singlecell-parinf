@@ -35,7 +35,8 @@ def main():
     num_chains = 4
     analyzer = StanSampleAnalyzer(result_dir, model_name, num_chains,
                                   calcium_ode, ts, 3, y0, y_ref=y_ref[0, t0:])
-    analyzer.run_analysis()
+    # analyzer.simulate_chains()
+    analyzer.plot_trace()
 
 if __name__ == "__main__":
     main()
