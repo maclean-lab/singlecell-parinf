@@ -51,7 +51,7 @@ def main():
 
     # set parameters
     num_chains = 4
-    num_iters = 5000
+    num_iters = 3000
     warmup = 1000
     thin = 1
 
