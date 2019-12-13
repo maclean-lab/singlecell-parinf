@@ -14,7 +14,7 @@ def central_dogma_ode(t, y, theta):
     return dydt
 
 def main():
-    result_dir = "../../result/stan-central-dogma-hpc-3"
+    result_dir = "../../result/stan-central-dogma-hpc-4"
     y0 = np.zeros(2)
     with open("timePointsCentralDogma.p", "rb") as f:
         ts = pickle.load(f, encoding="bytes")
@@ -22,10 +22,12 @@ def main():
         y_ref = pickle.load(f, encoding="bytes")
     y_ref = y_ref.squeeze()
 
-    num_chains = 4
     model_name = "central_dogma_model"
-    analyzer = StanSampleAnalyzer(result_dir, model_name, num_chains,
+    num_chains = 4
+    warmup = 2000
+    analyzer = StanSampleAnalyzer(result_dir, model_name, num_chains, warmup,
                                   central_dogma_ode, ts, 1, y0, y_ref=y_ref)
+    analyzer.simulate_chains()
     analyzer.plot_trace()
 
 if __name__ == "__main__":

@@ -1,15 +1,26 @@
 #!/usr/bin/env python
-import sys, os.path, pickle
+import sys
+import os.path
+import pickle
 import numpy as np
 import scipy.signal
+import pandas as pd
 from stan_helpers import StanSession
 
 def filter_trajectory(x):
+    """apply a low-pass filter for a trajectory"""
     sos = scipy.signal.butter(5, 1, btype="lowpass", analog=True,
                               output="sos")
     x_filtered = scipy.signal.sosfilt(sos, x)
 
     return x_filtered
+
+def moving_average(x: np.ndarray, window: int = 20):
+    """compute moving average of trajectories"""
+    x_df = pd.DataFrame(x)
+    x_moving_average = x_df.rolling(window=window, axis=1).mean().to_numpy()
+
+    return x_moving_average
 
 def main():
     # load model
@@ -23,8 +34,9 @@ def main():
     # load data
     y_raw = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
     t0, t_end = 221, 1000
-    y0 = np.array([0, 0, 0.7, y_raw[0, t0]])
-    y = y_raw[0, t0 + 1:]
+    y_smoothed = moving_average(y_raw)
+    y0 = np.array([0, 0, 0.7, y_smoothed[0, t0]])
+    y = y_smoothed[0, t0 + 1:]
     T = y.size
     ts = np.linspace(t0 + 1, t_end, t_end - t0)
     calcium_data = {

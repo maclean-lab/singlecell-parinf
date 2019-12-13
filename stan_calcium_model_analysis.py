@@ -26,16 +26,17 @@ def calcium_ode(t, y, theta):
     return dydt
 
 def main():
-    result_dir = "../../result/stan-calcium-model-hpc-3"
+    result_dir = "../../result/stan-calcium-model-hpc-4"
     t0, t_end = 221, 1000
     ts = np.linspace(t0, t_end, t_end - t0 + 1)
     y_ref = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
     y0 = np.array([0, 0, 0.7, y_ref[0, t0]])
     model_name = "calcium_model"
     num_chains = 4
-    analyzer = StanSampleAnalyzer(result_dir, model_name, num_chains,
+    warmup = 1000
+    analyzer = StanSampleAnalyzer(result_dir, model_name, num_chains, warmup,
                                   calcium_ode, ts, 3, y0, y_ref=y_ref[0, t0:])
-    # analyzer.simulate_chains()
+    analyzer.simulate_chains()
     analyzer.plot_trace()
 
 if __name__ == "__main__":

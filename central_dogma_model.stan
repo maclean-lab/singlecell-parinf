@@ -2,7 +2,7 @@
 variables by index
 1: RNA
 2: p
-paramters by index
+parameters by index
 1: betaM
 2: alphaM
 3: beta

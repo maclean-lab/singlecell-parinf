@@ -4,7 +4,7 @@ variables by index
 2: IP3
 3: h
 4: ca
-paramters by index
+parameters by index
 1: KonATP
 2: L
 3: Katp

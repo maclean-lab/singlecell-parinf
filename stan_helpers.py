@@ -74,11 +74,12 @@ class StanSampleAnalyzer():
     """analyze sample files from Stan sampling"""
     theta_0_col = 8
 
-    def __init__(self, result_dir, model_name, num_chains, ode, timesteps,
-                 target_var_idx, y0, y_ref=np.empty(0)):
+    def __init__(self, result_dir, model_name, num_chains, warmup, ode,
+                 timesteps, target_var_idx, y0, y_ref=np.empty(0)):
         self.result_dir = result_dir
         self.model_name = model_name
         self.num_chains = num_chains
+        self.warmup = warmup
         self.ode = ode
         self.timesteps = timesteps
         self.target_var_idx = target_var_idx
@@ -92,13 +93,13 @@ class StanSampleAnalyzer():
             sample_file = os.path.join(
                 self.result_dir, "{}_{}.csv".format(self.model_name, chain))
             samples = pd.read_csv(sample_file, index_col=False, comment="#")
-            y = np.zeros((samples.shape[0], self.timesteps.size))
+            thetas = samples.iloc[self.warmup:, self.theta_0_col:].to_numpy()
+            num_samples = thetas.shape[0]
+            y = np.zeros((num_samples, self.timesteps.size))
 
             # simulate trajectory from each samples
             print("Simulating trajectories from chain {}".format(chain))
-            for sample_idx, sample in tqdm(samples.iterrows(),
-                                           total=samples.shape[0]):
-                theta = sample[self.theta_0_col:].to_list()
+            for sample_idx, theta in tqdm(enumerate(thetas), total=num_samples):
                 y[sample_idx, :] = self._simulate_trajectory(theta)
 
             self._plot_trajectories(chain, y)
@@ -137,6 +138,7 @@ class StanSampleAnalyzer():
         plt.close()
 
     def plot_trace(self):
+        """plot trace for parameters"""
         for chain in range(self.num_chains):
             # load sample file
             sample_file = os.path.join(
@@ -144,8 +146,8 @@ class StanSampleAnalyzer():
             samples = pd.read_csv(sample_file, index_col=False, comment="#")
             samples = samples.to_numpy()
 
-            sigma = samples[:, self.theta_0_col - 1]
-            theta = samples[:, self.theta_0_col:]
+            sigma = samples[self.warmup:, self.theta_0_col - 1]
+            theta = samples[self.warmup:, self.theta_0_col:]
 
             plt.clf()
             num_subplot_rows = theta.shape[1] + 1
