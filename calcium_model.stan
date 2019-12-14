@@ -49,12 +49,14 @@ functions {
     }
 }
 data {
-    int<lower=1> N;  // number of variables
-    int<lower=1> T;  // number of time steps
-    real y0[N];      // initial values
-    real y[T];       // values at all time points
-    real t0;         // initial time point
-    real ts[T];      // all time points
+    int<lower=1> N;        // number of variables
+    int<lower=1> T;        // number of time steps
+    real y0[N];            // initial values
+    real y[T];             // values at all time points
+    real t0;               // initial time point
+    real ts[T];            // all time points
+    real mu_prior[19];     // mean of prior
+    real sigma_prior[19];  // standard deviation of prior
 }
 transformed data {
     real x_r[0];
@@ -68,7 +70,7 @@ model {
     real y_hat[T, N];
     sigma ~ cauchy(0, 0.05);
     for (j in 1:19) {
-        theta[j] ~ normal(1.0, 1.0);
+        theta[j] ~ normal(mu_prior[j], sigma_prior[j]);
     }
     y_hat = integrate_ode_rk45(sho, y0, t0, ts, theta, x_r, x_i);
     for (t in 1:T) {

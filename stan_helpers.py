@@ -191,3 +191,38 @@ class StanSampleAnalyzer():
                 self.result_dir, "parameter_violin_plot_{}.png".format(chain))
             plt.savefig(figure_name)
             plt.close()
+
+def calcium_ode(t, y, theta):
+    dydt = np.zeros(4)
+
+    dydt[0] = theta[0]* theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
+    dydt[1] = (theta[4] * y[0] * y[0]) \
+        / (theta[5] * theta[5] + y[0] * y[0]) - theta[6] * y[1]
+    dydt[2] = theta[7] * (y[3] + theta[8]) \
+        * (theta[8] / (y[3] * theta[8]) - y[2])
+    beta = 1 + theta[9] * theta[10] / np.power(theta[9] + y[3], 2)
+    m_inf = y[1] * y[3] / ((theta[11] + y[1]) * (theta[12] + y[3]))
+    dydt[3] = 1 / beta * (
+        theta[13]
+            * (theta[14] * np.power(m_inf, 3) * np.power(y[2], 3) + theta[15])
+            * (theta[17] - (1 + theta[13]) * y[3])
+        - theta[16] * np.power(y[3], 2)
+            / (np.power(theta[18], 2) + np.power(y[3], 2))
+    )
+
+    return dydt
+
+def filter_trajectory(x):
+    """apply a low-pass filter for a trajectory"""
+    sos = scipy.signal.butter(5, 1, btype="lowpass", analog=True,
+                              output="sos")
+    x_filtered = scipy.signal.sosfilt(sos, x)
+
+    return x_filtered
+
+def moving_average(x: np.ndarray, window: int = 20):
+    """compute moving average of trajectories"""
+    x_df = pd.DataFrame(x)
+    x_moving_average = x_df.rolling(window=window, axis=1).mean().to_numpy()
+
+    return x_moving_average
