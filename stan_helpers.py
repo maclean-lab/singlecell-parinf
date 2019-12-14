@@ -137,7 +137,7 @@ class StanSampleAnalyzer():
         plt.savefig(figure_name)
         plt.close()
 
-    def plot_trace(self):
+    def plot_parameters(self):
         """plot trace for parameters"""
         for chain in range(self.num_chains):
             # load sample file
@@ -149,25 +149,45 @@ class StanSampleAnalyzer():
             sigma = samples[self.warmup:, self.theta_0_col - 1]
             theta = samples[self.warmup:, self.theta_0_col:]
 
+            # make trace plot
             plt.clf()
-            num_subplot_rows = theta.shape[1] + 1
-            plt.figure(figsize=(6, num_subplot_rows*2))
+            num_params = theta.shape[1] + 1
+            plt.figure(figsize=(6, num_params*2))
 
-            # plot sigma
-            plt.subplot(num_subplot_rows, 1, 1)
+            # plot trace of sigma
+            plt.subplot(num_params, 1, 1)
             plt.plot(sigma)
             plt.title("sigma")
 
-            # plot theta
-            for idx in range(1, num_subplot_rows):
-                plt.subplot(num_subplot_rows, 1, idx + 1)
+            # plot trace of theta
+            for idx in range(1, num_params):
+                plt.subplot(num_params, 1, idx + 1)
                 plt.plot(theta[:, idx - 1])
                 plt.title("theta[{}]".format(idx - 1))
 
             plt.tight_layout()
 
-            # save plot
+            # save trace plot
             figure_name = os.path.join(self.result_dir,
                                        "parameter_trace_{}.png".format(chain))
+            plt.savefig(figure_name)
+            plt.close()
+
+            # make violin plot
+            plt.clf()
+            plt.figure(figsize=(num_params, 4))
+            plt.violinplot(samples[self.warmup:, self.theta_0_col - 1:])
+
+            # add paramter names to ticks on x-axis
+            param_names = ["sigma"] + \
+                ["theta[{}]".format(i) for i in range(0, num_params)]
+            param_ticks = np.arange(1, num_params + 1)
+            plt.xticks(param_ticks, param_names)
+
+            plt.tight_layout()
+
+            # save violin plot
+            figure_name = os.path.join(
+                self.result_dir, "parameter_violin_plot_{}.png".format(chain))
             plt.savefig(figure_name)
             plt.close()

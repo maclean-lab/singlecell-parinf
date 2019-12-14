@@ -28,7 +28,7 @@ def main():
     analyzer = StanSampleAnalyzer(result_dir, model_name, num_chains, warmup,
                                   central_dogma_ode, ts, 1, y0, y_ref=y_ref)
     analyzer.simulate_chains()
-    analyzer.plot_trace()
+    analyzer.plot_parameters()
 
 if __name__ == "__main__":
     main()

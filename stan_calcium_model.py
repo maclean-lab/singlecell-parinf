@@ -52,7 +52,7 @@ def main():
     # set parameters
     num_chains = 4
     num_iters = 3000
-    warmup = 1000
+    warmup = 2000
     thin = 1
 
     stan_session = StanSession(calcium_model, calcium_data, result_dir,

@@ -4,6 +4,7 @@ import numpy as np
 import scipy.integrate
 import matplotlib.pyplot as plt
 from stan_helpers import StanSampleAnalyzer
+from stan_calcium_model import moving_average
 
 def calcium_ode(t, y, theta):
     dydt = np.zeros(4)
@@ -30,14 +31,18 @@ def main():
     t0, t_end = 221, 1000
     ts = np.linspace(t0, t_end, t_end - t0 + 1)
     y_ref = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
+    # y_smoothed = moving_average(y_ref)
     y0 = np.array([0, 0, 0.7, y_ref[0, t0]])
+    # y0 = np.array([0, 0, 0.7, y_smoothed[0, t0]])
     model_name = "calcium_model"
     num_chains = 4
     warmup = 1000
     analyzer = StanSampleAnalyzer(result_dir, model_name, num_chains, warmup,
-                                  calcium_ode, ts, 3, y0, y_ref=y_ref[0, t0:])
+                                  calcium_ode, ts, 3, y0,
+                                  y_ref=y_ref[0, t0:])
+    #                               y_ref=y_smoothed[0, t0:])
     analyzer.simulate_chains()
-    analyzer.plot_trace()
+    analyzer.plot_parameters()
 
 if __name__ == "__main__":
     main()
