@@ -34,9 +34,8 @@ def main():
     # load data
     y_raw = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
     t0, t_end = 221, 1000
-    y_smoothed = moving_average(y_raw)
-    y0 = np.array([0, 0, 0.7, y_smoothed[0, t0]])
-    y = y_smoothed[0, t0 + 1:]
+    y0 = np.array([0, 0, 0.7, y_raw[0, t0]])
+    y = y_raw[0, t0 + 1:]
     T = y.size
     ts = np.linspace(t0 + 1, t_end, t_end - t0)
     calcium_data = {
