@@ -1,39 +1,88 @@
 #!/usr/bin/env python
 import sys
 import os.path
+import argparse
 import pickle
 import numpy as np
 import scipy.signal
+import scipy.io
 import pandas as pd
-from stan_helpers import StanSession, moving_average
+from stan_helpers import StanSession
+
+num_params = 19
+
+def get_args():
+    """get argument parser"""
+    arg_parser = argparse.ArgumentParser(description="Infer parameters of " +
+                                         "calcium mode using Stan.")
+    arg_parser.add_argument("--stan_model", dest="stan_model", metavar="MODEL",
+                            type=str, required=True)
+    arg_parser.add_argument("--cell_id", dest="cell_id", metavar="N", type=int,
+                            default=0)
+    arg_parser.add_argument("--t0", dest="t0", metavar="T", type=int,
+                            default=200)
+    arg_parser.add_argument("--num_chains", dest="num_chains", type=int,
+                            default=4)
+    arg_parser.add_argument("--num_iters", dest="num_iters", type=int,
+                            default=3000)
+    arg_parser.add_argument("--warmup", dest="warmup", type=int, default=1000)
+    arg_parser.add_argument("--thin", dest="thin", type=int, default=1)
+    arg_parser.add_argument("--result_dir", dest="result_dir", metavar="DIR",
+                            type=str, default=".")
+    arg_parser.add_argument("--prior_sample_file", dest="prior_sample_file",
+                            metavar="FILE", type=str, default=None)
+
+    return arg_parser.parse_args()
+
+def get_prior(sample_file):
+    """get prior distribution (from a previous run, if provided)"""
+    if sample_file is None:
+        # no sample file provided. use Gaussian(1.0, 1.0) for all parameters
+        prior_mean = np.ones(num_params)
+        prior_std = np.ones(num_params)
+    else:
+        # get number of warm-up iterations from sample file
+        with open(sample_file, "r") as sf:
+            for line in sf:
+                if "warmup=" in line:
+                    prior_warmup = int(line.strip().split("=")[-1])
+                    break
+
+        # get parameters from sample file
+        prior_samples = pd.read_csv(sample_file, index_col=False, comment="#")
+        prior_theta_0_col = 8
+        prior_theta = prior_samples.iloc[prior_warmup:, prior_theta_0_col:]
+
+        # get mean and standard deviation of sampled parameters
+        prior_mean = prior_theta.mean().to_numpy()
+        prior_std = prior_theta.std().to_numpy()
+
+    return prior_mean, prior_std
 
 def main():
-    # load model
-    if len(sys.argv) < 2:
-        print("Usage: python stan_calcium_model.py [stan_model] [result_dir]")
-        sys.exit(1)
-
-    calcium_model = sys.argv[1]
-    result_dir = "." if len(sys.argv) < 3 else sys.argv[2]
+    # get command-line arguments
+    args = get_args()
+    stan_model = args.stan_model
+    cell_id = args.cell_id
+    t0 = args.t0
+    num_chains = args.num_chains
+    num_iters = args.num_iters
+    warmup = args.warmup
+    thin = args.thin
+    result_dir = args.result_dir
+    prior_sample_file = args.prior_sample_file
 
     # prepare data for Stan model
-    # load trajectories
+    # get trajectory and time
     y_raw = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
-    t0, t_end = 221, 1000
-    y0 = np.array([0, 0, 0.7, y_raw[0, t0]])
-    y = y_raw[0, t0 + 1:]
+    t_end = 1000
+    y0 = np.array([0, 0, 0.7, y_raw[cell_id, t0]])
+    y = y_raw[cell_id, t0 + 1:]
     T = y.size
     ts = np.linspace(t0 + 1, t_end, t_end - t0)
 
-    # get prior distribution from a previous run
-    prior_samples = pd.read_csv(
-        "../../result/stan-calcium-model-hpc-4/calcium_model_2.csv",
-        index_col=False, comment="#")
-    prior_warmup = 1000
-    prior_theta_0_col = 8
-    prior_theta = prior_samples.iloc[prior_warmup:, prior_theta_0_col:]
-    prior_mean = prior_theta.mean().to_numpy()
-    prior_std = prior_theta.std().to_numpy()
+    # get prior distribution
+    prior_mean, prior_std = get_prior(prior_sample_file)
 
     # gather prepared data
     calcium_data = {
@@ -48,13 +97,8 @@ def main():
     }
     print("Data loaded.")
 
-    # set parameters
-    num_chains = 4
-    num_iters = 3000
-    warmup = 1000
-    thin = 1
-
-    stan_session = StanSession(calcium_model, calcium_data, result_dir,
+    # run Stan session
+    stan_session = StanSession(stan_model, calcium_data, result_dir,
                                num_chains=num_chains, num_iters=num_iters,
                                warmup=warmup, thin=thin)
     stan_session.run_sampling()

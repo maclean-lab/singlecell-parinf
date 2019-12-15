@@ -2,7 +2,8 @@ import sys
 import os.path
 import pickle
 import numpy as np
-import scipy
+import scipy.integrate
+import scipy.signal
 import pandas as pd
 import matplotlib.pyplot as plt
 import arviz as az
@@ -60,15 +61,17 @@ class StanSession:
         print("Stan fit object saved.")
 
         # plot fit result (native pystan implementation)
-        plt.clf()
-        self.fit.plot()
-        plt.savefig(os.path.join(self.result_dir, self.model_name + "_fit.png"))
+        # plt.clf()
+        # self.fit.plot()
+        # plt.savefig(os.path.join(self.result_dir, self.model_name + "_fit.png"))
 
         # make trace plot of fit result (arviz API)
         plt.clf()
         az.plot_trace(self.fit)
-        plt.savefig(os.path.join(self.result_dir,
-                                 self.model_name + "_fit_trace.png"))
+        trace_figure_name = os.path.join(
+            self.result_dir, self.model_name + "_fit_trace.png")
+        plt.savefig(trace_figure_name)
+        print("Trace plot saved")
 
 class StanSampleAnalyzer():
     """analyze sample files from Stan sampling"""
