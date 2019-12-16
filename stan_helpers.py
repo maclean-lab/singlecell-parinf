@@ -20,8 +20,7 @@ class StanSession:
             # load model from Stan code
             self.model = StanModel(file=stan_model, model_name=self.model_name)
 
-            compiled_model_file = os.path.join(result_dir,
-                                               self.model_name + ".pkl")
+            compiled_model_file = os.path.join(result_dir, "stan_model.pkl")
             with open(compiled_model_file, "wb") as f:
                 pickle.dump(self.model, f)
 
@@ -50,12 +49,12 @@ class StanSession:
         self.fit = self.model.sampling(
             data=self.data, chains=self.num_chains, iter=self.num_iters,
             warmup=self.warmup, thin=self.thin,
-            sample_file=os.path.join(self.result_dir, self.model_name))
+            sample_file=os.path.join(self.result_dir, "chain"))
         print("Sampling finished.")
         sys.stdout.flush()
 
         # save fit object
-        fit_file = os.path.join(self.result_dir, self.model_name + "_fit.pkl")
+        fit_file = os.path.join(self.result_dir, "stan_fit.pkl")
         with open(fit_file, "wb") as f:
             pickle.dump(self.fit, f)
         print("Stan fit object saved.")
@@ -63,13 +62,13 @@ class StanSession:
         # plot fit result (native pystan implementation)
         # plt.clf()
         # self.fit.plot()
-        # plt.savefig(os.path.join(self.result_dir, self.model_name + "_fit.png"))
+        # plt.savefig(os.path.join(self.result_dir, "stan_fit.png"))
 
         # make trace plot of fit result (arviz API)
         plt.clf()
         az.plot_trace(self.fit)
         trace_figure_name = os.path.join(
-            self.result_dir, self.model_name + "_fit_trace.png")
+            self.result_dir, "stan_fit_trace.png")
         plt.savefig(trace_figure_name)
         print("Trace plot saved")
 
@@ -77,10 +76,9 @@ class StanSampleAnalyzer():
     """analyze sample files from Stan sampling"""
     theta_0_col = 8
 
-    def __init__(self, result_dir, model_name, num_chains, warmup, ode,
+    def __init__(self, result_dir, num_chains, warmup, ode,
                  timesteps, target_var_idx, y0, y_ref=np.empty(0)):
         self.result_dir = result_dir
-        self.model_name = model_name
         self.num_chains = num_chains
         self.warmup = warmup
         self.ode = ode
@@ -94,7 +92,7 @@ class StanSampleAnalyzer():
         for chain in range(self.num_chains):
             # load sample file
             sample_file = os.path.join(
-                self.result_dir, "{}_{}.csv".format(self.model_name, chain))
+                self.result_dir, "chain_{}.csv".format(chain))
             samples = pd.read_csv(sample_file, index_col=False, comment="#")
             thetas = samples.iloc[self.warmup:, self.theta_0_col:].to_numpy()
             num_samples = thetas.shape[0]
@@ -145,7 +143,7 @@ class StanSampleAnalyzer():
         for chain in range(self.num_chains):
             # load sample file
             sample_file = os.path.join(
-                self.result_dir, "{}_{}.csv".format(self.model_name, chain))
+                self.result_dir, "chain_{}.csv".format(chain))
             samples = pd.read_csv(sample_file, index_col=False, comment="#")
             samples = samples.to_numpy()
 

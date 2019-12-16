@@ -12,7 +12,7 @@ from stan_helpers import StanSession
 num_params = 19
 
 def get_args():
-    """get argument parser"""
+    """parse command line arguments"""
     arg_parser = argparse.ArgumentParser(description="Infer parameters of " +
                                          "calcium mode using Stan.")
     arg_parser.add_argument("--stan_model", dest="stan_model", metavar="MODEL",
