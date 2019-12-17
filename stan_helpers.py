@@ -72,12 +72,13 @@ class StanSession:
         plt.savefig(trace_figure_name)
         print("Trace plot saved")
 
-class StanSampleAnalyzer():
+class StanSampleAnalyzer:
     """analyze sample files from Stan sampling"""
     theta_0_col = 8
 
     def __init__(self, result_dir, num_chains, warmup, ode,
-                 timesteps, target_var_idx, y0, y_ref=np.empty(0)):
+                 timesteps, target_var_idx, y0, y_ref=np.empty(0),
+                 show_progress=False):
         self.result_dir = result_dir
         self.num_chains = num_chains
         self.warmup = warmup
@@ -86,6 +87,7 @@ class StanSampleAnalyzer():
         self.target_var_idx = target_var_idx
         self.y0 = y0
         self.y_ref = y_ref
+        self.show_progress = show_progress
 
     def simulate_chains(self):
         """analyze each sample file"""
@@ -100,7 +102,8 @@ class StanSampleAnalyzer():
 
             # simulate trajectory from each samples
             print("Simulating trajectories from chain {}".format(chain))
-            for sample_idx, theta in tqdm(enumerate(thetas), total=num_samples):
+            for sample_idx, theta in tqdm(enumerate(thetas), total=num_samples,
+                                          disable=not self.show_progress):
                 y[sample_idx, :] = self._simulate_trajectory(theta)
 
             self._plot_trajectories(chain, y)
