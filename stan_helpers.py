@@ -70,7 +70,7 @@ class StanSession:
         trace_figure_name = os.path.join(
             self.result_dir, "stan_fit_trace.png")
         plt.savefig(trace_figure_name)
-        print("Trace plot saved")
+        print("Trace plot saved.")
 
 class StanSampleAnalyzer:
     """analyze sample files from Stan sampling"""
@@ -195,6 +195,8 @@ class StanSampleAnalyzer:
                 self.result_dir, "parameter_violin_plot_{}.png".format(chain))
             plt.savefig(figure_name)
             plt.close()
+
+            print("Parameter plots saved.")
 
 def calcium_ode(t, y, theta):
     dydt = np.zeros(4)
