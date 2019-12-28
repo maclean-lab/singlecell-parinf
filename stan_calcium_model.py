@@ -7,7 +7,7 @@ import numpy as np
 import scipy.signal
 import scipy.io
 import pandas as pd
-from stan_helpers import StanSession
+from stan_helpers import StanSession, moving_average
 
 num_params = 19
 
@@ -19,6 +19,11 @@ def get_args():
                             type=str, required=True)
     arg_parser.add_argument("--cell_id", dest="cell_id", metavar="N", type=int,
                             default=0)
+    arg_parser.add_argument("--preprocess_method", dest="preprocess_method",
+                            type=str, choices=["none", "moving_average"],
+                            default="none")
+    arg_parser.add_argument("--moving_average_window",
+                            dest="moving_average_window", type=int, default=20)
     arg_parser.add_argument("--t0", dest="t0", metavar="T", type=int,
                             default=200)
     arg_parser.add_argument("--num_chains", dest="num_chains", type=int,
@@ -64,6 +69,8 @@ def main():
     args = get_args()
     stan_model = args.stan_model
     cell_id = args.cell_id
+    preprocess_method = args.preprocess_method
+    moving_average_window = args.moving_average_window
     t0 = args.t0
     num_chains = args.num_chains
     num_iters = args.num_iters
@@ -78,6 +85,9 @@ def main():
     t_end = 1000
     y0 = np.array([0, 0, 0.7, y_raw[cell_id, t0]])
     y = y_raw[cell_id, t0 + 1:]
+    # apply preprocessing to the trajectory if specified
+    if preprocess_method == "moving_average":
+        y = moving_average(y, window=moving_average_window)
     T = y.size
     ts = np.linspace(t0 + 1, t_end, t_end - t0)
 

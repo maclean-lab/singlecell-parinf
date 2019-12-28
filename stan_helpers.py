@@ -236,6 +236,7 @@ class StanSampleAnalyzer:
             "chain_{}_parameter_pair_plot.png".format(chain_idx)
         )
         plt.savefig(figure_name)
+        plt.close()
 
 # utility functions
 def calcium_ode(t, y, theta):

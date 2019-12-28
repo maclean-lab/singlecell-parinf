@@ -48,7 +48,7 @@ def main():
                                   show_progress=show_progress)
 
     # run analyses
-    # analyzer.simulate_chains()
+    analyzer.simulate_chains()
     analyzer.plot_parameters()
 
 if __name__ == "__main__":
