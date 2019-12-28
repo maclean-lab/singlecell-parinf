@@ -203,11 +203,11 @@ class StanSampleAnalyzer:
         """make violin plot for parameters"""
         chain_samples = self.samples[chain_idx].iloc[
             self.warmup:, self.theta_0_col - 1:].to_numpy()
-        if use_log_scale:
-            chain_samples = np.log10(chain_samples)
 
         plt.clf()
         plt.figure(figsize=(self.num_params, 4))
+        if use_log_scale:
+            plt.yscale("log")
         plt.violinplot(chain_samples)
 
         # add paramter names to ticks on x-axis
