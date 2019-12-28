@@ -39,12 +39,16 @@ def main():
     y_ref = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
     y0 = np.array([0, 0, 0.7, y_ref[cell_id, t0]])
     ts = np.linspace(t0, t_end, t_end - t0 + 1)
+    param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
+                   "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
+                   "eta1", "eta2", "eta3", "c0", "k3"]
     analyzer = StanSampleAnalyzer(result_dir, num_chains, warmup, calcium_ode,
                                   ts, 3, y0, y_ref=y_ref[cell_id, t0:],
+                                  param_names=param_names,
                                   show_progress=show_progress)
 
     # run analyses
-    analyzer.simulate_chains()
+    # analyzer.simulate_chains()
     analyzer.plot_parameters()
 
 if __name__ == "__main__":

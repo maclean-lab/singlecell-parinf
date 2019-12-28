@@ -7,6 +7,7 @@ import scipy.signal
 import pandas as pd
 import matplotlib.pyplot as plt
 import arviz as az
+import seaborn as sns
 from tqdm import tqdm
 from pystan import StanModel
 
@@ -74,11 +75,11 @@ class StanSession:
 
 class StanSampleAnalyzer:
     """analyze sample files from Stan sampling"""
-    theta_0_col = 8
+    theta_0_col = 8  # column index for theta[0] in a Stan sample file
 
     def __init__(self, result_dir, num_chains, warmup, ode,
                  timesteps, target_var_idx, y0, y_ref=np.empty(0),
-                 show_progress=False):
+                 param_names=None, show_progress=False):
         self.result_dir = result_dir
         self.num_chains = num_chains
         self.warmup = warmup
@@ -87,26 +88,41 @@ class StanSampleAnalyzer:
         self.target_var_idx = target_var_idx
         self.y0 = y0
         self.y_ref = y_ref
+        self.param_names = param_names
         self.show_progress = show_progress
+
+        # load sample files
+        print("Loading stan sample files")
+        self.samples = []
+        for chain_idx in range(self.num_chains):
+            sample_file = os.path.join(
+                self.result_dir, "chain_{}.csv".format(chain_idx))
+            self.samples.append(
+                pd.read_csv(sample_file, index_col=False, comment="#"))
+
+        # check parameters names
+        self.num_params = self.samples[0].shape[1] - self.theta_0_col + 1
+        # set default parameters if not given or length mismatch
+        if not param_names or len(param_names) != self.num_params:
+            self.param_names = ["sigma"] \
+                + ["theta[{}]".format(i) for i in range(self.num_params - 1)]
 
     def simulate_chains(self):
         """analyze each sample file"""
-        for chain in range(self.num_chains):
-            # load sample file
-            sample_file = os.path.join(
-                self.result_dir, "chain_{}.csv".format(chain))
-            samples = pd.read_csv(sample_file, index_col=False, comment="#")
-            thetas = samples.iloc[self.warmup:, self.theta_0_col:].to_numpy()
+        for chain_idx in range(self.num_chains):
+            # get thetas
+            thetas = self.samples[chain_idx].iloc[self.warmup:,
+                                                  self.theta_0_col:].to_numpy()
             num_samples = thetas.shape[0]
             y = np.zeros((num_samples, self.timesteps.size))
 
             # simulate trajectory from each samples
-            print("Simulating trajectories from chain {}".format(chain))
+            print("Simulating trajectories from chain {}".format(chain_idx))
             for sample_idx, theta in tqdm(enumerate(thetas), total=num_samples,
                                           disable=not self.show_progress):
                 y[sample_idx, :] = self._simulate_trajectory(theta)
 
-            self._plot_trajectories(chain, y)
+            self._plot_trajectories(chain_idx, y)
 
     def _simulate_trajectory(self, theta):
         """simulate a trajectory with sampled parameters"""
@@ -136,69 +152,94 @@ class StanSampleAnalyzer:
         if self.y_ref.size > 0:
             plt.plot(self.timesteps, self.y_ref, "ko", fillstyle="none")
 
-        figure_name = os.path.join(self.result_dir,
-                                   "trajectories_{}.png".format(chain_idx))
+        figure_name = os.path.join(
+            self.result_dir, "chain_{}_trajectories.png".format(chain_idx))
         plt.savefig(figure_name)
         plt.close()
 
     def plot_parameters(self):
         """plot trace for parameters"""
-        for chain in range(self.num_chains):
-            # load sample file
-            sample_file = os.path.join(
-                self.result_dir, "chain_{}.csv".format(chain))
-            samples = pd.read_csv(sample_file, index_col=False, comment="#")
-            samples = samples.to_numpy()
+        for chain_idx in range(self.num_chains):
+            print("Making trace plot for chain {}".format(chain_idx))
+            self._make_trace_plot(chain_idx)
 
-            sigma = samples[self.warmup:, self.theta_0_col - 1]
-            theta = samples[self.warmup:, self.theta_0_col:]
+            print("Making violin plot for chain {}".format(chain_idx))
+            self._make_violin_plot(chain_idx)
 
-            # make trace plot
-            plt.clf()
-            num_params = theta.shape[1] + 1
-            plt.figure(figsize=(6, num_params*2))
+            print("Making pairs plot for chain {}".format(chain_idx))
+            self._make_pair_plot(chain_idx)
 
-            # plot trace of sigma
-            plt.subplot(num_params, 1, 1)
-            plt.plot(sigma)
-            plt.title("sigma")
+    def _make_trace_plot(self, chain_idx):
+        """make trace plota for parameters"""
+        sigma = self.samples[chain_idx].iloc[self.warmup:,
+                                             self.theta_0_col - 1].to_numpy()
+        theta = self.samples[chain_idx].iloc[self.warmup:,
+                                             self.theta_0_col:].to_numpy()
 
-            # plot trace of theta
-            for idx in range(1, num_params):
-                plt.subplot(num_params, 1, idx + 1)
-                plt.plot(theta[:, idx - 1])
-                plt.title("theta[{}]".format(idx - 1))
+        plt.clf()
+        plt.figure(figsize=(6, self.num_params*2))
 
-            plt.tight_layout()
+        # plot trace of sigma
+        plt.subplot(self.num_params, 1, 1)
+        plt.plot(sigma)
+        plt.title(self.param_names[0])
 
-            # save trace plot
-            figure_name = os.path.join(self.result_dir,
-                                       "parameter_trace_{}.png".format(chain))
-            plt.savefig(figure_name)
-            plt.close()
+        # plot trace of each theta
+        for idx in range(1, self.num_params):
+            plt.subplot(self.num_params, 1, idx + 1)
+            plt.plot(theta[:, idx - 1])
+            plt.title(self.param_names[idx])
 
-            # make violin plot
-            plt.clf()
-            plt.figure(figsize=(num_params, 4))
-            plt.violinplot(samples[self.warmup:, self.theta_0_col - 1:])
+        plt.tight_layout()
 
-            # add paramter names to ticks on x-axis
-            param_names = ["sigma"] + \
-                ["theta[{}]".format(i) for i in range(0, num_params)]
-            param_ticks = np.arange(1, num_params + 1)
-            plt.xticks(param_ticks, param_names)
+        # save trace plot
+        figure_name = os.path.join(
+            self.result_dir, "chain_{}_parameter_trace.png".format(chain_idx)
+        )
+        plt.savefig(figure_name)
+        plt.close()
 
-            plt.tight_layout()
+    def _make_violin_plot(self, chain_idx, use_log_scale=True):
+        """make violin plot for parameters"""
+        chain_samples = self.samples[chain_idx].iloc[
+            self.warmup:, self.theta_0_col - 1:].to_numpy()
+        if use_log_scale:
+            chain_samples = np.log10(chain_samples)
 
-            # save violin plot
-            figure_name = os.path.join(
-                self.result_dir, "parameter_violin_plot_{}.png".format(chain))
-            plt.savefig(figure_name)
-            plt.close()
+        plt.clf()
+        plt.figure(figsize=(self.num_params, 4))
+        plt.violinplot(chain_samples)
 
-            print("Parameter plots saved.")
+        # add paramter names to ticks on x-axis
+        param_ticks = np.arange(1, self.num_params + 1)
+        plt.xticks(param_ticks, self.param_names)
 
+        plt.tight_layout()
+
+        # save violin plot
+        figure_name = os.path.join(
+            self.result_dir,
+            "chain_{}_parameter_violin_plot.png".format(chain_idx)
+        )
+        plt.savefig(figure_name)
+        plt.close()
+
+    def _make_pair_plot(self, chain_idx):
+        """make pair plot for parameters"""
+        pairplot_samples = self.samples[chain_idx].iloc[
+            self.warmup:, self.theta_0_col - 1:]
+        pairplot_samples.columns = self.param_names
+        plt.clf()
+        sns.pairplot(pairplot_samples)
+        figure_name = os.path.join(
+            self.result_dir,
+            "chain_{}_parameter_pair_plot.png".format(chain_idx)
+        )
+        plt.savefig(figure_name)
+
+# utility functions
 def calcium_ode(t, y, theta):
+    """system of ODEs for the calcium model"""
     dydt = np.zeros(4)
 
     dydt[0] = theta[0]* theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
