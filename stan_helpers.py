@@ -261,6 +261,10 @@ def filter_trajectory(x):
 
 def moving_average(x: np.ndarray, window: int = 20):
     """compute moving average of trajectories"""
+    # make x 2D if it is 1D
+    if len(x.shape) == 1:
+        x = x[np.newaxis, :]
+
     x_df = pd.DataFrame(x)
     x_moving_average = x_df.rolling(window=window, axis=1).mean().to_numpy()
 

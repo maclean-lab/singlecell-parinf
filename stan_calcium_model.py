@@ -19,9 +19,8 @@ def get_args():
                             type=str, required=True)
     arg_parser.add_argument("--cell_id", dest="cell_id", metavar="N", type=int,
                             default=0)
-    arg_parser.add_argument("--preprocess_method", dest="preprocess_method",
-                            type=str, choices=["none", "moving_average"],
-                            default="none")
+    arg_parser.add_argument("--filter_type", dest="filter_type", type=str,
+                            choices=["none", "moving_average"], default="none")
     arg_parser.add_argument("--moving_average_window",
                             dest="moving_average_window", type=int, default=20)
     arg_parser.add_argument("--t0", dest="t0", metavar="T", type=int,
@@ -69,7 +68,7 @@ def main():
     args = get_args()
     stan_model = args.stan_model
     cell_id = args.cell_id
-    preprocess_method = args.preprocess_method
+    filter_type = args.filter_type
     moving_average_window = args.moving_average_window
     t0 = args.t0
     num_chains = args.num_chains
@@ -83,13 +82,15 @@ def main():
     # get trajectory and time
     y_raw = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
     t_end = 1000
-    y0 = np.array([0, 0, 0.7, y_raw[cell_id, t0]])
-    y = y_raw[cell_id, t0 + 1:]
+    y = y_raw[cell_id, :]
     # apply preprocessing to the trajectory if specified
-    if preprocess_method == "moving_average":
-        print("Processing raw trajectory using moving average with window " +
+    if filter_type == "moving_average":
+        print("Filtering raw trajectory using moving average with window " +
               "size of {}...".format(moving_average_window))
         y = moving_average(y, window=moving_average_window)
+        y = np.squeeze(y)
+    y0 = np.array([0, 0, 0.7, y[t0]])
+    y = y[t0 + 1:]
     T = y.size
     ts = np.linspace(t0 + 1, t_end, t_end - t0)
 
@@ -107,7 +108,8 @@ def main():
         "mu_prior": prior_mean,
         "sigma_prior": prior_std
     }
-    print("Data loaded.")
+    print("Data initialized")
+    sys.stdout.flush()
 
     # run Stan session
     stan_session = StanSession(stan_model, calcium_data, result_dir,
