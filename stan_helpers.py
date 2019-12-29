@@ -92,33 +92,39 @@ class StanSampleAnalyzer:
         self.show_progress = show_progress
 
         # load sample files
-        print("Loading stan sample files")
+        print("Loading stan sample files...")
+        self.raw_samples = []
         self.samples = []
         for chain_idx in range(self.num_chains):
             sample_file = os.path.join(
                 self.result_dir, "chain_{}.csv".format(chain_idx))
+            raw_samples = pd.read_csv(sample_file, index_col=False, comment="#")
+            self.raw_samples.append(raw_samples)
             self.samples.append(
-                pd.read_csv(sample_file, index_col=False, comment="#"))
+                raw_samples.iloc[self.warmup:, self.theta_0_col - 1:])
 
-        # check parameters names
-        self.num_params = self.samples[0].shape[1] - self.theta_0_col + 1
-        # set default parameters if not given or length mismatch
+        self.num_samples = self.samples[0].shape[0]
+        self.num_params = self.samples[0].shape[1]
+
+        # set parameters names
         if not param_names or len(param_names) != self.num_params:
             self.param_names = ["sigma"] \
                 + ["theta[{}]".format(i) for i in range(self.num_params - 1)]
+
+        for samples in self.samples:
+            samples.columns = self.param_names
 
     def simulate_chains(self):
         """analyze each sample file"""
         for chain_idx in range(self.num_chains):
             # get thetas
-            thetas = self.samples[chain_idx].iloc[self.warmup:,
-                                                  self.theta_0_col:].to_numpy()
-            num_samples = thetas.shape[0]
-            y = np.zeros((num_samples, self.timesteps.size))
+            thetas = self.samples[chain_idx].iloc[:, 1:].to_numpy()
+            y = np.zeros((self.num_samples, self.timesteps.size))
 
             # simulate trajectory from each samples
-            print("Simulating trajectories from chain {}".format(chain_idx))
-            for sample_idx, theta in tqdm(enumerate(thetas), total=num_samples,
+            print("Simulating trajectories from chain {}...".format(chain_idx))
+            for sample_idx, theta in tqdm(enumerate(thetas),
+                                          total=self.num_samples,
                                           disable=not self.show_progress):
                 y[sample_idx, :] = self._simulate_trajectory(theta)
 
@@ -160,55 +166,43 @@ class StanSampleAnalyzer:
     def plot_parameters(self):
         """plot trace for parameters"""
         for chain_idx in range(self.num_chains):
-            print("Making trace plot for chain {}".format(chain_idx))
+            print("Making trace plot for chain {}...".format(chain_idx))
             self._make_trace_plot(chain_idx)
 
-            print("Making violin plot for chain {}".format(chain_idx))
+            print("Making violin plot for chain {}...".format(chain_idx))
             self._make_violin_plot(chain_idx)
 
-            print("Making pairs plot for chain {}".format(chain_idx))
+            print("Making pairs plot for chain {}...".format(chain_idx))
             self._make_pair_plot(chain_idx)
 
     def _make_trace_plot(self, chain_idx):
         """make trace plota for parameters"""
-        sigma = self.samples[chain_idx].iloc[self.warmup:,
-                                             self.theta_0_col - 1].to_numpy()
-        theta = self.samples[chain_idx].iloc[self.warmup:,
-                                             self.theta_0_col:].to_numpy()
+        samples = self.samples[chain_idx].to_numpy()
 
         plt.clf()
         plt.figure(figsize=(6, self.num_params*2))
 
-        # plot trace of sigma
-        plt.subplot(self.num_params, 1, 1)
-        plt.plot(sigma)
-        plt.title(self.param_names[0])
-
-        # plot trace of each theta
-        for idx in range(1, self.num_params):
+        # plot trace of each parameter
+        for idx in range(self.num_params):
             plt.subplot(self.num_params, 1, idx + 1)
-            plt.plot(theta[:, idx - 1])
+            plt.plot(samples[:, idx])
             plt.title(self.param_names[idx])
 
         plt.tight_layout()
 
         # save trace plot
         figure_name = os.path.join(
-            self.result_dir, "chain_{}_parameter_trace.png".format(chain_idx)
-        )
+            self.result_dir, "chain_{}_parameter_trace.png".format(chain_idx))
         plt.savefig(figure_name)
         plt.close()
 
     def _make_violin_plot(self, chain_idx, use_log_scale=True):
         """make violin plot for parameters"""
-        chain_samples = self.samples[chain_idx].iloc[
-            self.warmup:, self.theta_0_col - 1:].to_numpy()
-
         plt.clf()
         plt.figure(figsize=(self.num_params, 4))
         if use_log_scale:
             plt.yscale("log")
-        plt.violinplot(chain_samples)
+        plt.violinplot(self.samples[chain_idx].to_numpy())
 
         # add paramter names to ticks on x-axis
         param_ticks = np.arange(1, self.num_params + 1)
@@ -226,11 +220,8 @@ class StanSampleAnalyzer:
 
     def _make_pair_plot(self, chain_idx):
         """make pair plot for parameters"""
-        pairplot_samples = self.samples[chain_idx].iloc[
-            self.warmup:, self.theta_0_col - 1:]
-        pairplot_samples.columns = self.param_names
         plt.clf()
-        sns.pairplot(pairplot_samples)
+        sns.pairplot(self.samples[chain_idx])
         figure_name = os.path.join(
             self.result_dir,
             "chain_{}_parameter_pair_plot.png".format(chain_idx)

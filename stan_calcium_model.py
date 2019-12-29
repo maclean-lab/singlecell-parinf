@@ -87,6 +87,8 @@ def main():
     y = y_raw[cell_id, t0 + 1:]
     # apply preprocessing to the trajectory if specified
     if preprocess_method == "moving_average":
+        print("Processing raw trajectory using moving average with window " +
+              "size of {}...".format(moving_average_window))
         y = moving_average(y, window=moving_average_window)
     T = y.size
     ts = np.linspace(t0 + 1, t_end, t_end - t0)

@@ -14,7 +14,7 @@ def get_args():
                             type=str, required=True)
     arg_parser.add_argument("--cell_id", dest="cell_id", metavar="N", type=int,
                             default=0)
-    arg_parser.add_argument("--t0", dest="t0", metavar="T", type=int,
+    arg_parser.add_argument("--t0", dest="t0", metavar="T0", type=int,
                             default=200)
     arg_parser.add_argument("--num_chains", dest="num_chains", type=int,
                             default=4)
@@ -48,7 +48,7 @@ def main():
                                   show_progress=show_progress)
 
     # run analyses
-    analyzer.simulate_chains()
+    # analyzer.simulate_chains()
     analyzer.plot_parameters()
 
 if __name__ == "__main__":
