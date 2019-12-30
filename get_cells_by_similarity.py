@@ -1,6 +1,8 @@
+#!/usr/bin/env python
 import numpy as np
 import scipy.io
 import pandas as pd
+import matplotlib.pyplot as plt
 
 def main():
     # load similarity matrix
@@ -8,6 +10,16 @@ def main():
     similarity_matrix = soptsc_vars["W"]
 
     num_cells = similarity_matrix.shape[0]
+
+    # plot similarity matrix
+    plt.clf()
+    plt.figure(figsize=(16, 16))
+    plt.imshow(similarity_matrix, cmap="gray")
+    plt.colorbar()
+    plt.savefig("cell_similarity.png")
+    plt.close()
+
+    # get a chain of cells by similarity
     cells = np.zeros(num_cells, dtype=np.int)
     cell_set = set([0])
 

@@ -269,3 +269,23 @@ def moving_average(x: np.ndarray, window: int = 20):
     x_moving_average = x_df.rolling(window=window, axis=1).mean().to_numpy()
 
     return x_moving_average
+
+def get_prior_from_sample_file(sample_file):
+    """get prior distribution from a previous run, if provided"""
+    # get number of warm-up iterations from sample file
+    with open(sample_file, "r") as sf:
+        for line in sf:
+            if "warmup=" in line:
+                prior_warmup = int(line.strip().split("=")[-1])
+                break
+
+    # get parameters from sample file
+    prior_samples = pd.read_csv(sample_file, index_col=False, comment="#")
+    prior_theta_0_col = 8
+    prior_theta = prior_samples.iloc[prior_warmup:, prior_theta_0_col:]
+
+    # get mean and standard deviation of sampled parameters
+    prior_mean = prior_theta.mean().to_numpy()
+    prior_std = prior_theta.std().to_numpy()
+
+    return prior_mean, prior_std

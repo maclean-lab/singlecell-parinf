@@ -1,15 +1,8 @@
 #!/usr/bin/env python
 import sys
-import os.path
 import argparse
-import pickle
 import numpy as np
-import scipy.signal
-import scipy.io
-import pandas as pd
-from stan_helpers import StanSession, moving_average
-
-num_params = 19
+from stan_helpers import StanSession, moving_average, get_prior_from_sample_file
 
 def get_args():
     """parse command line arguments"""
@@ -19,7 +12,7 @@ def get_args():
                             type=str, required=True)
     arg_parser.add_argument("--cell_id", dest="cell_id", metavar="N", type=int,
                             default=0)
-    arg_parser.add_argument("--filter_type", dest="filter_type", type=str,
+    arg_parser.add_argument("--filter_type", dest="filter_type",
                             choices=["none", "moving_average"], default="none")
     arg_parser.add_argument("--moving_average_window",
                             dest="moving_average_window", type=int, default=20)
@@ -35,33 +28,10 @@ def get_args():
                             type=str, default=".")
     arg_parser.add_argument("--prior_sample_file", dest="prior_sample_file",
                             metavar="FILE", type=str, default=None)
+    arg_parser.add_argument("--prior_std_scale", dest="prior_std_scale",
+                            type=float, default=1.0)
 
     return arg_parser.parse_args()
-
-def get_prior(sample_file):
-    """get prior distribution (from a previous run, if provided)"""
-    if sample_file is None:
-        # no sample file provided. use Gaussian(1.0, 1.0) for all parameters
-        prior_mean = np.ones(num_params)
-        prior_std = np.ones(num_params)
-    else:
-        # get number of warm-up iterations from sample file
-        with open(sample_file, "r") as sf:
-            for line in sf:
-                if "warmup=" in line:
-                    prior_warmup = int(line.strip().split("=")[-1])
-                    break
-
-        # get parameters from sample file
-        prior_samples = pd.read_csv(sample_file, index_col=False, comment="#")
-        prior_theta_0_col = 8
-        prior_theta = prior_samples.iloc[prior_warmup:, prior_theta_0_col:]
-
-        # get mean and standard deviation of sampled parameters
-        prior_mean = prior_theta.mean().to_numpy()
-        prior_std = prior_theta.std().to_numpy()
-
-    return prior_mean, prior_std
 
 def main():
     # get command-line arguments
@@ -77,6 +47,7 @@ def main():
     thin = args.thin
     result_dir = args.result_dir
     prior_sample_file = args.prior_sample_file
+    prior_std_scale = args.prior_std_scale
 
     # prepare data for Stan model
     # get trajectory and time
@@ -95,7 +66,15 @@ def main():
     ts = np.linspace(t0 + 1, t_end, t_end - t0)
 
     # get prior distribution
-    prior_mean, prior_std = get_prior(prior_sample_file)
+    if prior_sample_file is None:
+        # no sample file provided. use Gaussian(1.0, 1.0) for all parameters
+        num_params = 19
+        prior_mean = np.ones(num_params)
+        prior_std = np.ones(num_params)
+    else:
+        prior_mean, prior_std = get_prior_from_sample_file(prior_sample_file)
+
+    prior_std *= prior_std_scale
 
     # gather prepared data
     calcium_data = {
