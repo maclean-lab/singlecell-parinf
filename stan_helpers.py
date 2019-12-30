@@ -25,13 +25,13 @@ class StanSession:
             with open(compiled_model_file, "wb") as f:
                 pickle.dump(self.model, f)
 
-            print("Compiled stan model saved.")
+            print("Compiled stan model saved")
         elif model_ext == ".pkl":
             # load saved model
             with open(stan_model, "rb") as f:
                 self.model = pickle.load(f)
 
-            print("Compiled stan model loaded.")
+            print("Compiled stan model loaded")
         else:
             # cannot load given file, exit
             print("Unsupported input file")
@@ -51,14 +51,14 @@ class StanSession:
             data=self.data, chains=self.num_chains, iter=self.num_iters,
             warmup=self.warmup, thin=self.thin,
             sample_file=os.path.join(self.result_dir, "chain"))
-        print("Sampling finished.")
+        print("Stan sampling finished")
         sys.stdout.flush()
 
         # save fit object
         fit_file = os.path.join(self.result_dir, "stan_fit.pkl")
         with open(fit_file, "wb") as f:
             pickle.dump(self.fit, f)
-        print("Stan fit object saved.")
+        print("Stan fit object saved")
 
         # plot fit result (native pystan implementation)
         # plt.clf()
@@ -71,7 +71,7 @@ class StanSession:
         trace_figure_name = os.path.join(
             self.result_dir, "stan_fit_trace.png")
         plt.savefig(trace_figure_name)
-        print("Trace plot saved.")
+        print("Trace plot saved")
 
 class StanSampleAnalyzer:
     """analyze sample files from Stan sampling"""
