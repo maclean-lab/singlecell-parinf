@@ -49,7 +49,7 @@ def main():
 
     # run analyses
     analyzer.simulate_chains()
-    # analyzer.plot_parameters()
+    analyzer.plot_parameters()
 
 if __name__ == "__main__":
     main()
