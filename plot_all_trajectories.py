@@ -58,8 +58,8 @@ def main():
         y = moving_average(y_raw)
         figure_path = "../../result/trajectories_moving_average.pdf"
     else:
-        print("No filter specified or unknown type of filter. Using raw " +
-              "trajectories.")
+        print("No filter specified or unknown type of filter. Using raw "
+              + "trajectories.")
 
         y = y_raw
         figure_path = "../../result/trajectories_raw.pdf"

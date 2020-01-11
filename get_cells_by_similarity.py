@@ -33,17 +33,26 @@ def plot_similarity(similarity_matrix):
 
 def get_cells_greedy(similarity_matrix):
     num_cells = similarity_matrix.shape[0]
+    cell_set = set([0])
+    num_unsimilar = 0
 
     for i in range(1, num_cells):
         cells = np.zeros(num_cells, dtype=np.int)
-        cell_set = set([0])
 
         sorted_cells = np.argsort(similarity_matrix[cells[i - 1], :])[::-1]
         cells[i] = next(c for c in sorted_cells if c not in cell_set)
         cell_set.add(cells[i])
 
+        if similarity_matrix[cells[i - 1], cells[i]] == 0:
+            num_unsimilar += 1
+            if i < 20:
+                print("Warning: the {}-th cell is added with 0 ".format(i)
+                      + "similarity")
+
     cells = pd.Series(cells)
     cells.to_csv("cells_by_similarity.txt", header=False, index=False)
+    print("There are {} cells that are not similar to ".format(num_unsimilar)
+          + "their predecessors")
 
 def get_cells_bfs(similarity_matrix, root=0, threshold=0.0):
     curr_level = collections.deque()

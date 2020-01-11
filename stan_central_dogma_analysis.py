@@ -22,10 +22,9 @@ def main():
         y_ref = pickle.load(f, encoding="bytes")
     y_ref = y_ref.squeeze()
 
-    model_name = "central_dogma_model"
     num_chains = 4
     warmup = 2000
-    analyzer = StanSampleAnalyzer(result_dir, model_name, num_chains, warmup,
+    analyzer = StanSampleAnalyzer(result_dir, num_chains, warmup,
                                   central_dogma_ode, ts, 1, y0, y_ref=y_ref)
     analyzer.simulate_chains()
     analyzer.plot_parameters()

@@ -6,8 +6,8 @@ from stan_helpers import StanSession, moving_average, get_prior_from_sample_file
 
 def get_args():
     """parse command line arguments"""
-    arg_parser = argparse.ArgumentParser(description="Infer parameters of " +
-                                         "calcium mode using Stan.")
+    arg_parser = argparse.ArgumentParser(description="Infer parameters of "
+                                         + "calcium mode using Stan.")
     arg_parser.add_argument("--stan_model", dest="stan_model", metavar="MODEL",
                             type=str, required=True)
     arg_parser.add_argument("--cell_id", dest="cell_id", metavar="N", type=int,
@@ -56,8 +56,8 @@ def main():
     y = y_raw[cell_id, :]
     # apply preprocessing to the trajectory if specified
     if filter_type == "moving_average":
-        print("Filtering raw trajectory using moving average with window " +
-              "size of {}...".format(moving_average_window))
+        print("Filtering raw trajectory using moving average with window "
+              + "size of {}...".format(moving_average_window))
         y = moving_average(y, window=moving_average_window)
         y = np.squeeze(y)
     y0 = np.array([0, 0, 0.7, y[t0]])
@@ -74,7 +74,10 @@ def main():
     else:
         prior_mean, prior_std = get_prior_from_sample_file(prior_sample_file)
 
-    prior_std *= prior_std_scale
+    if prior_std_scale != 1.0:
+        print("Scaling standard deviation of prior distribution by "
+              + "{}".format(prior_std_scale ))
+        prior_std *= prior_std_scale
 
     # gather prepared data
     calcium_data = {

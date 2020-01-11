@@ -8,8 +8,8 @@ from stan_helpers import StanSampleAnalyzer, calcium_ode
 
 def get_args():
     """parse command line arguments"""
-    arg_parser = argparse.ArgumentParser(description="Analyze Stan sample " +
-                                         "files.")
+    arg_parser = argparse.ArgumentParser(description="Analyze Stan sample "
+                                         + "files.")
     arg_parser.add_argument("--result_dir", dest="result_dir", metavar="DIR",
                             type=str, required=True)
     arg_parser.add_argument("--cell_id", dest="cell_id", metavar="N", type=int,
