@@ -8,6 +8,32 @@ from matplotlib.backends.backend_pdf import PdfPages
 from tqdm import tqdm
 from stan_helpers import moving_average
 
+def main():
+    # get filter option from command line
+    arg_parser = argparse.ArgumentParser(description="Plot all trajectories.")
+    arg_parser.add_argument("--filter_type", dest="filter_type", type=str,
+                            default=None)
+    args = arg_parser.parse_args()
+
+    # load trajectories
+    print("Loading trajectories")
+    y_raw = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
+
+    # apply filter
+    if args.filter_type == "moving_average":
+        y = moving_average(y_raw)
+        figure_path = "../../result/trajectories_moving_average.pdf"
+    else:
+        print("No filter specified or unknown type of filter. Using raw "
+              + "trajectories")
+
+        y = y_raw
+        figure_path = "../../result/trajectories_raw.pdf"
+
+    # make the trajectory plot
+    plot_trajectories(y, figure_path)
+    print("Trajectory plot saved")
+
 def plot_trajectories(y: np.ndarray, figure_path: str):
     """plot all trajectories in one PDF file"""
     num_cells = y.shape[0]
@@ -39,34 +65,6 @@ def plot_trajectories(y: np.ndarray, figure_path: str):
             plt.tight_layout()
             pdf.savefig()
             plt.close()
-
-def main():
-    # get filter option from command line
-    arg_parser = argparse.ArgumentParser(description="Plot all trajectories.")
-    arg_parser.add_argument("--filter_type", dest="filter_type", type=str,
-                            default=None)
-    args = arg_parser.parse_args()
-
-    # load trajectories
-    print("Loading trajectories")
-    y_raw = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
-
-    # apply filter
-    if args.filter_type == "moving_average":
-        print("Running moving average filter...")
-
-        y = moving_average(y_raw)
-        figure_path = "../../result/trajectories_moving_average.pdf"
-    else:
-        print("No filter specified or unknown type of filter. Using raw "
-              + "trajectories.")
-
-        y = y_raw
-        figure_path = "../../result/trajectories_raw.pdf"
-
-    # make the trajectory plot
-    plot_trajectories(y, figure_path)
-    print("Trajectory plot saved.")
 
 if __name__ == "__main__":
     main()

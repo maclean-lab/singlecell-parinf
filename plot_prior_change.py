@@ -11,25 +11,6 @@ num_params = len(param_names)
 cell_ids = [0, 3369, 1695, 61, 2623, 619, 1271, 4927, 613, 4305]
 num_cells = len(cell_ids)
 
-def plot_prior_changes(prior_stats, figure_name):
-    """plot changes in prior mean or standard deviation"""
-    # initialize the figure
-    plt.clf()
-    plt.figure(figsize=(6, num_params * 2))
-
-    # plot change of each parameter
-    for i in range(num_params):
-        plt.subplot(num_params, 1, i + 1)
-        plt.plot(prior_stats[i, :], "x")
-        plt.xticks(np.arange(num_cells), cell_ids)
-        plt.title(param_names[i])
-
-    plt.tight_layout()
-
-    # save the figure
-    plt.savefig(figure_name)
-    plt.close()
-
 def main():
     result_dir_root = "../../result"
     sample_files = [
@@ -59,6 +40,25 @@ def main():
                        os.path.join(result_dir_root, "prior_mean_change.png"))
     plot_prior_changes(prior_stds,
                        os.path.join(result_dir_root, "prior_std_change.png"))
+
+def plot_prior_changes(prior_stats, figure_name):
+    """plot changes in prior mean or standard deviation"""
+    # initialize the figure
+    plt.clf()
+    plt.figure(figsize=(6, num_params * 2))
+
+    # plot change of each parameter
+    for i in range(num_params):
+        plt.subplot(num_params, 1, i + 1)
+        plt.plot(prior_stats[i, :], "x")
+        plt.xticks(np.arange(num_cells), cell_ids)
+        plt.title(param_names[i])
+
+    plt.tight_layout()
+
+    # save the figure
+    plt.savefig(figure_name)
+    plt.close()
 
 if __name__ == "__main__":
     main()

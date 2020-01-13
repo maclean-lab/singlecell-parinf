@@ -273,7 +273,7 @@ def calcium_ode(t, y, theta):
 
     return dydt
 
-def filter_trajectory(x):
+def low_pass_filter(x):
     """apply a low-pass filter for a trajectory"""
     sos = scipy.signal.butter(5, 1, btype="lowpass", analog=True,
                               output="sos")
@@ -281,8 +281,11 @@ def filter_trajectory(x):
 
     return x_filtered
 
-def moving_average(x: np.ndarray, window: int = 20):
+def moving_average(x: np.ndarray, window: int = 20, verbose=True):
     """compute moving average of trajectories"""
+    if verbose:
+        print("Performing moving average with window size of "
+              + "{}...".format(window))
     # make x 2D if it is 1D
     if len(x.shape) == 1:
         x = x[np.newaxis, :]
@@ -292,8 +295,12 @@ def moving_average(x: np.ndarray, window: int = 20):
 
     return x_moving_average
 
-def get_prior_from_sample_file(sample_file):
+def get_prior_from_sample_file(sample_file, verbose=True):
     """get prior distribution from a previous run, if provided"""
+    if verbose:
+        print("Getting prior distribution of parameters from stan sample "
+              + "file...")
+
     # get number of warm-up iterations from sample file
     with open(sample_file, "r") as sf:
         for line in sf:

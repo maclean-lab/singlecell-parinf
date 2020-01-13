@@ -28,6 +28,10 @@ cell_dirs = [os.path.join(result_root,
              for c, r, in zip(cell_ids, runs)]
 progression_dir = os.path.join(result_root, "stan-calcium-model-progression")
 
+def main():
+    plot_average_r_squared()
+    plot_average_running_time()
+
 def plot_average_r_squared():
     """plot average of R^2 for all pairs of parameters"""
     print("Plotting average R^2")
@@ -123,10 +127,6 @@ def plot_average_running_time():
     plt.ylabel("Running time (min)")
     plt.savefig(os.path.join(progression_dir, "average_running_time.png"))
     plt.close()
-
-def main():
-    # plot_average_r_squared()
-    plot_average_running_time()
 
 if __name__ == "__main__":
     main()
