@@ -1,8 +1,10 @@
 import sys
 import os.path
+import itertools
 import pickle
 import numpy as np
 import scipy.integrate
+import scipy.stats
 import scipy.signal
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -93,6 +95,7 @@ class StanSampleAnalyzer:
 
         # load sample files
         print("Loading stan sample files...")
+        sys.stdout.flush()
         self.raw_samples = []
         self.samples = []
         for chain_idx in range(self.num_chains):
@@ -228,6 +231,25 @@ class StanSampleAnalyzer:
         )
         plt.savefig(figure_name)
         plt.close()
+
+    def get_r_squared(self):
+        """compute R^2 for all pairs of sampled parameters in each chain"""
+        for chain_idx in range(self.num_chains):
+            r_squared = np.ones((self.num_params, self.num_params))
+            for i, j in itertools.combinations(range(self.num_params), 2):
+                _, _, r_value, _, _ = scipy.stats.linregress(
+                    self.samples[chain_idx].iloc[:, i],
+                    self.samples[chain_idx].iloc[:, j]
+                )
+                r_squared[i, j] = r_squared[j, i] = r_value ** 2
+
+            r_squared_df = pd.DataFrame(r_squared, index=self.param_names,
+                                        columns=self.param_names)
+            r_squared_df.to_csv(
+                os.path.join(self.result_dir,
+                             "chain_{}_r_squared.csv".format(chain_idx)),
+                float_format="%.8f"
+            )
 
 # utility functions
 def calcium_ode(t, y, theta):
