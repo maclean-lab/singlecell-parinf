@@ -299,10 +299,10 @@ def get_prior_from_sample_files(prior_dir, prior_chains, verbose=True):
     """get prior distribution from a previous run, if provided"""
     if verbose:
         print("Getting prior distribution of parameters from stan sample "
-              + "file...")
+              + "files...")
 
+    # get sampled parameters from all sample files
     prior_thetas = []
-
     for chain in prior_chains:
         sample_file = os.path.join(prior_dir, "chain_{}.csv".format(chain))
 
@@ -318,8 +318,7 @@ def get_prior_from_sample_files(prior_dir, prior_chains, verbose=True):
                                     comment="#")
         prior_theta_0_col = 8
         prior_thetas.append(prior_samples.iloc[prior_warmup:,
-                                            prior_theta_0_col:])
-        print(prior_thetas[-1].shape)
+                                               prior_theta_0_col:])
 
     # get mean and standard deviation of sampled parameters
     prior_thetas_combined = pd.concat(prior_thetas)
