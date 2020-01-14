@@ -295,26 +295,36 @@ def moving_average(x: np.ndarray, window: int = 20, verbose=True):
 
     return x_moving_average
 
-def get_prior_from_sample_file(sample_file, verbose=True):
+def get_prior_from_sample_files(prior_dir, prior_chains, verbose=True):
     """get prior distribution from a previous run, if provided"""
     if verbose:
         print("Getting prior distribution of parameters from stan sample "
               + "file...")
 
-    # get number of warm-up iterations from sample file
-    with open(sample_file, "r") as sf:
-        for line in sf:
-            if "warmup=" in line:
-                prior_warmup = int(line.strip().split("=")[-1])
-                break
+    prior_thetas = []
 
-    # get parameters from sample file
-    prior_samples = pd.read_csv(sample_file, index_col=False, comment="#")
-    prior_theta_0_col = 8
-    prior_theta = prior_samples.iloc[prior_warmup:, prior_theta_0_col:]
+    for chain in prior_chains:
+        sample_file = os.path.join(prior_dir, "chain_{}.csv".format(chain))
+
+        # get number of warm-up iterations from sample file
+        with open(sample_file, "r") as sf:
+            for line in sf:
+                if "warmup=" in line:
+                    prior_warmup = int(line.strip().split("=")[-1])
+                    break
+
+        # get parameters from sample file
+        prior_samples = pd.read_csv(sample_file, index_col=False,
+                                    comment="#")
+        prior_theta_0_col = 8
+        prior_thetas.append(prior_samples.iloc[prior_warmup:,
+                                            prior_theta_0_col:])
+        print(prior_thetas[-1].shape)
 
     # get mean and standard deviation of sampled parameters
-    prior_mean = prior_theta.mean().to_numpy()
-    prior_std = prior_theta.std().to_numpy()
+    prior_thetas_combined = pd.concat(prior_thetas)
+    print(prior_thetas_combined.shape)
+    prior_mean = prior_thetas_combined.mean().to_numpy()
+    prior_std = prior_thetas_combined.std().to_numpy()
 
     return prior_mean, prior_std

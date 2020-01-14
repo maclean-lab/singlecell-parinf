@@ -34,19 +34,21 @@ def plot_similarity(similarity_matrix):
         plt.savefig("cell_similarity.png")
         plt.close()
 
-def get_cells_greedy(similarity_matrix, verbose=False):
+def get_cells_greedy(similarity_matrix, root=0, verbose=False):
     num_cells = similarity_matrix.shape[0]
-    cell_set = set([0])
+    visited = np.full(num_cells, False, dtype=bool)
+    ordered_cells = np.zeros(num_cells, dtype=np.int)
     num_unsimilars = 0
+    visited[root] = True
 
     for i in range(1, num_cells):
-        cells = np.zeros(num_cells, dtype=np.int)
+        sorted_cells = np.argsort(
+            similarity_matrix[ordered_cells[i - 1], :]
+        )[::-1]
+        ordered_cells[i] = next(c for c in sorted_cells if not visited[c])
+        visited[ordered_cells[i]] = True
 
-        sorted_cells = np.argsort(similarity_matrix[cells[i - 1], :])[::-1]
-        cells[i] = next(c for c in sorted_cells if c not in cell_set)
-        cell_set.add(cells[i])
-
-        if similarity_matrix[cells[i - 1], cells[i]] == 0:
+        if similarity_matrix[ordered_cells[i - 1], ordered_cells[i]] == 0:
             num_unsimilars += 1
             if verbose:
                 print("Warning: the {}-th cell is added with 0 ".format(i)
@@ -56,8 +58,9 @@ def get_cells_greedy(similarity_matrix, verbose=False):
         print("There are {} cells that are not similar ".format(num_unsimilars)
             + "to their predecessors")
 
-    cells = pd.Series(cells)
-    cells.to_csv("cells_by_similarity.txt", header=False, index=False)
+    ordered_cells = pd.Series(ordered_cells)
+    ordered_cells.to_csv("cells_by_similarity_greedy.txt", header=False,
+                         index=False)
 
 def get_cells_bfs(similarity_matrix, root=0, threshold=0.0):
     """get cell ordering using breadth-first search"""

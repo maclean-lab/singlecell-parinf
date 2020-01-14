@@ -2,7 +2,7 @@
 import os.path
 import numpy as np
 import matplotlib.pyplot as plt
-from stan_helpers import get_prior_from_sample_file
+from stan_helpers import get_prior_from_sample_files
 
 param_names = ["KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
@@ -13,26 +13,14 @@ num_cells = len(cell_ids)
 
 def main():
     result_dir_root = "../../result"
-    sample_files = [
-        "stan-calcium-model-hpc-cell-0-4/chain_2.csv",
-        "stan-calcium-model-hpc-cell-3369-1/chain_0.csv",
-        "stan-calcium-model-hpc-cell-1695-1/chain_0.csv",
-        "stan-calcium-model-hpc-cell-61-1/chain_0.csv",
-        "stan-calcium-model-hpc-cell-2623-1/chain_0.csv",
-        "stan-calcium-model-hpc-cell-619-1/chain_0.csv",
-        "stan-calcium-model-hpc-cell-1271-1/chain_0.csv",
-        "stan-calcium-model-hpc-cell-4927-1/chain_0.csv",
-        "stan-calcium-model-hpc-cell-613-1/chain_0.csv",
-        "stan-calcium-model-hpc-cell-4305-1/chain_0.csv",
-    ]
 
     # get priors
     prior_means = np.empty((num_params, num_cells))
     prior_stds = np.empty((num_params, num_cells))
     for i in range(num_cells):
-        prior_mean, prior_std = get_prior_from_sample_file(
-            os.path.join(result_dir_root, sample_files[i])
-        )
+        chain = 0 if cell_ids[i] != 0 else 2
+        prior_mean, prior_std = get_prior_from_sample_files(result_dir_root,
+                                                            chain)
         prior_means[:, i] = prior_mean
         prior_stds[:, i] = prior_std
 

@@ -2,7 +2,8 @@
 import sys
 import argparse
 import numpy as np
-from stan_helpers import StanSession, moving_average, get_prior_from_sample_file
+from stan_helpers import StanSession, moving_average, \
+    get_prior_from_sample_files
 
 def main():
     # get command-line arguments
@@ -17,7 +18,8 @@ def main():
     warmup = args.warmup
     thin = args.thin
     result_dir = args.result_dir
-    prior_sample_file = args.prior_sample_file
+    prior_dir = args.prior_dir
+    prior_chains = args.prior_chains
     prior_std_scale = args.prior_std_scale
 
     # prepare data for Stan model
@@ -35,13 +37,14 @@ def main():
     ts = np.linspace(t0 + 1, t_end, t_end - t0)
 
     # get prior distribution
-    if prior_sample_file is None:
+    if prior_dir is None:
         # no sample file provided. use Gaussian(1.0, 1.0) for all parameters
         num_params = 19
         prior_mean = np.ones(num_params)
         prior_std = np.ones(num_params)
     else:
-        prior_mean, prior_std = get_prior_from_sample_file(prior_sample_file)
+        prior_mean, prior_std = get_prior_from_sample_files(prior_dir,
+                                                            prior_chains)
 
     if prior_std_scale != 1.0:
         print("Scaling standard deviation of prior distribution by "
@@ -90,8 +93,10 @@ def get_args():
     arg_parser.add_argument("--thin", dest="thin", type=int, default=1)
     arg_parser.add_argument("--result_dir", dest="result_dir", metavar="DIR",
                             type=str, default=".")
-    arg_parser.add_argument("--prior_sample_file", dest="prior_sample_file",
-                            metavar="FILE", type=str, default=None)
+    arg_parser.add_argument("--prior_dir", dest="prior_dir", type=str,
+                            default=None)
+    arg_parser.add_argument("--prior_chains", dest = "prior_chains", type=int,
+                            nargs="+", default=[0, 1, 2, 3])
     arg_parser.add_argument("--prior_std_scale", dest="prior_std_scale",
                             type=float, default=1.0)
 

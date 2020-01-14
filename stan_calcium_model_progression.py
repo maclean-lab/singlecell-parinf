@@ -18,8 +18,8 @@ num_params = len(param_names)
 cell_ids = [0, 3369, 1695, 61, 2623, 619, 1271, 4927, 613, 4305]
 runs = [4, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 t0s = [221, 220, 230, 187, 214, 200, 200, 200, 200, 210]
-chains = [[2], "all", "all", "all", "all", "all", "all", "all", "all", "all"]
 num_cells = len(cell_ids)
+num_chains = 4
 
 # path of result
 result_root = "../../result"
@@ -29,26 +29,23 @@ cell_dirs = [os.path.join(result_root,
 progression_dir = os.path.join(result_root, "stan-calcium-model-progression")
 
 def main():
-    plot_average_r_squared()
+    plot_r_squared()
     plot_average_running_time()
 
-def plot_average_r_squared():
-    """plot average of R^2 for all pairs of parameters"""
-    print("Plotting average R^2")
+def plot_r_squared():
+    """plot R^2 for all pairs of parameters"""
+    print("Plotting R^2...")
 
     # compute average of R^2
-    average_r_squared = np.zeros((num_params, num_params, num_cells))
-    for k in range(num_cells):
-        cell_chains = [0, 1, 2, 3] if chains[k] == "all" else chains[k]
-
-        for chain in cell_chains:
+    r_squared_all = np.zeros((num_params, num_params, num_cells,
+                              num_chains))
+    for cell in range(num_cells):
+        for chain in range(num_chains):
             r_squared_file = os.path.join(
-                cell_dirs[k], "chain_{}_r_squared.csv".format(chain)
+                cell_dirs[cell], "chain_{}_r_squared.csv".format(chain)
             )
             r_squared = pd.read_csv(r_squared_file, index_col=0)
-            average_r_squared[:, :, k] = average_r_squared[:, :, k] + r_squared.to_numpy()
-
-        average_r_squared[:, :, k] /= len(cell_chains)
+            r_squared_all[:, :, cell, chain] = r_squared.to_numpy()
 
     # make plots
     num_pairs = num_params * (num_params - 1) // 2
@@ -74,7 +71,10 @@ def plot_average_r_squared():
                     num_rows, num_cols, idx + 1,
                     title="{} vs {}".format(param_names[i], param_names[j])
                 )
-                plt.plot(average_r_squared[i, j, :], "x")
+
+                for chain in range(num_chains):
+                    plt.plot(r_squared_all[i, j, :, chain], "x")
+
                 plt.xticks(np.arange(num_cells), cell_ids)
                 plt.ylim((0, 1))
 
@@ -104,12 +104,11 @@ def plot_average_r_squared():
     """
 
 def plot_average_running_time():
+    print("Plotting average running time...")
+
     average_time = np.zeros(num_cells)
-
     for k in range(num_cells):
-        cell_chains = [0, 1, 2, 3] if chains[k] == "all" else chains[k]
-
-        for chain in cell_chains:
+        for chain in range(num_chains):
             # load sample file
             sample_file = os.path.join(cell_dirs[k],
                                        "chain_{}.csv".format(chain))
@@ -118,7 +117,7 @@ def plot_average_running_time():
                 words = lines[-2].split()
                 average_time[k] += float(words[1]) / 60
 
-        average_time[k] /= len(cell_chains)
+        average_time[k] /= num_chains
 
     plt.clf()
     plt.plot(average_time, "x")
