@@ -323,7 +323,6 @@ def get_prior_from_sample_files(prior_dir, prior_chains, verbose=True):
 
     # get mean and standard deviation of sampled parameters
     prior_thetas_combined = pd.concat(prior_thetas)
-    print(prior_thetas_combined.shape)
     prior_mean = prior_thetas_combined.mean().to_numpy()
     prior_std = prior_thetas_combined.std().to_numpy()
 
