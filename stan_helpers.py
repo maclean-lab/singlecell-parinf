@@ -298,8 +298,8 @@ def moving_average(x: np.ndarray, window: int = 20, verbose=True):
 def get_prior_from_sample_files(prior_dir, prior_chains, verbose=True):
     """get prior distribution from a previous run, if provided"""
     if verbose:
-        print("Getting prior distribution of parameters from stan sample "
-              + "files...")
+        print("Getting prior distribution of parameters from chain "
+              + "{} ...".format(", ".join(str(c) for c in prior_chains)))
 
     # get sampled parameters from all sample files
     prior_thetas = []

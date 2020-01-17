@@ -23,7 +23,9 @@ def main():
     prior_std_scale = args.prior_std_scale
 
     # prepare data for Stan model
+    print("Initializing data for cell {}...".format(cell_id))
     # get trajectory and time
+    print("Loading trajectories...")
     y_raw = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
     t_end = 1000
     y = y_raw[cell_id, :]
@@ -48,7 +50,7 @@ def main():
 
     if prior_std_scale != 1.0:
         print("Scaling standard deviation of prior distribution by "
-              + "{}".format(prior_std_scale))
+              + "{}...".format(prior_std_scale))
         prior_std *= prior_std_scale
 
     # gather prepared data
