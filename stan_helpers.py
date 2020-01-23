@@ -224,7 +224,10 @@ class StanSampleAnalyzer:
     def _make_pair_plot(self, chain_idx):
         """make pair plot for parameters"""
         plt.clf()
-        sns.pairplot(self.samples[chain_idx])
+        sns.pairplot(self.samples[chain_idx], diag_kind="kde",
+                     plot_kws=dict(alpha=0.4, s=30, color="#191970",
+                                   edgecolor="#ffffff", linewidth=0.2),
+                     diag_kws=dict(color="#191970", shade=True))
         figure_name = os.path.join(
             self.result_dir,
             "chain_{}_parameter_pair_plot.png".format(chain_idx)
@@ -299,10 +302,11 @@ def get_prior_from_sample_files(prior_dir, prior_chains, verbose=True):
     """get prior distribution from a previous run, if provided"""
     if verbose:
         print("Getting prior distribution of parameters from chain "
-              + "{} ...".format(", ".join(str(c) for c in prior_chains)))
+              + "{}...".format(", ".join(str(c) for c in prior_chains)))
 
     # get sampled parameters from all sample files
     prior_thetas = []
+    prior_theta_0_col = 8
     for chain in prior_chains:
         sample_file = os.path.join(prior_dir, "chain_{}.csv".format(chain))
 
@@ -316,7 +320,6 @@ def get_prior_from_sample_files(prior_dir, prior_chains, verbose=True):
         # get parameters from sample file
         prior_samples = pd.read_csv(sample_file, index_col=False,
                                     comment="#")
-        prior_theta_0_col = 8
         prior_thetas.append(prior_samples.iloc[prior_warmup:,
                                                prior_theta_0_col:])
 

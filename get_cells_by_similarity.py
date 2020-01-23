@@ -7,24 +7,22 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 def main():
-    args = sys.argv[1:]
+    method = sys.argv[1]
+    threshold = 0.0 if len(sys.argv) < 3 else float(sys.argv[2])
 
     # load similarity matrix
     soptsc_vars = scipy.io.loadmat("../../result/SoptSC/workspace.mat")
     similarity_matrix = soptsc_vars["W"]
 
     # plot similarity matrix
-    if "plot" in args:
+    if method == "plot":
         plot_similarity(similarity_matrix)
-
-    if "greedy" in args:
+    elif method == "greedy":
         get_cells_greedy(similarity_matrix)
-
-    if "bfs" in args:
-        get_cells_bfs(similarity_matrix)
-
-    if "dfs" in args:
-        get_cells_dfs(similarity_matrix)
+    elif method == "bfs":
+        get_cells_bfs(similarity_matrix, threshold=threshold)
+    elif method == "dfs":
+        get_cells_dfs(similarity_matrix, threshold=threshold)
 
 def plot_similarity(similarity_matrix):
         plt.clf()
@@ -110,6 +108,7 @@ def get_cells_dfs(similarity_matrix, root=0, threshold=0.0):
     visited = np.full(num_cells, False, dtype=bool)
     ordered_cells = np.zeros(num_cells, dtype=int)
     parents = np.zeros(num_cells, dtype=int)
+    num_visited = 0
 
     # run DFS
     i = 0  # order of cell in DFS, not index of cell
@@ -119,6 +118,7 @@ def get_cells_dfs(similarity_matrix, root=0, threshold=0.0):
         # get a cell from DFS stack
         cell = dfs_stack.pop()
         parent = parent_stack.pop()
+        num_visited += 1
 
         # add cell to ordering if unvisited
         if not visited[cell]:
@@ -133,6 +133,9 @@ def get_cells_dfs(similarity_matrix, root=0, threshold=0.0):
                         and similarity_matrix[cell, neighbor] > threshold):
                     dfs_stack.append(neighbor)
                     parent_stack.append(cell)
+
+    if num_visited < num_cells:
+        print("Warning: {} cell(s) not visited".format(num_cells - num_visited))
 
     dfs_result = pd.DataFrame({"Cell": ordered_cells, "Parent": parents})
     dfs_result.to_csv("cells_by_similarity_dfs.txt", sep="\t", index=False)
