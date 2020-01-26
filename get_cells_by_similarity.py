@@ -11,7 +11,7 @@ def main():
     threshold = 0.0 if len(sys.argv) < 3 else float(sys.argv[2])
 
     # load similarity matrix
-    soptsc_vars = scipy.io.loadmat("../../result/SoptSC/workspace.mat")
+    soptsc_vars = scipy.io.loadmat("../../result/SoptSC/SoptSC/workspace.mat")
     similarity_matrix = soptsc_vars["W"]
 
     # plot similarity matrix
@@ -105,10 +105,10 @@ def get_cells_dfs(similarity_matrix, root=0, threshold=0.0):
     num_cells = similarity_matrix.shape[0]
     dfs_stack = collections.deque()
     parent_stack = collections.deque()
-    visited = np.full(num_cells, False, dtype=bool)
-    ordered_cells = np.zeros(num_cells, dtype=int)
-    parents = np.zeros(num_cells, dtype=int)
-    num_visited = 0
+    unvisited_set = set(range(num_cells))
+    ordered_cells = np.zeros(num_cells, dtype=int)  # indexed by order of visit
+    parents = np.zeros(num_cells, dtype=int)        # indexed by cell ID
+    num_children = np.zeros(num_cells, dtype=int)   # indexed by cell ID
 
     # run DFS
     i = 0  # order of cell in DFS, not index of cell
@@ -118,24 +118,32 @@ def get_cells_dfs(similarity_matrix, root=0, threshold=0.0):
         # get a cell from DFS stack
         cell = dfs_stack.pop()
         parent = parent_stack.pop()
-        num_visited += 1
 
         # add cell to ordering if unvisited
-        if not visited[cell]:
-            visited[cell] = True
+        if cell in unvisited_set:
+            unvisited_set.remove(cell)
             ordered_cells[i] = cell
             parents[i] = parent
+            if parent > -1:
+                num_children[parent] += 1
             i += 1
 
             # add unvisited neighbors to the stack
-            for neighbor in range(num_cells):
-                if (neighbor != cell and not visited[neighbor]
-                        and similarity_matrix[cell, neighbor] > threshold):
+            for neighbor in unvisited_set:
+                if similarity_matrix[cell, neighbor] > threshold:
                     dfs_stack.append(neighbor)
                     parent_stack.append(cell)
 
-    if num_visited < num_cells:
-        print("Warning: {} cell(s) not visited".format(num_cells - num_visited))
+    if i + 1 < num_cells:
+        print("Warning: {} cell(s) not visited".format(num_cells - i - 1))
+
+    # find cells with more than 1 child
+    print("Cells with more than 1 child:")
+    print("order\tcell\tchildren")
+    for i, cell in enumerate(ordered_cells):
+        if num_children[cell] > 1:
+            children = np.squeeze(np.argwhere(parents == cell))
+            print("{}\t{}\t{}".format(i, cell, children))
 
     dfs_result = pd.DataFrame({"Cell": ordered_cells, "Parent": parents})
     dfs_result.to_csv("cells_by_similarity_dfs.txt", sep="\t", index=False)
