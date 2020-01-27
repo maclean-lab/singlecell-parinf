@@ -2,6 +2,7 @@ import sys
 import os.path
 import itertools
 import pickle
+import json
 import numpy as np
 import scipy.integrate
 import scipy.stats
@@ -61,6 +62,28 @@ class StanSession:
         with open(fit_file, "wb") as f:
             pickle.dump(self.fit, f)
         print("Stan fit object saved")
+
+    def run_post_sampling_routines(self):
+        """run analysis after sampling"""
+        # get summary of fit
+        summary_txt_file = os.path.join(self.result_dir, "stan_fit_summary.txt")
+        with open(summary_txt_file, "w") as txt_file:
+            txt_file.write(self.fit.stansummary())
+
+        fit_summary = self.fit.summary()
+        fit_summary_table = pd.DataFrame(
+            data=fit_summary["summary"], index=fit_summary["summary_rownames"],
+            columns=fit_summary["summary_colnames"]
+        )
+        summary_table_file = os.path.join(self.result_dir,
+                                          "stan_fit_summary.csv")
+        fit_summary_table.to_csv(summary_table_file)
+        print("Stan summary saved")
+
+        # save samples
+        fit_samples = self.fit.to_dataframe()
+        fit_samples_file = os.path.join(self.result_dir, "stan_fit_samples.csv")
+        fit_samples.to_csv(fit_samples_file)
 
         # plot fit result (native pystan implementation)
         # plt.clf()

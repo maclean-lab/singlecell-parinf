@@ -29,14 +29,15 @@ def main():
 
     # set parameters
     num_chains = 4
-    num_iters = 5000
-    warmup = 2000
+    num_iters = 2000
+    warmup = 1000
     thin = 1
 
     stan_session = StanSession(central_dogma_model, central_dogma_data,
                                result_dir, num_chains=num_chains,
                                num_iters=num_iters, warmup=warmup, thin=thin)
     stan_session.run_sampling()
+    stan_session.run_post_sampling_routines()
 
 if __name__ == "__main__":
     main()

@@ -6,7 +6,7 @@ import numpy as np
 from stan_helpers import StanSampleAnalyzer
 
 def main():
-    result_dir = "../../result/stan-central-dogma-hpc-4"
+    result_dir = "../../result/stan-central-dogma/local-2"
     y0 = np.zeros(2)
     with open("timePointsCentralDogma.p", "rb") as f:
         ts = pickle.load(f, encoding="bytes")
@@ -15,7 +15,7 @@ def main():
     y_ref = y_ref.squeeze()
 
     num_chains = 4
-    warmup = 2000
+    warmup = 1000
     analyzer = StanSampleAnalyzer(result_dir, num_chains, warmup,
                                   central_dogma_ode, ts, 1, y0, y_ref=y_ref)
     analyzer.simulate_chains()
