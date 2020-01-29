@@ -32,7 +32,7 @@ def main():
     if filter_type == "moving_average":
         y = moving_average(y, window=moving_average_window)
     ts = np.linspace(t0 + 1, t_end, t_end - t0)
-    T = ts.size - 1
+    T = ts.size
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
@@ -44,11 +44,11 @@ def main():
         if is_r_hat_good:
             # good R_hat, advance to the next cell
             cell_order += 1
-            print("Initializing sampling for {}-th cell".format(cell_order))
+            print("Initializing sampling for {}-th cell...".format(cell_order))
         else:
             # bad R_hat, restart sampling for the cell
             print("Bad R_hat value of log probability for "
-                  + "{}-th cell. ".format(cell_order))
+                  + "{}-th cell".format(cell_order))
             print("Re-initializing sampling...")
 
         # get cell and its predecessor
