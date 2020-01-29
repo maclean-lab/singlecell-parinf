@@ -103,7 +103,7 @@ class StanSession:
         if verbose:
             print("Trace plot saved")
 
-        return fit_summary.loc["lp__", "Rhat"]
+        return self.fit_summary.loc["lp__", "Rhat"]
 
 class StanSampleAnalyzer:
     """analyze sample files from Stan sampling"""
