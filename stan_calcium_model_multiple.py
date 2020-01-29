@@ -37,7 +37,7 @@ def main():
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
 
-    cells = pd.read_csv(cell_list, index_col=False)
+    cells = pd.read_csv(cell_list, delimiter="\t", index_col=False)
     cell_order = 0
     is_r_hat_good = True
     while cell_order < num_cells:
