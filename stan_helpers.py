@@ -52,6 +52,8 @@ class StanSession:
         self.warmup = warmup
         self.thin = thin
 
+        sys.stdout.flush()
+
     def run_sampling(self):
         """Run Stan sampling"""
         # run sampling
@@ -60,7 +62,6 @@ class StanSession:
             warmup=self.warmup, thin=self.thin,
             sample_file=os.path.join(self.result_dir, "chain"))
         print("Stan sampling finished")
-        sys.stdout.flush()
 
         # save fit object
         stan_fit_path = os.path.join(self.result_dir, "stan_fit.pkl")
@@ -68,10 +69,13 @@ class StanSession:
             pickle.dump(self.fit, f)
         print("Stan fit object saved")
 
+        sys.stdout.flush()
+
     def run_post_sampling_routines(self, verbose=True):
         """Run analysis after sampling"""
         if verbose:
             print("Running post-sampling analysis routines...")
+            sys.stdout.flush()
 
         # get summary of fit
         summary_path = os.path.join(self.result_dir, "stan_fit_summary.txt")
@@ -100,13 +104,16 @@ class StanSession:
         az.plot_trace(self.fit)
         trace_figure_path = os.path.join(self.result_dir, "stan_fit_trace.png")
         plt.savefig(trace_figure_path)
+        plt.close()
         if verbose:
             print("Trace plot saved")
+
+        sys.stdout.flush()
 
         return self.fit_summary.loc["lp__", "Rhat"]
 
 class StanSampleAnalyzer:
-    """analyze sample files from Stan sampling"""
+    """Analyze sample files from Stan sampling"""
     def __init__(self, result_dir, ode, timesteps, y0, target_var_idx,
                  use_summary=False, num_chains=4, warmup=1000, param_names=None,
                  y_ref=np.empty(0), show_progress=False):
@@ -125,8 +132,8 @@ class StanSampleAnalyzer:
         # load sample files
         print("Loading stan sample files...")
         sys.stdout.flush()
-        self.samples = []
 
+        self.samples = []
         if self.use_summary:
             # get number of chains and number of warmup iterations from
             # stan_fit_summary.txt
@@ -150,6 +157,7 @@ class StanSampleAnalyzer:
                 ].iloc[:, 3:-7]
                 self.samples.append(samples)
         else:
+            # use sample files generatd by stan's sampling function
             self.raw_samples = []
 
             for chain_idx in range(self.num_chains):
@@ -175,7 +183,7 @@ class StanSampleAnalyzer:
             samples.columns = self.param_names
 
     def simulate_chains(self):
-        """analyze each sample file"""
+        """Simulate trajectory for all chains"""
         for chain_idx in range(self.num_chains):
             # get thetas
             thetas = self.samples[chain_idx].iloc[:, 1:].to_numpy()
@@ -190,8 +198,10 @@ class StanSampleAnalyzer:
 
             self._plot_trajectories(chain_idx, y)
 
+            sys.stdout.flush()
+
     def _simulate_trajectory(self, theta):
-        """simulate a trajectory with sampled parameters"""
+        """Simulate a trajectory with sampled parameters"""
         # initialize ODE solver
         solver = scipy.integrate.ode(self.ode)
         solver.set_integrator("dopri5")
@@ -211,7 +221,7 @@ class StanSampleAnalyzer:
         return y
 
     def _plot_trajectories(self, chain_idx, y):
-        """plot ODE solution (trajectory)"""
+        """Plot ODE solution (trajectory)"""
         plt.clf()
         plt.plot(self.timesteps, y.T)
 
@@ -224,7 +234,7 @@ class StanSampleAnalyzer:
         plt.close()
 
     def plot_parameters(self):
-        """plot trace for parameters"""
+        """Make plots for sampled parameters"""
         for chain_idx in range(self.num_chains):
             print("Making trace plot for chain {}...".format(chain_idx))
             self._make_trace_plot(chain_idx)
@@ -235,8 +245,10 @@ class StanSampleAnalyzer:
             print("Making pairs plot for chain {}...".format(chain_idx))
             self._make_pair_plot(chain_idx)
 
+            sys.stdout.flush()
+
     def _make_trace_plot(self, chain_idx):
-        """make trace plota for parameters"""
+        """Make trace plots for parameters"""
         samples = self.samples[chain_idx].to_numpy()
 
         plt.clf()
@@ -257,7 +269,7 @@ class StanSampleAnalyzer:
         plt.close()
 
     def _make_violin_plot(self, chain_idx, use_log_scale=True):
-        """make violin plot for parameters"""
+        """Make violin plot for parameters"""
         plt.clf()
         plt.figure(figsize=(self.num_params, 4))
         if use_log_scale:
@@ -279,7 +291,7 @@ class StanSampleAnalyzer:
         plt.close()
 
     def _make_pair_plot(self, chain_idx):
-        """make pair plot for parameters"""
+        """Make pair plot for parameters"""
         plt.clf()
         sns.pairplot(self.samples[chain_idx], diag_kind="kde",
                      plot_kws=dict(alpha=0.4, s=30, color="#191970",
@@ -293,7 +305,7 @@ class StanSampleAnalyzer:
         plt.close()
 
     def get_r_squared(self):
-        """compute R^2 for all pairs of sampled parameters in each chain"""
+        """Compute R^2 for all pairs of sampled parameters in each chain"""
         for chain_idx in range(self.num_chains):
             r_squared = np.ones((self.num_params, self.num_params))
             for i, j in itertools.combinations(range(self.num_params), 2):
@@ -313,7 +325,7 @@ class StanSampleAnalyzer:
 
 # utility functions
 def calcium_ode(t, y, theta):
-    """system of ODEs for the calcium model"""
+    """System of ODEs for the calcium model"""
     dydt = np.zeros(4)
 
     dydt[0] = theta[0]* theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
@@ -334,7 +346,7 @@ def calcium_ode(t, y, theta):
     return dydt
 
 def low_pass_filter(x):
-    """apply a low-pass filter for a trajectory"""
+    """Apply a low-pass filter for a trajectory"""
     sos = scipy.signal.butter(5, 1, btype="lowpass", analog=True,
                               output="sos")
     x_filtered = scipy.signal.sosfilt(sos, x)
@@ -342,10 +354,12 @@ def low_pass_filter(x):
     return x_filtered
 
 def moving_average(x: np.ndarray, window: int = 20, verbose=True):
-    """compute moving average of trajectories"""
+    """Compute moving average of trajectories"""
     if verbose:
         print("Performing moving average with window size of "
               + "{}...".format(window))
+        sys.stdout.flush()
+
     # make x 2D if it is 1D
     if len(x.shape) == 1:
         x = x[np.newaxis, :]
@@ -357,10 +371,11 @@ def moving_average(x: np.ndarray, window: int = 20, verbose=True):
 
 def get_prior_from_sample_files(prior_dir, prior_chains, use_summary=False,
                                 verbose=True):
-    """get prior distribution from a previous run, if provided"""
+    """Get prior distribution from a previous run, if provided"""
     if verbose:
         print("Getting prior distribution of parameters from chain "
               + "{}...".format(", ".join(str(c) for c in prior_chains)))
+        sys.stdout.flush()
 
     # get sampled parameters
     if use_summary:

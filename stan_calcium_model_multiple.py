@@ -38,17 +38,22 @@ def main():
                    "eta1", "eta2", "eta3", "c0", "k3"]
 
     cells = pd.read_csv(cell_list, delimiter="\t", index_col=False)
-    cell_order = 0
+    cell_order = 0  # order of cell in cell list, not cell id
     is_r_hat_good = True
+    # convert 1, 2, 3... to 1st, 2nd, 3rd...
+    # credit: https://stackoverflow.com/questions/9647202
+    num2ord = lambda n: \
+        "{}{}".format(n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])
     while cell_order < num_cells:
         if is_r_hat_good:
             # good R_hat, advance to the next cell
             cell_order += 1
-            print("Initializing sampling for {}-th cell...".format(cell_order))
+            print("Initializing sampling for the "
+                  + "{} cell...".format(num2ord(cell_order)))
         else:
             # bad R_hat, restart sampling for the cell
-            print("Bad R_hat value of log probability for "
-                  + "{}-th cell".format(cell_order))
+            print("Bad R_hat value of log probability for the "
+                  + "{} cell".format(num2ord(cell_order)))
             print("Re-initializing sampling...")
 
         # get cell and its predecessor
@@ -101,6 +106,9 @@ def main():
             analyzer.simulate_chains()
             analyzer.plot_parameters()
             analyzer.get_r_squared()
+
+            print()
+            sys.stdout.flush()
 
 def get_args():
     """Parse command line arguments"""
