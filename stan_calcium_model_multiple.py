@@ -96,7 +96,8 @@ def main():
         is_r_hat_good = 0.9 <= log_prob_r_hat <= 1.1
         if is_r_hat_good:
             analyzer = StanSampleAnalyzer(cell_dir, calcium_ode, ts, y0, 3,
-                                          use_summary=True, y_ref=y_ref)
+                                          use_summary=True,
+                                          param_names=param_names, y_ref=y_ref)
             analyzer.simulate_chains()
             analyzer.plot_parameters()
             analyzer.get_r_squared()
