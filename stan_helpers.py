@@ -146,8 +146,8 @@ class StanSampleAnalyzer:
             for chain_idx in range(self.num_chains):
                 samples = self.raw_samples.loc[
                     (self.raw_samples["chain"] == chain_idx)
-                    & (self.raw_samples["warmup"] == 0)
-                ].iloc[3:-7]
+                     & (self.raw_samples["warmup"] == 0), :
+                ].iloc[:, 3:-7]
                 self.samples.append(samples)
         else:
             self.raw_samples = []
@@ -355,34 +355,45 @@ def moving_average(x: np.ndarray, window: int = 20, verbose=True):
 
     return x_moving_average
 
-def get_prior_from_sample_files(prior_dir, prior_chains, verbose=True):
+def get_prior_from_sample_files(prior_dir, prior_chains, use_summary=False,
+                                verbose=True):
     """get prior distribution from a previous run, if provided"""
     if verbose:
         print("Getting prior distribution of parameters from chain "
               + "{}...".format(", ".join(str(c) for c in prior_chains)))
 
-    # get sampled parameters from all sample files
-    prior_thetas = []
-    prior_theta_0_col = 8
-    for chain in prior_chains:
-        sample_file = os.path.join(prior_dir, "chain_{}.csv".format(chain))
+    # get sampled parameters
+    if use_summary:
+        # get samples output by stan fit object
+        sample_path = os.path.join(prior_dir, "stan_fit_samples.csv")
+        samples = pd.read_csv(sample_path, index_col=0)
+        prior_thetas = samples.loc[
+            (samples["chain"].isin(prior_chains) & samples["warmup"] == 0), :
+        ].iloc[:, 4:-7]
+        prior_mean = prior_thetas.mean().to_numpy()
+        prior_std = prior_thetas.std().to_numpy()
+    else:
+        # get samples from stan sample file
+        prior_thetas = []
 
-        # get number of warm-up iterations from sample file
-        with open(sample_file, "r") as sf:
-            for line in sf:
-                if "warmup=" in line:
-                    prior_warmup = int(line.strip().split("=")[-1])
-                    break
+        for chain in prior_chains:
+            sample_path = os.path.join(prior_dir, "chain_{}.csv".format(chain))
 
-        # get parameters from sample file
-        prior_samples = pd.read_csv(sample_file, index_col=False,
-                                    comment="#")
-        prior_thetas.append(prior_samples.iloc[prior_warmup:,
-                                               prior_theta_0_col:])
+            # get number of warm-up iterations from sample file
+            with open(sample_path, "r") as sf:
+                for line in sf:
+                    if "warmup=" in line:
+                        prior_warmup = int(line.strip().split("=")[-1])
+                        break
 
-    # get mean and standard deviation of sampled parameters
-    prior_thetas_combined = pd.concat(prior_thetas)
-    prior_mean = prior_thetas_combined.mean().to_numpy()
-    prior_std = prior_thetas_combined.std().to_numpy()
+            # get parameters from sample file
+            prior_samples = pd.read_csv(sample_path, index_col=False,
+                                        comment="#")
+            prior_thetas.append(prior_samples.iloc[prior_warmup:, 8:])
+
+        # get mean and standard deviation of sampled parameters
+        prior_thetas_combined = pd.concat(prior_thetas)
+        prior_mean = prior_thetas_combined.mean().to_numpy()
+        prior_std = prior_thetas_combined.std().to_numpy()
 
     return prior_mean, prior_std
