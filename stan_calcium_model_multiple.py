@@ -53,11 +53,11 @@ def main():
 
         # get cell and its predecessor
         cell_id = cells.loc[cell_order, "Cell"]
-        cell_dir = os.path.join(result_dir, "cell-{:4d}".format(cell_id))
+        cell_dir = os.path.join(result_dir, "cell-{:04d}".format(cell_id))
         if not os.path.exists(cell_dir):
             os.mkdir(cell_dir)
         pred_id = cells.loc[cell_order, "Parent"]
-        pred_dir = os.path.join(result_dir, "cell-{:4d}".format(pred_id))
+        pred_dir = os.path.join(result_dir, "cell-{:04d}".format(pred_id))
 
         # get prior distribution of predecessor
         pred_chains = [2] if pred_id == 0 else [0, 1, 2, 3]
