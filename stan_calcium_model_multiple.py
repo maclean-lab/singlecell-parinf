@@ -115,6 +115,8 @@ def get_args():
                             default=100)
     arg_parser.add_argument("--filter_type", dest="filter_type",
                             choices=["none", "moving_average"], default="none")
+    arg_parser.add_argument("--moving_average_window",
+                            dest="moving_average_window", type=int, default=20)
     arg_parser.add_argument("--t0", dest="t0", metavar="T", type=int,
                             default=200)
     arg_parser.add_argument("--num_chains", dest="num_chains", type=int,
