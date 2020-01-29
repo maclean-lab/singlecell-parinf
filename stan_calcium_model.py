@@ -76,8 +76,8 @@ def main():
 
 def get_args():
     """parse command line arguments"""
-    arg_parser = argparse.ArgumentParser(description="Infer parameters of "
-                                         + "calcium mode using Stan.")
+    arg_parser = argparse.ArgumentParser(
+        description="Infer parameters of calcium mode using stan.")
     arg_parser.add_argument("--stan_model", dest="stan_model", metavar="MODEL",
                             type=str, required=True)
     arg_parser.add_argument("--cell_id", dest="cell_id", metavar="N", type=int,
@@ -91,7 +91,7 @@ def get_args():
     arg_parser.add_argument("--num_chains", dest="num_chains", type=int,
                             default=4)
     arg_parser.add_argument("--num_iters", dest="num_iters", type=int,
-                            default=3000)
+                            default=2000)
     arg_parser.add_argument("--warmup", dest="warmup", type=int, default=1000)
     arg_parser.add_argument("--thin", dest="thin", type=int, default=1)
     arg_parser.add_argument("--result_dir", dest="result_dir", metavar="DIR",

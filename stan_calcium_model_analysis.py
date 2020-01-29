@@ -22,18 +22,19 @@ def main():
 
     # initialize Stan analyzer
     y_ref = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
-    y_ref_cell = y_ref[cell_id, t0:]
+    y_ref_cell = y_ref[cell_id, :]
     if filter_type == "moving_average":
         y_ref_cell = moving_average(y_ref_cell, window=moving_average_window)
         y_ref_cell = np.squeeze(y_ref_cell)
+    y_ref_cell = y_ref_cell[t0:]
     y0 = np.array([0, 0, 0.7, y_ref_cell[t0]])
     ts = np.linspace(t0, t_end, t_end - t0 + 1)
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
-    analyzer = StanSampleAnalyzer(result_dir, num_chains, warmup, calcium_ode,
-                                  ts, 3, y0, y_ref=y_ref_cell,
-                                  param_names=param_names,
+    analyzer = StanSampleAnalyzer(result_dir, calcium_ode, ts, y0, 3,
+                                  num_chains=num_chains, warmup=warmup,
+                                  param_names=param_names, y_ref=y_ref_cell,
                                   show_progress=show_progress)
 
     # run tasks

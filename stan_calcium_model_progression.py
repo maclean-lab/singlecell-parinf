@@ -104,21 +104,6 @@ def plot_r_squared():
             pdf.savefig()
             plt.close()
 
-    """
-    for i, j in itertools.combinations(range(num_params), 2):
-        plt.clf()
-        plt.plot(average_r_squared[i, j, :], "x")
-        plt.xticks(np.arange(num_cells), cell_ids)
-        plt.ylim((0, 1))
-        plt.title("{} vs {}".format(param_names[i], param_names[j]))
-        figure_name = os.path.join(
-            progression_dir,
-            "r_squared_{}_{}.png".format(param_names[i], param_names[j])
-        )
-        plt.savefig(figure_name)
-        plt.close()
-    """
-
 def plot_average_running_time():
     print("Plotting average running time...")
 

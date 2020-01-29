@@ -2,36 +2,41 @@ import sys
 import os.path
 import itertools
 import pickle
-import json
+import re
+
 import numpy as np
 import scipy.integrate
 import scipy.stats
 import scipy.signal
 import pandas as pd
+
 import matplotlib.pyplot as plt
 import arviz as az
 import seaborn as sns
+
 from tqdm import tqdm
+
 from pystan import StanModel
 
 class StanSession:
-    def __init__(self, stan_model, data, result_dir, num_chains=4,
+    def __init__(self, stan_model_path, data, result_dir, num_chains=4,
                  num_iters=1000, warmup=1000, thin=1):
         # load Stan model
-        stan_model = os.path.basename(stan_model)
-        self.model_name, model_ext = os.path.splitext(stan_model)
+        stan_model_path = os.path.basename(stan_model_path)
+        self.model_name, model_ext = os.path.splitext(stan_model_path)
         if model_ext == ".stan":
             # load model from Stan code
-            self.model = StanModel(file=stan_model, model_name=self.model_name)
+            self.model = StanModel(file=stan_model_path,
+                                   model_name=self.model_name)
 
-            compiled_model_file = os.path.join(result_dir, "stan_model.pkl")
-            with open(compiled_model_file, "wb") as f:
+            compiled_model_path = os.path.join(result_dir, "stan_model.pkl")
+            with open(compiled_model_path, "wb") as f:
                 pickle.dump(self.model, f)
 
             print("Compiled stan model saved")
         elif model_ext == ".pkl":
             # load saved model
-            with open(stan_model, "rb") as f:
+            with open(stan_model_path, "rb") as f:
                 self.model = pickle.load(f)
 
             print("Compiled stan model loaded")
@@ -58,76 +63,105 @@ class StanSession:
         sys.stdout.flush()
 
         # save fit object
-        fit_file = os.path.join(self.result_dir, "stan_fit.pkl")
-        with open(fit_file, "wb") as f:
+        stan_fit_path = os.path.join(self.result_dir, "stan_fit.pkl")
+        with open(stan_fit_path, "wb") as f:
             pickle.dump(self.fit, f)
         print("Stan fit object saved")
 
-    def run_post_sampling_routines(self):
-        """run analysis after sampling"""
+    def run_post_sampling_routines(self, verbose=True):
+        """Run analysis after sampling"""
+        if verbose:
+            print("Running post-sampling analysis routines...")
+
         # get summary of fit
-        summary_txt_file = os.path.join(self.result_dir, "stan_fit_summary.txt")
-        with open(summary_txt_file, "w") as txt_file:
-            txt_file.write(self.fit.stansummary())
+        summary_path = os.path.join(self.result_dir, "stan_fit_summary.txt")
+        with open(summary_path, "w") as sf:
+            sf.write(self.fit.stansummary())
 
         fit_summary = self.fit.summary()
-        fit_summary_table = pd.DataFrame(
+        self.fit_summary = pd.DataFrame(
             data=fit_summary["summary"], index=fit_summary["summary_rownames"],
             columns=fit_summary["summary_colnames"]
         )
-        summary_table_file = os.path.join(self.result_dir,
-                                          "stan_fit_summary.csv")
-        fit_summary_table.to_csv(summary_table_file)
-        print("Stan summary saved")
+        fit_summary_path = os.path.join(self.result_dir, "stan_fit_summary.csv")
+        self.fit_summary.to_csv(fit_summary_path)
+        if verbose:
+            print("Stan summary saved")
 
         # save samples
         fit_samples = self.fit.to_dataframe()
-        fit_samples_file = os.path.join(self.result_dir, "stan_fit_samples.csv")
-        fit_samples.to_csv(fit_samples_file)
-
-        # plot fit result (native pystan implementation)
-        # plt.clf()
-        # self.fit.plot()
-        # plt.savefig(os.path.join(self.result_dir, "stan_fit.png"))
+        fit_samples_path = os.path.join(self.result_dir, "stan_fit_samples.csv")
+        fit_samples.to_csv(fit_samples_path)
+        if verbose:
+            print("Stan samples saved")
 
         # make trace plot of fit result (arviz API)
         plt.clf()
         az.plot_trace(self.fit)
-        trace_figure_name = os.path.join(
-            self.result_dir, "stan_fit_trace.png")
-        plt.savefig(trace_figure_name)
-        print("Trace plot saved")
+        trace_figure_path = os.path.join(self.result_dir, "stan_fit_trace.png")
+        plt.savefig(trace_figure_path)
+        if verbose:
+            print("Trace plot saved")
+
+        return fit_summary.loc["lp__", "Rhat"]
 
 class StanSampleAnalyzer:
     """analyze sample files from Stan sampling"""
-    theta_0_col = 8  # column index for theta[0] in a Stan sample file
-
-    def __init__(self, result_dir, num_chains, warmup, ode,
-                 timesteps, target_var_idx, y0, y_ref=np.empty(0),
-                 param_names=None, show_progress=False):
+    def __init__(self, result_dir, ode, timesteps, y0, target_var_idx,
+                 use_summary=False, num_chains=4, warmup=1000, param_names=None,
+                 y_ref=np.empty(0), show_progress=False):
         self.result_dir = result_dir
-        self.num_chains = num_chains
-        self.warmup = warmup
         self.ode = ode
         self.timesteps = timesteps
-        self.target_var_idx = target_var_idx
         self.y0 = y0
-        self.y_ref = y_ref
+        self.target_var_idx = target_var_idx
+        self.use_summary = use_summary
+        self.num_chains = num_chains
+        self.warmup = warmup
         self.param_names = param_names
+        self.y_ref = y_ref
         self.show_progress = show_progress
 
         # load sample files
         print("Loading stan sample files...")
         sys.stdout.flush()
-        self.raw_samples = []
         self.samples = []
-        for chain_idx in range(self.num_chains):
-            sample_file = os.path.join(
-                self.result_dir, "chain_{}.csv".format(chain_idx))
-            raw_samples = pd.read_csv(sample_file, index_col=False, comment="#")
-            self.raw_samples.append(raw_samples)
-            self.samples.append(
-                raw_samples.iloc[self.warmup:, self.theta_0_col - 1:])
+
+        if self.use_summary:
+            # get number of chains and number of warmup iterations from
+            # stan_fit_summary.txt
+            summary_path = os.path.join(self.result_dir, "stan_fit_summary.txt")
+            with open(summary_path, "r") as summary_file:
+                lines = summary_file.readlines()
+
+            sampling_params = re.findall(r"\d+", lines[1])
+            self.num_chains = int(sampling_params[0])
+            self.warmup = int(sampling_params[2])
+
+            # get raw samples
+            sample_path = os.path.join(self.result_dir, "stan_fit_samples.csv")
+            self.raw_samples = pd.read_csv(sample_path, index_col=0)
+
+            # extract sampled parameters
+            for chain_idx in range(self.num_chains):
+                samples = self.raw_samples.loc[
+                    (self.raw_samples["chain"] == chain_idx)
+                    & (self.raw_samples["warmup"] == 0)
+                ].iloc[3:-7]
+                self.samples.append(samples)
+        else:
+            self.raw_samples = []
+
+            for chain_idx in range(self.num_chains):
+                # get raw samples
+                sample_path = os.path.join(
+                    self.result_dir, "chain_{}.csv".format(chain_idx))
+                raw_samples = pd.read_csv(sample_path, index_col=False,
+                                          comment="#")
+                self.raw_samples.append(raw_samples)
+
+                # extract sampled parameters
+                self.samples.append(raw_samples.iloc[self.warmup:, 7:])
 
         self.num_samples = self.samples[0].shape[0]
         self.num_params = self.samples[0].shape[1]
