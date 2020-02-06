@@ -14,7 +14,7 @@ def main():
     filter_type = args.filter_type
     moving_average_window = args.moving_average_window
     t0 = args.t0
-    t_end = 1000
+    use_summary = args.use_summary
     num_chains = args.num_chains
     warmup = args.warmup
     tasks = args.tasks
@@ -28,14 +28,21 @@ def main():
         y_ref_cell = np.squeeze(y_ref_cell)
     y_ref_cell = y_ref_cell[t0:]
     y0 = np.array([0, 0, 0.7, y_ref_cell[t0]])
+    t_end = 1000
     ts = np.linspace(t0, t_end, t_end - t0 + 1)
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
-    analyzer = StanSampleAnalyzer(result_dir, calcium_ode, ts, y0, 3,
-                                  num_chains=num_chains, warmup=warmup,
-                                  param_names=param_names, y_ref=y_ref_cell,
-                                  show_progress=show_progress)
+    if use_summary:
+        analyzer = StanSampleAnalyzer(result_dir, calcium_ode, ts, y0, 3,
+                                    use_summary=use_summary,
+                                    param_names=param_names, y_ref=y_ref_cell,
+                                    show_progress=show_progress)
+    else:
+        analyzer = StanSampleAnalyzer(result_dir, calcium_ode, ts, y0, 3,
+                                    num_chains=num_chains, warmup=warmup,
+                                    param_names=param_names, y_ref=y_ref_cell,
+                                    show_progress=show_progress)
 
     # run tasks
     if "all" in tasks:
@@ -61,6 +68,8 @@ def get_args():
                             dest="moving_average_window", type=int, default=20)
     arg_parser.add_argument("--t0", dest="t0", metavar="T0", type=int,
                             default=200)
+    arg_parser.add_argument("--use_summary", dest="use_summary", default=False,
+                            action="store_true")
     arg_parser.add_argument("--num_chains", dest="num_chains", type=int,
                             default=4)
     arg_parser.add_argument("--warmup", dest="warmup", type=int, default=1000)

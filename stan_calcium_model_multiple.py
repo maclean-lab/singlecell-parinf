@@ -39,55 +39,71 @@ def main():
 
     cells = pd.read_csv(cell_list, delimiter="\t", index_col=False)
     cell_order = 0  # order of cell in cell list, not cell id
+    cell_id = cells.loc[cell_order, "Cell"]
+    cell_dir = os.path.join(result_dir, "cell-{:04d}".format(cell_id))
     is_r_hat_good = True
+    num_runs = 0
+    max_num_runs = 3
     # convert 1, 2, 3... to 1st, 2nd, 3rd...
     # credit: https://stackoverflow.com/questions/9647202
     num2ord = lambda n: \
         "{}{}".format(n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])
     while cell_order < num_cells:
-        if is_r_hat_good:
-            # good R_hat, advance to the next cell
+        # prepare for current iteration
+        if is_r_hat_good or num_runs == max_num_runs:
+            # good R_hat or too many runs, advance to the next cell
+            if num_runs == max_num_runs:
+                # too many runs, skip last cell
+                print("Skip the {} cell (ID: {}) ".format(num2ord(cell_order),
+                                                          cell_id)
+                      + "due to too many runs of sampling")
+                print("Prior distribution will not be updated")
+            else:
+                # update prior distribution
+                print("Getting prior distribution from the "
+                      + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
+                prior_chains = [2] if cell_id == 0 else [0, 1, 2, 3]
+                prior_mean, prior_std = get_prior_from_sample_files(
+                    cell_dir, prior_chains
+                )
+
+                if prior_std_scale != 1.0:
+                    print("Scaling standard deviation of prior distribution "
+                          + "by {}...".format(prior_std_scale))
+                    prior_std *= prior_std_scale
+
+            # get current cell
             cell_order += 1
+            cell_id = cells.loc[cell_order, "Cell"]
+            cell_dir = os.path.join(result_dir, "cell-{:04d}".format(cell_id))
+            if not os.path.exists(cell_dir):
+                os.mkdir(cell_dir)
+            num_runs = 1
+
+            # gather prepared data
             print("Initializing sampling for the "
-                  + "{} cell...".format(num2ord(cell_order)))
+                  + "{} cell (ID: {})...".format(num2ord(cell_order), cell_id))
+            y0 = np.array([0, 0, 0.7, y[cell_id, t0]])
+            y_ref = y[cell_id, t0 + 1:]
+            calcium_data = {
+                "N": 4,
+                "T": T,
+                "y0": y0,
+                "y": y_ref,
+                "t0": t0,
+                "ts": ts,
+                "mu_prior": prior_mean,
+                "sigma_prior": prior_std
+            }
+            print("Sampling initialized. Starting sampling...")
         else:
             # bad R_hat, restart sampling for the cell
             print("Bad R_hat value of log probability for the "
-                  + "{} cell".format(num2ord(cell_order)))
-            print("Re-initializing sampling...")
+                  + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
+            print("Restarting sampling...")
 
-        # get cell and its predecessor
-        cell_id = cells.loc[cell_order, "Cell"]
-        cell_dir = os.path.join(result_dir, "cell-{:04d}".format(cell_id))
-        if not os.path.exists(cell_dir):
-            os.mkdir(cell_dir)
-        pred_id = cells.loc[cell_order, "Parent"]
-        pred_dir = os.path.join(result_dir, "cell-{:04d}".format(pred_id))
+            num_runs += 1
 
-        # get prior distribution of predecessor
-        pred_chains = [2] if pred_id == 0 else [0, 1, 2, 3]
-        prior_mean, prior_std = get_prior_from_sample_files(pred_dir,
-                                                            pred_chains)
-
-        if prior_std_scale != 1.0:
-            print("Scaling standard deviation of prior distribution by "
-                  + "{}...".format(prior_std_scale))
-            prior_std *= prior_std_scale
-
-        # gather prepared data
-        y0 = np.array([0, 0, 0.7, y[cell_id, t0]])
-        y_ref = y[cell_id, t0 + 1:]
-        calcium_data = {
-            "N": 4,
-            "T": T,
-            "y0": y0,
-            "y": y_ref,
-            "t0": t0,
-            "ts": ts,
-            "mu_prior": prior_mean,
-            "sigma_prior": prior_std
-        }
-        print("Data initialized")
         sys.stdout.flush()
 
         # run Stan session
@@ -100,6 +116,9 @@ def main():
         # analyze result of current cell
         is_r_hat_good = 0.9 <= log_prob_r_hat <= 1.1
         if is_r_hat_good:
+            print("Good R_hat value of log probability the "
+                + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
+
             analyzer = StanSampleAnalyzer(cell_dir, calcium_ode, ts, y0, 3,
                                           use_summary=True,
                                           param_names=param_names, y_ref=y_ref)
@@ -107,8 +126,8 @@ def main():
             analyzer.plot_parameters()
             analyzer.get_r_squared()
 
-            print()
-            sys.stdout.flush()
+        print()
+        sys.stdout.flush()
 
 def get_args():
     """Parse command line arguments"""

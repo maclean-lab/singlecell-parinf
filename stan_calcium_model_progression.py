@@ -20,10 +20,7 @@ num_cells = len(cell_ids)
 num_chains = 4
 cell_meta = pd.DataFrame(index=cell_ids)
 # cell_meta["run"] = [4, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-cell_meta["run"] = [4, "2-moving-average", "3-moving-average",
-                    "3-moving-average", "2-moving-average", "2-moving-average",
-                    "2-moving-average", "4-moving-average", "2-moving-average",
-                    "2-moving-average"]
+cell_meta["run"] = [4, 1, 2, 2, 1, 1, 1, 2, 1, 1]
 cell_meta["t0s"] = [221, 220, 230, 187, 214, 200, 200, 200, 200, 210]
 # cell_meta["converged_chains"] = [[2], [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3],
 #                                  [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3],
@@ -33,21 +30,30 @@ cell_meta["converged_chains"] = [[2], [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3],
                                  [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3]]
 
 # path of result
-result_root = "../../result"
+result_root = "../../result/stan-calcium-model-moving-average"
 for cell in cell_ids:
     cell_meta.loc[cell, "dir"] = os.path.join(
-        result_root,
-        "stan-calcium-model-hpc-cell-" \
-            + "{}-{}".format(cell, cell_meta.loc[cell, "run"])
+        result_root, "hpc-cell-{}-{}".format(cell, cell_meta.loc[cell, "run"])
     )
-progression_dir = os.path.join(result_root, "stan-calcium-model-progression")
+progression_dir = os.path.join(result_root, "hpc-progression")
 
 def main():
-    plot_r_squared()
-    plot_average_running_time()
-    plot_parameter_violin()
+    # plot_r_squared()
+    param_pairs = [("KonATP", "L"), ("KonATP", "Kip3"), ("L", "Kip3"),
+                   ("Katp", "KoffPLC"), ("Katp", "KoffIP3"), ("Katp", "dinh"),
+                   ("Katp", "d5"), ("KoffPLC", "KoffIP3"), ("KoffPLC", "d5"),
+                   ("Vplc", "KoffIP3"), ("Vplc", "d1"), ("a", "dinh"),
+                   ("dinh", "d5"), ("dinh", "eta3"), ("Ke", "Be"),
+                   ("d5", "epr"), ("d5", "eta2"), ("d5", "c0"),
+                   ("epr", "eta2"), ("epr", "eta3")]
+    # param_pairs = [("KonATP", "L"), ("KonATP", "Kip3"), ("L", "Kip3"),
+    #                ("Vplc", "d1"), ("Ke", "Be")]
+    plot_r_squared(param_pairs=param_pairs)
 
-def plot_r_squared():
+    # plot_average_running_time()
+    # plot_parameter_violin()
+
+def plot_r_squared(param_pairs=None):
     """plot R^2 for all pairs of parameters"""
     print("Plotting R^2 between parameters...")
 
@@ -64,7 +70,9 @@ def plot_r_squared():
             r_squared_all[:, :, k, chain] = r_squared.to_numpy()
 
     # make plots
-    num_pairs = num_params * (num_params - 1) // 2
+    if not param_pairs:
+        param_pairs = list(itertools.combinations(param_names, 2))
+    num_pairs = len(param_pairs)
     num_rows, num_cols = 4, 2
     num_subplots_per_page = num_rows * num_cols
     num_pages = math.ceil(num_pairs / num_subplots_per_page)
@@ -82,17 +90,21 @@ def plot_r_squared():
                 num_subplots = num_subplots_per_page
 
             # plot each pair of parameters
-            for idx in range(num_subplots):
-                plt.subplot(
-                    num_rows, num_cols, idx + 1,
-                    title="{} vs {}".format(param_names[i], param_names[j])
-                )
+            idx = 0
+            while idx < num_subplots:
+                if (param_names[i], param_names[j]) in param_pairs:
+                    plt.subplot(
+                        num_rows, num_cols, idx + 1,
+                        title="{} vs {}".format(param_names[i], param_names[j])
+                    )
 
-                for chain in range(num_chains):
-                    plt.plot(r_squared_all[i, j, :, chain], "x")
+                    for chain in range(num_chains):
+                        plt.plot(r_squared_all[i, j, :, chain], "x")
 
-                plt.xticks(np.arange(num_cells), cell_ids)
-                plt.ylim((0, 1))
+                    plt.xticks(np.arange(num_cells), cell_ids)
+                    plt.ylim((0, 1))
+
+                    idx += 1
 
                 # advance to next pair of parameters
                 j += 1
