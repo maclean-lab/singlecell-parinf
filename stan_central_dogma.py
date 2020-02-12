@@ -37,7 +37,7 @@ def main():
                                result_dir, num_chains=num_chains,
                                num_iters=num_iters, warmup=warmup, thin=thin)
     stan_session.run_sampling()
-    stan_session.run_post_sampling_routines()
+    stan_session.gather_fit_result()
 
 if __name__ == "__main__":
     main()

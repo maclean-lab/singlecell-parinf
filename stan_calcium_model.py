@@ -72,7 +72,7 @@ def main():
                                num_chains=num_chains, num_iters=num_iters,
                                warmup=warmup, thin=thin)
     stan_session.run_sampling()
-    stan_session.run_post_sampling_routines()
+    stan_session.gather_fit_result()
 
 def get_args():
     """parse command line arguments"""

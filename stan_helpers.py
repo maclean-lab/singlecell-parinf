@@ -71,10 +71,10 @@ class StanSession:
 
         sys.stdout.flush()
 
-    def run_post_sampling_routines(self, verbose=True):
+    def gather_fit_result(self, verbose=True):
         """Run analysis after sampling"""
         if verbose:
-            print("Running post-sampling analysis routines...")
+            print("Gathering result from stan fit object...")
             sys.stdout.flush()
 
         # get summary of fit
@@ -99,18 +99,73 @@ class StanSession:
         if verbose:
             print("Stan samples saved")
 
-        # make trace plot of fit result (arviz API)
+        # make plots using arviz
+        self.inference_data = az.from_pystan(self.fit)
+
+        # make trace plot
         plt.clf()
-        az.plot_trace(self.fit)
+        az.plot_trace(self.inference_data)
         trace_figure_path = os.path.join(self.result_dir, "stan_fit_trace.png")
         plt.savefig(trace_figure_path)
         plt.close()
         if verbose:
             print("Trace plot saved")
 
+        # make plot for posterior
+        plt.clf()
+        az.plot_posterior(self.inference_data)
+        posterior_figure_path = os.path.join(self.result_dir,
+                                             "stan_fit_posterior.png")
+        plt.savefig(posterior_figure_path)
+        plt.close()
+        if verbose:
+            print("Posterior plot saved")
+
+        # make pair plots
+        plt.clf()
+        az.plot_posterior(self.inference_data)
+        pair_figure_path = os.path.join(self.result_dir, "stan_fit_pair.png")
+        plt.savefig(pair_figure_path)
+        plt.close()
+        if verbose:
+            print("Pair plot saved")
+
         sys.stdout.flush()
 
         return self.fit_summary.loc["lp__", "Rhat"]
+
+    def get_good_chain_combo(self):
+        """Get a combination of chains with good R_hat value of log
+        posteriors
+        """
+        if 0.9 <= self.fit_summary.loc["lp__", "Rhat"] <= 1.1:
+            return list(range(self.num_chains))
+
+        if self.num_chains <= 2:
+            return None
+
+        best_combo = None
+        best_rhat = np.inf
+        best_rhat_dist = np.inf
+
+        # try remove one bad chain
+        for chain_combo in itertools.combinations(range(self.num_chains),
+                                                  self.num_chains - 1):
+            chain_combo = list(chain_combo)
+            combo_data = self.inference_data.sel(chain=chain_combo)
+            combo_stats_rhat = az.rhat(combo_data.sample_stats, method="split")
+            combo_lp_rhat = combo_stats_rhat["lp"].item()
+            combo_lp_rhat_dist = np.abs(combo_lp_rhat - 1.0)
+
+            if combo_lp_rhat_dist < best_rhat_dist:
+                best_combo = chain_combo
+                best_rhat = combo_lp_rhat
+                best_rhat_dist = combo_lp_rhat_dist
+
+        if 0.9 <= best_rhat <= 1.1:
+            return best_combo
+        else:
+            return None
 
 class StanSampleAnalyzer:
     """Analyze sample files from Stan sampling"""
@@ -373,7 +428,7 @@ def get_prior_from_sample_files(prior_dir, prior_chains, use_summary=False,
                                 verbose=True):
     """Get prior distribution from a previous run, if provided"""
     if verbose:
-        print("Getting prior distribution of parameters from chain "
+        print("Getting prior distribution from chain "
               + "{}...".format(", ".join(str(c) for c in prior_chains)))
         sys.stdout.flush()
 

@@ -41,28 +41,27 @@ def main():
     cell_order = 0  # order of cell in cell list, not cell id
     cell_id = cells.loc[cell_order, "Cell"]
     cell_dir = os.path.join(result_dir, "cell-{:04d}".format(cell_id))
-    is_r_hat_good = True
-    num_runs = 0
-    max_num_runs = 3
+    prior_chains = [2]  # chains for prior (for cell 0, use chain 2 only)
+    num_tries = 0  # number of tries of stan sampling for a cell
+    max_num_tries = 3  # maximum number of tries of stan sampling
     # convert 1, 2, 3... to 1st, 2nd, 3rd...
     # credit: https://stackoverflow.com/questions/9647202
     num2ord = lambda n: \
         "{}{}".format(n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])
     while cell_order < num_cells:
         # prepare for current iteration
-        if is_r_hat_good or num_runs == max_num_runs:
-            # good R_hat or too many runs, advance to the next cell
-            if num_runs == max_num_runs:
-                # too many runs, skip last cell
-                print("Skip the {} cell (ID: {}) ".format(num2ord(cell_order),
-                                                          cell_id)
-                      + "due to too many runs of sampling")
+        if prior_chains or num_tries == max_num_tries:
+            # good R_hat for select chains or too many runs, advance to the
+            # next cell
+            if num_tries == max_num_tries:
+                # too many tries, skip last cell
+                print("Skip the {} cell (ID: ".format(num2ord(cell_order))
+                      + "{}) due to too many tries of sampling".format(cell_id))
                 print("Prior distribution will not be updated")
             else:
                 # update prior distribution
                 print("Getting prior distribution from the "
                       + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
-                prior_chains = [2] if cell_id == 0 else [0, 1, 2, 3]
                 prior_mean, prior_std = get_prior_from_sample_files(
                     cell_dir, prior_chains
                 )
@@ -78,7 +77,7 @@ def main():
             cell_dir = os.path.join(result_dir, "cell-{:04d}".format(cell_id))
             if not os.path.exists(cell_dir):
                 os.mkdir(cell_dir)
-            num_runs = 1
+            num_tries = 1
 
             # gather prepared data
             print("Initializing sampling for the "
@@ -98,11 +97,11 @@ def main():
             print("Sampling initialized. Starting sampling...")
         else:
             # bad R_hat, restart sampling for the cell
-            print("Bad R_hat value of log probability for the "
+            print("Bad R_hat value of log posterior for the "
                   + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
             print("Restarting sampling...")
 
-            num_runs += 1
+            num_tries += 1
 
         sys.stdout.flush()
 
@@ -111,13 +110,15 @@ def main():
                                    num_chains=num_chains, num_iters=num_iters,
                                    warmup=warmup, thin=thin)
         stan_session.run_sampling()
-        log_prob_r_hat = stan_session.run_post_sampling_routines()
+        _ = stan_session.gather_fit_result()
 
         # analyze result of current cell
-        is_r_hat_good = 0.9 <= log_prob_r_hat <= 1.1
-        if is_r_hat_good:
-            print("Good R_hat value of log probability the "
+        prior_chains = stan_session.get_good_chain_combo()
+
+        if prior_chains:
+            print("Good R_hat value of log posteriors for the "
                 + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
+            print("Running analysis on sampling result...")
 
             analyzer = StanSampleAnalyzer(cell_dir, calcium_ode, ts, y0, 3,
                                           use_summary=True,
