@@ -123,7 +123,7 @@ class StanSession:
 
         # make pair plots
         plt.clf()
-        az.plot_posterior(self.inference_data)
+        az.plot_pair(self.inference_data)
         pair_figure_path = os.path.join(self.result_dir, "stan_fit_pair.png")
         plt.savefig(pair_figure_path)
         plt.close()
