@@ -38,97 +38,104 @@ def main():
                    "eta1", "eta2", "eta3", "c0", "k3"]
 
     cells = pd.read_csv(cell_list, delimiter="\t", index_col=False)
-    cell_order = 0  # order of cell in cell list, not cell id
-    cell_id = cells.loc[cell_order, "Cell"]
-    cell_dir = os.path.join(result_dir, "cell-{:04d}".format(cell_id))
+    prev_id = 0
+    prior_dir = os.path.join(result_dir, "cell-0000")
     prior_chains = [2]  # chains for prior (for cell 0, use chain 2 only)
-    num_tries = 0  # number of tries of stan sampling for a cell
     max_num_tries = 3  # maximum number of tries of stan sampling
     # convert 1, 2, 3... to 1st, 2nd, 3rd...
     # credit: https://stackoverflow.com/questions/9647202
     num2ord = lambda n: \
         "{}{}".format(n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])
-    while cell_order < num_cells:
-        # prepare for current iteration
-        if prior_chains or num_tries == max_num_tries:
-            # good R_hat for select chains or too many runs, advance to the
-            # next cell
-            if num_tries == max_num_tries:
-                # too many tries, skip last cell
-                print("Skip the {} cell (ID: ".format(num2ord(cell_order))
-                      + "{}) due to too many tries of sampling".format(cell_id))
-                print("Prior distribution will not be updated")
-            else:
-                # update prior distribution
-                print("Getting prior distribution from the "
-                      + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
-                prior_mean, prior_std = get_prior_from_sample_files(
-                    cell_dir, prior_chains
-                )
+    for cell_order in range(1, num_cells):
+        # set up for current cell
+        cell_id = cells.loc[cell_order, "Cell"]
+        cell_dir = os.path.join(result_dir, "cell-{:04d}".format(cell_id))
+        if not os.path.exists(cell_dir):
+            os.mkdir(cell_dir)
+        num_tries = 0
+        print("Initializing sampling for the "
+              + "{} cell (ID: {})...".format(num2ord(cell_order), cell_id))
 
-                if prior_std_scale != 1.0:
-                    print("Scaling standard deviation of prior distribution "
-                          + "by {}...".format(prior_std_scale))
-                    prior_std *= prior_std_scale
+        # update prior distribution
+        if prior_chains:
+            print("Updating prior distribution from the "
+                  + "{} cell (ID: ".format(num2ord(cell_order - 1))
+                  + "{})...".format(prev_id))
+            prior_mean, prior_std = get_prior_from_sample_files(prior_dir,
+                                                                prior_chains)
 
-            # get current cell
-            cell_order += 1
-            cell_id = cells.loc[cell_order, "Cell"]
-            cell_dir = os.path.join(result_dir, "cell-{:04d}".format(cell_id))
-            if not os.path.exists(cell_dir):
-                os.mkdir(cell_dir)
-            num_tries = 1
+            if prior_std_scale != 1.0:
+                print("Scaling standard deviation of prior distribution "
+                        + "by {}...".format(prior_std_scale))
+                prior_std *= prior_std_scale
 
-            # gather prepared data
-            print("Initializing sampling for the "
-                  + "{} cell (ID: {})...".format(num2ord(cell_order), cell_id))
-            y0 = np.array([0, 0, 0.7, y[cell_id, t0]])
-            y_ref = y[cell_id, t0 + 1:]
-            calcium_data = {
-                "N": 4,
-                "T": T,
-                "y0": y0,
-                "y": y_ref,
-                "t0": t0,
-                "ts": ts,
-                "mu_prior": prior_mean,
-                "sigma_prior": prior_std
-            }
-            print("Sampling initialized. Starting sampling...")
+            prior_chains = None  # reset prior chains
         else:
-            # bad R_hat, restart sampling for the cell
-            print("Bad R_hat value of log posterior for the "
-                  + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
-            print("Restarting sampling...")
+            print("Prior distribution will not be update from the "
+                  + "{} cell (ID: ".format(num2ord(cell_order - 1))
+                  + "{}) due to too many unsuccessful ".format(prev_id)
+                  + "attempts of sampling")
+
+        # gather prepared data
+        y0 = np.array([0, 0, 0.7, y[cell_id, t0]])
+        y_ref = y[cell_id, t0 + 1:]
+        calcium_data = {
+            "N": 4,
+            "T": T,
+            "y0": y0,
+            "y": y_ref,
+            "t0": t0,
+            "ts": ts,
+            "mu_prior": prior_mean,
+            "sigma_prior": prior_std
+        }
+        sys.stdout.flush()
+
+        # try sampling
+        while not prior_chains and num_tries < max_num_tries:
+            print("Starting {} attempt of ".format(num2ord(num_tries))
+                    + "sampling...")
+            sys.stdout.flush()
+
+            # run Stan session
+            stan_session = StanSession(stan_model, calcium_data, cell_dir,
+                                    num_chains=num_chains, num_iters=num_iters,
+                                    warmup=warmup, thin=thin)
+            stan_session.run_sampling()
+            _ = stan_session.gather_fit_result()
+
+            # find chain combo with good R_hat value
+            prior_chains = stan_session.get_good_chain_combo()
+
+            if prior_chains:
+                # good R_hat value of one chain combo
+                # analyze result of current cell
+                print("Good R_hat value of log posteriors for the "
+                    + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
+                print("Running analysis on sampled result...")
+
+                analyzer = StanSampleAnalyzer(cell_dir, calcium_ode, ts, y0, 3,
+                                              use_summary=True,
+                                              param_names=param_names,
+                                              y_ref=y_ref)
+                analyzer.simulate_chains()
+                analyzer.plot_parameters()
+                analyzer.get_r_squared()
+            else:
+                # bad R_hat value of every chain combo
+                print("Bad R_hat value of log posteriors for the "
+                    + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
 
             num_tries += 1
 
-        sys.stdout.flush()
+            print()
+            sys.stdout.flush()
 
-        # run Stan session
-        stan_session = StanSession(stan_model, calcium_data, cell_dir,
-                                   num_chains=num_chains, num_iters=num_iters,
-                                   warmup=warmup, thin=thin)
-        stan_session.run_sampling()
-        _ = stan_session.gather_fit_result()
+        # prepare for next cell
+        prev_id = cell_id
+        prior_dir = cell_dir
 
-        # analyze result of current cell
-        prior_chains = stan_session.get_good_chain_combo()
-
-        if prior_chains:
-            print("Good R_hat value of log posteriors for the "
-                + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
-            print("Running analysis on sampling result...")
-
-            analyzer = StanSampleAnalyzer(cell_dir, calcium_ode, ts, y0, 3,
-                                          use_summary=True,
-                                          param_names=param_names, y_ref=y_ref)
-            analyzer.simulate_chains()
-            analyzer.plot_parameters()
-            analyzer.get_r_squared()
-
-        print()
-        sys.stdout.flush()
+    print("Sampling for all cells finished")
 
 def get_args():
     """Parse command line arguments"""
