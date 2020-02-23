@@ -26,23 +26,23 @@ def main():
     if filter_type == "moving_average":
         y_ref_cell = moving_average(y_ref_cell, window=moving_average_window)
         y_ref_cell = np.squeeze(y_ref_cell)
-    y_ref_cell = y_ref_cell[t0:]
     y0 = np.array([0, 0, 0.7, y_ref_cell[t0]])
+    y_ref_cell = y_ref_cell[t0 + 1:]
     t_end = 1000
-    ts = np.linspace(t0, t_end, t_end - t0 + 1)
+    ts = np.linspace(t0 + 1, t_end, t_end - t0)
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
     if use_summary:
-        analyzer = StanSampleAnalyzer(result_dir, calcium_ode, ts, y0, 3,
-                                    use_summary=use_summary,
-                                    param_names=param_names, y_ref=y_ref_cell,
-                                    show_progress=show_progress)
+        analyzer = StanSampleAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
+                                      use_summary=use_summary,
+                                      param_names=param_names, y_ref=y_ref_cell,
+                                      show_progress=show_progress)
     else:
-        analyzer = StanSampleAnalyzer(result_dir, calcium_ode, ts, y0, 3,
-                                    num_chains=num_chains, warmup=warmup,
-                                    param_names=param_names, y_ref=y_ref_cell,
-                                    show_progress=show_progress)
+        analyzer = StanSampleAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
+                                      num_chains=num_chains, warmup=warmup,
+                                      param_names=param_names, y_ref=y_ref_cell,
+                                      show_progress=show_progress)
 
     # run tasks
     if "all" in tasks:

@@ -20,6 +20,7 @@ def main():
     num_iters = args.num_iters
     warmup = args.warmup
     thin = args.thin
+    rhat_upper_bound = args.rhat_upper_bound
     result_dir = args.result_dir
     prior_std_scale = args.prior_std_scale
 
@@ -27,11 +28,14 @@ def main():
     # get trajectory and time
     print("Loading trajectories...")
     y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
-    t_end = 1000
+    t_end = y.shape[1]
     # apply preprocessing to the trajectory if specified
     if filter_type == "moving_average":
         y = moving_average(y, window=moving_average_window)
     ts = np.linspace(t0 + 1, t_end, t_end - t0)
+    # downsample trajectories
+    y = np.concatenate((y[:, 0:400], y[:, 400::10]), axis=1)
+    ts = np.concatenate((ts[0:400-t0], ts[400-t0::10]))
     T = ts.size
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
@@ -46,7 +50,7 @@ def main():
     # credit: https://stackoverflow.com/questions/9647202
     num2ord = lambda n: \
         "{}{}".format(n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])
-    for cell_order in range(1, num_cells):
+    for cell_order in range(1, num_cells + 1):
         # set up for current cell
         cell_id = cells.loc[cell_order, "Cell"]
         cell_dir = os.path.join(result_dir, "cell-{:04d}".format(cell_id))
@@ -66,7 +70,7 @@ def main():
 
             if prior_std_scale != 1.0:
                 print("Scaling standard deviation of prior distribution "
-                        + "by {}...".format(prior_std_scale))
+                      + "by {}...".format(prior_std_scale))
                 prior_std *= prior_std_scale
 
             prior_chains = None  # reset prior chains
@@ -93,14 +97,16 @@ def main():
 
         # try sampling
         while not prior_chains and num_tries < max_num_tries:
+            num_tries += 1
             print("Starting {} attempt of ".format(num2ord(num_tries))
-                    + "sampling...")
+                  + "sampling...")
             sys.stdout.flush()
 
             # run Stan session
             stan_session = StanSession(stan_model, calcium_data, cell_dir,
                                     num_chains=num_chains, num_iters=num_iters,
-                                    warmup=warmup, thin=thin)
+                                    warmup=warmup, thin=thin,
+                                    rhat_upper_bound=rhat_upper_bound)
             stan_session.run_sampling()
             _ = stan_session.gather_fit_result()
 
@@ -111,11 +117,11 @@ def main():
                 # good R_hat value of one chain combo
                 # analyze result of current cell
                 print("Good R_hat value of log posteriors for the "
-                    + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
+                      + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
                 print("Running analysis on sampled result...")
 
-                analyzer = StanSampleAnalyzer(cell_dir, calcium_ode, ts, y0, 3,
-                                              use_summary=True,
+                analyzer = StanSampleAnalyzer(cell_dir, calcium_ode, 3, y0, t0,
+                                              ts, use_summary=True,
                                               param_names=param_names,
                                               y_ref=y_ref)
                 analyzer.simulate_chains()
@@ -124,9 +130,8 @@ def main():
             else:
                 # bad R_hat value of every chain combo
                 print("Bad R_hat value of log posteriors for the "
-                    + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
-
-            num_tries += 1
+                      + "{} cell (ID: {})".format(num2ord(cell_order), cell_id)
+                      + "on the {} attempt".format(num2ord(num_tries)))
 
             print()
             sys.stdout.flush()
@@ -136,12 +141,14 @@ def main():
         prior_dir = cell_dir
 
     print("Sampling for all cells finished")
+    sys.stdout.flush()
 
 def get_args():
     """Parse command line arguments"""
     arg_parser = argparse.ArgumentParser(
         description="Infer parameters of calclium model for multiple cells "
-                    + "using stan")
+                    + "using stan"
+    )
     arg_parser.add_argument("--stan_model", dest="stan_model", metavar="MODEL",
                             type=str, required=True)
     arg_parser.add_argument("--cell_list", dest="cell_list", type=str,
@@ -160,6 +167,8 @@ def get_args():
                             default=2000)
     arg_parser.add_argument("--warmup", dest="warmup", type=int, default=1000)
     arg_parser.add_argument("--thin", dest="thin", type=int, default=1)
+    arg_parser.add_argument("--rhat_upper_bound", dest="rhat_upper_bound",
+                            type=float, default=1.1)
     arg_parser.add_argument("--result_dir", dest="result_dir", metavar="DIR",
                             type=str, default=".")
     arg_parser.add_argument("--prior_std_scale", dest="prior_std_scale",

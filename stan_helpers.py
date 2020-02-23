@@ -20,7 +20,7 @@ from pystan import StanModel
 
 class StanSession:
     def __init__(self, stan_model_path, data, result_dir, num_chains=4,
-                 num_iters=1000, warmup=1000, thin=1):
+                 num_iters=1000, warmup=1000, thin=1, rhat_upper_bound=1.1):
         # load Stan model
         stan_model_path = os.path.basename(stan_model_path)
         self.model_name, model_ext = os.path.splitext(stan_model_path)
@@ -51,6 +51,7 @@ class StanSession:
         self.num_iters = num_iters
         self.warmup = warmup
         self.thin = thin
+        self.rhat_upper_bound = rhat_upper_bound
 
         sys.stdout.flush()
 
@@ -138,7 +139,7 @@ class StanSession:
         """Get a combination of chains with good R_hat value of log
         posteriors
         """
-        if 0.9 <= self.fit_summary.loc["lp__", "Rhat"] <= 1.1:
+        if 0.9 <= self.fit_summary.loc["lp__", "Rhat"] <= self.rhat_upper_bound:
             return list(range(self.num_chains))
 
         if self.num_chains <= 2:
@@ -162,18 +163,19 @@ class StanSession:
                 best_rhat = combo_lp_rhat
                 best_rhat_dist = combo_lp_rhat_dist
 
-        if 0.9 <= best_rhat <= 1.1:
+        if 0.9 <= best_rhat <= self.rhat_upper_bound:
             return best_combo
         else:
             return None
 
 class StanSampleAnalyzer:
     """Analyze sample files from Stan sampling"""
-    def __init__(self, result_dir, ode, timesteps, y0, target_var_idx,
+    def __init__(self, result_dir, ode, target_var_idx, y0, t0, timesteps,
                  use_summary=False, num_chains=4, warmup=1000, param_names=None,
                  y_ref=np.empty(0), show_progress=False):
         self.result_dir = result_dir
         self.ode = ode
+        self.t0 = t0
         self.timesteps = timesteps
         self.y0 = y0
         self.target_var_idx = target_var_idx
@@ -261,12 +263,11 @@ class StanSampleAnalyzer:
         solver = scipy.integrate.ode(self.ode)
         solver.set_integrator("dopri5")
         solver.set_f_params(theta)
-        solver.set_initial_value(self.y0, self.timesteps[0])
+        solver.set_initial_value(self.y0, self.t0)
 
         # perform numerical integration
         y = np.zeros_like(self.timesteps)
-        y[0] = self.y0[self.target_var_idx]
-        i = 1
+        i = 0
         while solver.successful() and i < self.timesteps.size:
             solver.integrate(self.timesteps[i])
             y[i] = solver.y[self.target_var_idx]

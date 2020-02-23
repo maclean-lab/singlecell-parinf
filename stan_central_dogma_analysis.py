@@ -16,7 +16,7 @@ def main():
 
     num_chains = 4
     warmup = 1000
-    analyzer = StanSampleAnalyzer(result_dir, central_dogma_ode, ts, y0, 1,
+    analyzer = StanSampleAnalyzer(result_dir, central_dogma_ode, 1, y0, 0, ts,
                                   num_chains=num_chains, warmup=warmup,
                                   y_ref=y_ref)
     analyzer.simulate_chains()
