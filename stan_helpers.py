@@ -70,6 +70,11 @@ class StanSession:
             pickle.dump(self.fit, f)
         print("Stan fit object saved")
 
+        # convert fit object to arviz's inference data
+        self.inference_data = az.from_pystan(self.fit)
+        inference_data_path = os.path.join(self.result_dir, "arviz_inf_data.nc")
+        self.inference_data.to_netcdf(inference_data_path)
+
         sys.stdout.flush()
 
     def gather_fit_result(self, verbose=True):
@@ -101,8 +106,6 @@ class StanSession:
             print("Stan samples saved")
 
         # make plots using arviz
-        self.inference_data = az.from_pystan(self.fit)
-
         # make trace plot
         plt.clf()
         az.plot_trace(self.inference_data)

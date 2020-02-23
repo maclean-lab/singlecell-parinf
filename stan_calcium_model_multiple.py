@@ -28,7 +28,7 @@ def main():
     # get trajectory and time
     print("Loading trajectories...")
     y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
-    t_end = y.shape[1]
+    t_end = y.shape[1] - 1
     # apply preprocessing to the trajectory if specified
     if filter_type == "moving_average":
         y = moving_average(y, window=moving_average_window)
