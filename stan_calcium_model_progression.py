@@ -15,43 +15,54 @@ param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
 num_params = len(param_names)
 
 # cells to analyze
-cell_ids = [0, 3369, 1695, 61, 2623, 619, 1271, 4927, 613, 4305]
+# cell_ids = [0, 3369, 1695, 61, 2623, 619, 1271, 4927, 613, 4305]
+cell_ids = [0, 5057, 5119, 5096, 5099, 5095, 5087, 5098, 5125, 5124, 5107,
+            5089, 5127, 5114, 5106, 5048, 5093, 5116]
 num_cells = len(cell_ids)
 num_chains = 4
 cell_meta = pd.DataFrame(index=cell_ids)
 # cell_meta["run"] = [4, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-cell_meta["run"] = [4, 1, 2, 2, 1, 1, 1, 2, 1, 1]
-cell_meta["t0s"] = [221, 220, 230, 187, 214, 200, 200, 200, 200, 210]
+# cell_meta["run"] = [4, 1, 2, 2, 1, 1, 1, 2, 1, 1]
+# cell_meta["t0s"] = [221, 220, 230, 187, 214, 200, 200, 200, 200, 210]
 # cell_meta["converged_chains"] = [[2], [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3],
 #                                  [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3],
 #                                  [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3]]
-cell_meta["converged_chains"] = [[2], [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3],
-                                 [0, 1, 2, 3], [0, 1, 2, 3], [0, 2, 3],
-                                 [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3]]
+# cell_meta["converged_chains"] = [[2], [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3],
+#                                  [0, 1, 2, 3], [0, 1, 2, 3], [0, 2, 3],
+#                                  [0, 1, 2, 3], [0, 1, 2, 3], [0, 1, 2, 3]]
+cell_meta["t0"] = [221] + [200] * (num_cells - 1)
+cell_meta["converged_chains"] = [[2]] + [list(range(num_chains))] \
+    * (num_cells - 1)
 
 # path of result
-result_root = "../../result/stan-calcium-model-moving-average"
+# result_root = "../../result/stan-calcium-model-moving-average"
+# for cell in cell_ids:
+#     cell_meta.loc[cell, "dir"] = os.path.join(
+#         result_root, "hpc-cell-{}-{}".format(cell, cell_meta.loc[cell, "run"])
+#     )
+# progression_dir = os.path.join(result_root, "hpc-progression")
+result_root = "../../result/stan-calcium-model-100-3"
 for cell in cell_ids:
-    cell_meta.loc[cell, "dir"] = os.path.join(
-        result_root, "hpc-cell-{}-{}".format(cell, cell_meta.loc[cell, "run"])
-    )
-progression_dir = os.path.join(result_root, "hpc-progression")
+    cell_meta.loc[cell, "dir"] = os.path.join(result_root,
+                                              "cell-{:04d}".format(cell))
+progression_dir = os.path.join(result_root, "chain-progression")
+
 
 def main():
     # plot_r_squared()
-    param_pairs = [("KonATP", "L"), ("KonATP", "Kip3"), ("L", "Kip3"),
-                   ("Katp", "KoffPLC"), ("Katp", "KoffIP3"), ("Katp", "dinh"),
-                   ("Katp", "d5"), ("KoffPLC", "KoffIP3"), ("KoffPLC", "d5"),
-                   ("Vplc", "KoffIP3"), ("Vplc", "d1"), ("a", "dinh"),
-                   ("dinh", "d5"), ("dinh", "eta3"), ("Ke", "Be"),
-                   ("d5", "epr"), ("d5", "eta2"), ("d5", "c0"),
-                   ("epr", "eta2"), ("epr", "eta3")]
+    # param_pairs = [("KonATP", "L"), ("KonATP", "Kip3"), ("L", "Kip3"),
+    #                ("Katp", "KoffPLC"), ("Katp", "KoffIP3"), ("Katp", "dinh"),
+    #                ("Katp", "d5"), ("KoffPLC", "KoffIP3"), ("KoffPLC", "d5"),
+    #                ("Vplc", "KoffIP3"), ("Vplc", "d1"), ("a", "dinh"),
+    #                ("dinh", "d5"), ("dinh", "eta3"), ("Ke", "Be"),
+    #                ("d5", "epr"), ("d5", "eta2"), ("d5", "c0"),
+    #                ("epr", "eta2"), ("epr", "eta3")]
     # param_pairs = [("KonATP", "L"), ("KonATP", "Kip3"), ("L", "Kip3"),
     #                ("Vplc", "d1"), ("Ke", "Be")]
-    plot_r_squared(param_pairs=param_pairs)
+    # plot_r_squared(param_pairs=param_pairs)
 
     # plot_average_running_time()
-    # plot_parameter_violin()
+    plot_parameter_violin()
 
 def plot_r_squared(param_pairs=None):
     """plot R^2 for all pairs of parameters"""
@@ -204,7 +215,7 @@ def plot_parameter_violin():
                 plt.subplot(num_rows, num_cols, idx + 1,
                             title=param_names[param_idx])
                 plt.violinplot(all_samples[param_names[param_idx]])
-                plt.xticks(np.arange(1, num_cells + 1), cell_ids)
+                plt.xticks(np.arange(1, num_cells + 1), cell_ids, rotation=90)
 
             plt.tight_layout()
             pdf.savefig()

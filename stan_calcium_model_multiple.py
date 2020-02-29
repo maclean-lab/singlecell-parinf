@@ -34,8 +34,9 @@ def main():
         y = moving_average(y, window=moving_average_window)
     ts = np.linspace(t0 + 1, t_end, t_end - t0)
     # downsample trajectories
-    y = np.concatenate((y[:, 0:400], y[:, 400::10]), axis=1)
-    ts = np.concatenate((ts[0:400-t0], ts[400-t0::10]))
+    t_downsample = 300
+    y = np.concatenate((y[:, 0:t_downsample], y[:, t_downsample::10]), axis=1)
+    ts = np.concatenate((ts[0:t_downsample-t0], ts[t_downsample-t0::10]))
     T = ts.size
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
