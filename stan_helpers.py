@@ -72,9 +72,8 @@ class StanSession:
 
         # convert fit object to arviz's inference data
         self.inference_data = az.from_pystan(self.fit)
-        # inference_data_path = os.path.join(self.result_dir,
-        #                                    "arviz_inf_data.nc")
-        # az.to_netcdf(self.inference_data, inference_data_path)
+        inference_data_path = os.path.join(self.result_dir, "arviz_inf_data.nc")
+        az.to_netcdf(self.inference_data, inference_data_path)
 
         sys.stdout.flush()
 
