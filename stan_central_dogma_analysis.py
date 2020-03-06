@@ -3,7 +3,7 @@ import sys
 import os.path
 import pickle
 import numpy as np
-from stan_helpers import StanSampleAnalyzer
+from stan_helpers import StanSessionAnalyzer
 
 def main():
     result_dir = "../../result/stan-central-dogma/local-2"
@@ -16,7 +16,7 @@ def main():
 
     num_chains = 4
     warmup = 1000
-    analyzer = StanSampleAnalyzer(result_dir, central_dogma_ode, 1, y0, 0, ts,
+    analyzer = StanSessionAnalyzer(result_dir, central_dogma_ode, 1, y0, 0, ts,
                                   num_chains=num_chains, warmup=warmup,
                                   y_ref=y_ref)
     analyzer.simulate_chains()

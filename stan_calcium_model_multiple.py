@@ -4,14 +4,16 @@ import os
 import argparse
 import numpy as np
 import pandas as pd
-from stan_helpers import StanSession, StanSampleAnalyzer, moving_average, \
+from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
     get_prior_from_sample_files, calcium_ode
 
 def main():
     # get command-line arguments
     args = get_args()
     stan_model = args.stan_model
-    cell_list = args.cell_list
+    cell_list_path = args.cell_list
+    prior_id = args.prior_cell
+    prior_chains = args.prior_chains
     num_cells = args.num_cells
     filter_type = args.filter_type
     moving_average_window = args.moving_average_window
@@ -24,7 +26,23 @@ def main():
     result_dir = args.result_dir
     prior_std_scale = args.prior_std_scale
 
-    # prepare data for Stan model
+    # set up for sampling
+    cell_list = pd.read_csv(cell_list_path, delimiter="\t", index_col=False)
+    prior_cell_order = np.where(cell_list["Cell"] == prior_id)[0][0]
+    num_total_cells = cell_list.shape[0]
+    num_cells_left = num_total_cells - prior_cell_order - 1
+    if num_cells == 0 or num_cells_left == 0:
+        print("No cells left to sample. Exiting...")
+        sys.exit(0)
+    if num_total_cells < num_cells:
+        num_cells = num_cells_left
+        print("The given number of cells exceeds the number of cells after "
+              + "the prior cell in the cell list. Setting number of cells "
+              + "to the latter")
+    first_cell_order = prior_cell_order + 1
+    last_cell_order = prior_cell_order + num_cells
+    prior_dir = os.path.join(result_dir, "cell-{:04d}".format(prior_id))
+
     # get trajectory and time
     print("Loading trajectories...")
     y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
@@ -42,18 +60,14 @@ def main():
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
 
-    cells = pd.read_csv(cell_list, delimiter="\t", index_col=False)
-    prev_id = 0
-    prior_dir = os.path.join(result_dir, "cell-0000")
-    prior_chains = [2]  # chains for prior (for cell 0, use chain 2 only)
     max_num_tries = 3  # maximum number of tries of stan sampling
     # convert 1, 2, 3... to 1st, 2nd, 3rd...
     # credit: https://stackoverflow.com/questions/9647202
     num2ord = lambda n: \
         "{}{}".format(n,"tsnrhtdd"[(n//10%10!=1)*(n%10<4)*n%10::4])
-    for cell_order in range(1, num_cells + 1):
+    for cell_order in range(first_cell_order, last_cell_order + 1):
         # set up for current cell
-        cell_id = cells.loc[cell_order, "Cell"]
+        cell_id = cell_list.loc[cell_order, "Cell"]
         cell_dir = os.path.join(result_dir, "cell-{:04d}".format(cell_id))
         if not os.path.exists(cell_dir):
             os.mkdir(cell_dir)
@@ -65,7 +79,7 @@ def main():
         if prior_chains:
             print("Updating prior distribution from the "
                   + "{} cell (ID: ".format(num2ord(cell_order - 1))
-                  + "{})...".format(prev_id))
+                  + "{})...".format(prior_id))
             prior_mean, prior_std = get_prior_from_sample_files(prior_dir,
                                                                 prior_chains)
 
@@ -76,9 +90,9 @@ def main():
 
             prior_chains = None  # reset prior chains
         else:
-            print("Prior distribution will not be update from the "
+            print("Prior distribution will not be updated from the "
                   + "{} cell (ID: ".format(num2ord(cell_order - 1))
-                  + "{}) due to too many unsuccessful ".format(prev_id)
+                  + "{}) due to too many unsuccessful ".format(prior_id)
                   + "attempts of sampling")
 
         # gather prepared data
@@ -121,10 +135,10 @@ def main():
                       + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
                 print("Running analysis on sampled result...")
 
-                analyzer = StanSampleAnalyzer(cell_dir, calcium_ode, 3, y0, t0,
-                                              ts, use_summary=True,
-                                              param_names=param_names,
-                                              y_ref=y_ref)
+                analyzer = StanSessionAnalyzer(cell_dir, calcium_ode, 3, y0,
+                                               t0, ts, use_summary=True,
+                                               param_names=param_names,
+                                               y_ref=y_ref)
                 analyzer.simulate_chains()
                 analyzer.plot_parameters()
                 analyzer.get_r_squared()
@@ -138,7 +152,7 @@ def main():
             sys.stdout.flush()
 
         # prepare for next cell
-        prev_id = cell_id
+        prior_id = cell_id
         prior_dir = cell_dir
 
     print("Sampling for all cells finished")
@@ -148,12 +162,16 @@ def get_args():
     """Parse command line arguments"""
     arg_parser = argparse.ArgumentParser(
         description="Infer parameters of calclium model for multiple cells "
-                    + "using stan"
+                    + "using Stan"
     )
     arg_parser.add_argument("--stan_model", dest="stan_model", metavar="MODEL",
                             type=str, required=True)
     arg_parser.add_argument("--cell_list", dest="cell_list", type=str,
                             required=True)
+    arg_parser.add_argument("--prior_cell", dest="prior_cell", type=int,
+                            default=0)
+    arg_parser.add_argument("--prior_chains", dest = "prior_chains", type=int,
+                            nargs="+", default=[2])
     arg_parser.add_argument("--num_cells", dest="num_cells", type=int,
                             default=100)
     arg_parser.add_argument("--filter_type", dest="filter_type",

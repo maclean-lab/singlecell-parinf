@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 import scipy.integrate
 import matplotlib.pyplot as plt
-from stan_helpers import StanSampleAnalyzer, calcium_ode, moving_average
+from stan_helpers import StanSessionAnalyzer, calcium_ode, moving_average
 
 def main():
     # unpack arguments
@@ -34,12 +34,12 @@ def main():
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
     if use_summary:
-        analyzer = StanSampleAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
+        analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
                                       use_summary=use_summary,
                                       param_names=param_names, y_ref=y_ref_cell,
                                       show_progress=show_progress)
     else:
-        analyzer = StanSampleAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
+        analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
                                       num_chains=num_chains, warmup=warmup,
                                       param_names=param_names, y_ref=y_ref_cell,
                                       show_progress=show_progress)

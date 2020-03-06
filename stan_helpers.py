@@ -4,6 +4,7 @@ import itertools
 import pickle
 import re
 
+import math
 import numpy as np
 import scipy.integrate
 import scipy.stats
@@ -11,6 +12,7 @@ import scipy.signal
 import pandas as pd
 
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 import arviz as az
 import seaborn as sns
 
@@ -71,9 +73,11 @@ class StanSession:
         print("Stan fit object saved")
 
         # convert fit object to arviz's inference data
+        print("Converting Stan fit object to Arviz inference data")
         self.inference_data = az.from_pystan(self.fit)
         inference_data_path = os.path.join(self.result_dir, "arviz_inf_data.nc")
         az.to_netcdf(self.inference_data, inference_data_path)
+        print("Arviz inference data saved")
 
         sys.stdout.flush()
 
@@ -171,8 +175,8 @@ class StanSession:
         else:
             return None
 
-class StanSampleAnalyzer:
-    """Analyze sample files from Stan sampling"""
+class StanSessionAnalyzer:
+    """Analyze samples from a Stan sampling session"""
     def __init__(self, result_dir, ode, target_var_idx, y0, t0, timesteps,
                  use_summary=False, num_chains=4, warmup=1000, param_names=None,
                  y_ref=np.empty(0), show_progress=False):
@@ -382,6 +386,49 @@ class StanSampleAnalyzer:
                 float_format="%.8f"
             )
 
+class StanMultiSessionAnalyzer:
+    def __init__(self, session_list, result_root, session_result_dirs,
+                 use_summary=False, num_chains=4, warmup=1000,
+                 param_names=None):
+        self.session_list = session_list
+        self.result_root = result_root
+        self.session_result_dirs = session_result_dirs
+        self.use_summary = use_summary
+        self.num_chains = num_chains
+        self.warmup = warmup
+        self.param_names = param_names
+
+        self.num_sessions = len(self.session_list)
+
+        # initialize sample anaylzers for all cells
+        self.sample_analyzers = [None] * self.num_sessions
+        for i, result_dir in enumerate(self.session_result_dirs):
+            self.sample_analyzers[i] = StanSessionAnalyzer(
+                os.path.join(self.result_root, result_dir), None, None, None,
+                None, None, use_summary=self.use_summary,
+                num_chains=self.num_chains, warmup=self.warmup,
+                param_names=self.param_names, y_ref=None, show_progress=False
+            )
+
+        # make a directory for result
+        self.analyzer_result_dir = os.path.join(self.result_root,
+                                                "multi_sample_analysis")
+        if not os.path.exists(self.analyzer_result_dir):
+            os.mkdir(self.analyzer_result_dir)
+
+    def plot_parameter_violin(self):
+        """make violin plots of all parameters"""
+        # gather all samples
+        all_samples = [np.vstack(analyzer.samples)
+                       for analyzer in self.sample_analyzers]
+        all_samples = np.array(all_samples)
+        all_samples = all_samples.T
+        figure_path = os.path.join(self.analyzer_result_dir, "param_violin.pdf")
+
+        pdf_multi_plot(plt.violinplot, all_samples, figure_path, num_rows=4,
+                       num_cols=1, titles=self.param_names,
+                       xticks=self.session_list, xtick_rotation=90)
+
 # utility functions
 def calcium_ode(t, y, theta):
     """System of ODEs for the calcium model"""
@@ -471,3 +518,40 @@ def get_prior_from_sample_files(prior_dir, prior_chains, use_summary=False,
         prior_std = prior_thetas_combined.std().to_numpy()
 
     return prior_mean, prior_std
+
+def pdf_multi_plot(plot_func, plot_data, figure_path, *args, num_rows=4,
+                   num_cols=2, titles=None, xticks=None, xtick_rotation=0):
+    """make multiple plots in a PDF"""
+    num_subplots_per_page = num_rows * num_cols
+    num_plots = len(plot_data)
+    num_pages = math.ceil(num_plots / num_subplots_per_page)
+    if xticks is not None:
+        xtick_pos = np.arange(1, len(xticks) + 1)
+
+    with PdfPages(figure_path) as pdf:
+        # generate each page
+        for page in range(num_pages):
+            # set page size as US letter
+            plt.figure(figsize=(8.5, 11))
+
+            # set number of subplots in current page
+            if page == num_pages - 1:
+                num_subplots = (num_plots - 1) % num_subplots_per_page + 1
+            else:
+                num_subplots = num_subplots_per_page
+
+            # plot each parameter
+            for plot_idx in range(num_subplots):
+                data_idx = page * num_subplots_per_page + plot_idx
+                plt.subplot(num_rows, num_cols, plot_idx + 1)
+                plot_func(plot_data[data_idx], *args)
+
+                if xticks is not None:
+                    plt.xticks(xtick_pos, xticks, rotation=xtick_rotation)
+
+                if titles is not None:
+                    plt.title(titles[data_idx])
+
+            plt.tight_layout()
+            pdf.savefig()
+            plt.close()
