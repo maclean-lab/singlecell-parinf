@@ -32,9 +32,9 @@ def main():
     num_total_cells = cell_list.shape[0]
     num_cells_left = num_total_cells - prior_cell_order - 1
     if num_cells == 0 or num_cells_left == 0:
-        print("No cells left to sample. Exiting...")
+        print("No cells to sample. Exiting...")
         sys.exit(0)
-    if num_total_cells < num_cells:
+    if num_cells_left < num_cells:
         num_cells = num_cells_left
         print("The given number of cells exceeds the number of cells after "
               + "the prior cell in the cell list. Setting number of cells "
