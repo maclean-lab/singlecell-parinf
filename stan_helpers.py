@@ -423,9 +423,9 @@ class StanMultiSessionAnalyzer:
                        for analyzer in self.sample_analyzers]
         all_samples = np.array(all_samples)
         all_samples = all_samples.T
-        figure_path = os.path.join(self.analyzer_result_dir, "param_violin.pdf")
+        output_path = os.path.join(self.analyzer_result_dir, "param_violin.pdf")
 
-        pdf_multi_plot(plt.violinplot, all_samples, figure_path, num_rows=4,
+        pdf_multi_plot(plt.violinplot, all_samples, output_path, num_rows=4,
                        num_cols=1, titles=self.param_names,
                        xticks=self.session_list, xtick_rotation=90)
 
@@ -519,7 +519,7 @@ def get_prior_from_sample_files(prior_dir, prior_chains, use_summary=False,
 
     return prior_mean, prior_std
 
-def pdf_multi_plot(plot_func, plot_data, figure_path, *args, num_rows=4,
+def pdf_multi_plot(plot_func, plot_data, output_path, *args, num_rows=4,
                    num_cols=2, titles=None, xticks=None, xtick_rotation=0):
     """make multiple plots in a PDF"""
     num_subplots_per_page = num_rows * num_cols
@@ -528,7 +528,7 @@ def pdf_multi_plot(plot_func, plot_data, figure_path, *args, num_rows=4,
     if xticks is not None:
         xtick_pos = np.arange(1, len(xticks) + 1)
 
-    with PdfPages(figure_path) as pdf:
+    with PdfPages(output_path) as pdf:
         # generate each page
         for page in range(num_pages):
             # set page size as US letter

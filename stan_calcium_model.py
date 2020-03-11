@@ -2,8 +2,9 @@
 import sys
 import argparse
 import numpy as np
-from stan_helpers import StanSession, moving_average, \
-    get_prior_from_sample_files
+import pandas as pd
+from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
+    get_prior_from_sample_files, calcium_ode
 
 def main():
     # get command-line arguments
@@ -20,33 +21,43 @@ def main():
     result_dir = args.result_dir
     prior_dir = args.prior_dir
     prior_chains = args.prior_chains
+    prior_spec_path = args.prior_spec
     prior_std_scale = args.prior_std_scale
 
     # prepare data for Stan model
     print("Initializing data for cell {}...".format(cell_id))
     # get trajectory and time
     print("Loading trajectories...")
-    y_raw = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
-    t_end = 1000
-    y = y_raw[cell_id, :]
+    y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
+    y = y[cell_id, :]
+    t_end = y.size - 1
     # apply preprocessing to the trajectory if specified
     if filter_type == "moving_average":
         y = moving_average(y, window=moving_average_window)
         y = np.squeeze(y)
-    y0 = np.array([0, 0, 0.7, y[t0]])
-    y = y[t0 + 1:]
-    T = y.size
     ts = np.linspace(t0 + 1, t_end, t_end - t0)
+    # downsample trajectories
+    t_downsample = 300
+    y = np.concatenate((y[0:t_downsample], y[t_downsample::10]))
+    ts = np.concatenate((ts[0:t_downsample-t0], ts[t_downsample-t0::10]))
+    T = ts.size
+    param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
+                   "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
+                   "eta1", "eta2", "eta3", "c0", "k3"]
 
     # get prior distribution
-    if prior_dir is None:
+    if prior_dir:
+        prior_mean, prior_std = get_prior_from_sample_files(prior_dir,
+                                                            prior_chains)
+    elif prior_spec_path:
+        prior_spec = pd.read_csv(prior_spec_path, delimiter="\t", index_col=0)
+        prior_mean = prior_spec["mu"].to_numpy()
+        prior_std = prior_spec["sigma"].to_numpy()
+    else:
         # no sample file provided. use Gaussian(1.0, 1.0) for all parameters
         num_params = 19
         prior_mean = np.ones(num_params)
         prior_std = np.ones(num_params)
-    else:
-        prior_mean, prior_std = get_prior_from_sample_files(prior_dir,
-                                                            prior_chains)
 
     if prior_std_scale != 1.0:
         print("Scaling standard deviation of prior distribution by "
@@ -54,11 +65,13 @@ def main():
         prior_std *= prior_std_scale
 
     # gather prepared data
+    y0 = np.array([0, 0, 0.7, y[t0]])
+    y_ref = y[t0 + 1:]
     calcium_data = {
         "N": 4,
         "T": T,
         "y0": y0,
-        "y": y,
+        "y": y_ref,
         "t0": t0,
         "ts": ts,
         "mu_prior": prior_mean,
@@ -72,7 +85,14 @@ def main():
                                num_chains=num_chains, num_iters=num_iters,
                                warmup=warmup, thin=thin)
     stan_session.run_sampling()
-    stan_session.gather_fit_result()
+    _ = stan_session.gather_fit_result()
+
+    analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
+                                   use_summary=True, param_names=param_names,
+                                   y_ref=y_ref)
+    analyzer.simulate_chains()
+    analyzer.plot_parameters()
+    analyzer.get_r_squared()
 
 def get_args():
     """parse command line arguments"""
@@ -98,8 +118,10 @@ def get_args():
                             type=str, default=".")
     arg_parser.add_argument("--prior_dir", dest="prior_dir", type=str,
                             default=None)
-    arg_parser.add_argument("--prior_chains", dest = "prior_chains", type=int,
+    arg_parser.add_argument("--prior_chains", dest="prior_chains", type=int,
                             nargs="+", default=[0, 1, 2, 3])
+    arg_parser.add_argument("--prior_spec", dest="prior_spec", type=str,
+                            default=None)
     arg_parser.add_argument("--prior_std_scale", dest="prior_std_scale",
                             type=float, default=1.0)
 
