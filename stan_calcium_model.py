@@ -50,12 +50,16 @@ def main():
         prior_mean, prior_std = get_prior_from_sample_files(prior_dir,
                                                             prior_chains)
     elif prior_spec_path:
+        print(f"Getting prior distribution from {prior_spec_path}...")
         prior_spec = pd.read_csv(prior_spec_path, delimiter="\t", index_col=0)
         prior_mean = prior_spec["mu"].to_numpy()
         prior_std = prior_spec["sigma"].to_numpy()
+        print("Prior distbution is set as follows:")
+        print(prior_spec)
     else:
         # no sample file provided. use Gaussian(1.0, 1.0) for all parameters
-        num_params = 19
+        print("Setting prior distribution to N(1.0, 1.0) for all parameters")
+        num_params = len(param_names)
         prior_mean = np.ones(num_params)
         prior_std = np.ones(num_params)
 
