@@ -57,13 +57,13 @@ class StanSession:
 
         sys.stdout.flush()
 
-    def run_sampling(self):
+    def run_sampling(self, control={}):
         """Run Stan sampling"""
         # run sampling
         self.fit = self.model.sampling(
             data=self.data, chains=self.num_chains, iter=self.num_iters,
             warmup=self.warmup, thin=self.thin,
-            sample_file=os.path.join(self.result_dir, "chain"))
+            sample_file=os.path.join(self.result_dir, "chain"), control=control)
         print("Stan sampling finished")
 
         # save fit object
@@ -179,7 +179,7 @@ class StanSessionAnalyzer:
     """Analyze samples from a Stan sampling session"""
     def __init__(self, result_dir, ode, target_var_idx, y0, t0, timesteps,
                  use_summary=False, num_chains=4, warmup=1000, param_names=None,
-                 y_ref=np.empty(0), show_progress=False):
+                 y_ref=np.empty(0)):
         self.result_dir = result_dir
         self.ode = ode
         self.t0 = t0
@@ -191,7 +191,6 @@ class StanSessionAnalyzer:
         self.warmup = warmup
         self.param_names = param_names
         self.y_ref = y_ref
-        self.show_progress = show_progress
 
         # load sample files
         print("Loading stan sample files...")
@@ -215,10 +214,13 @@ class StanSessionAnalyzer:
 
             # extract sampled parameters
             for chain_idx in range(self.num_chains):
+                # TODO: consider drop columns by name, rather than hard code
+                # indexing
                 samples = self.raw_samples.loc[
                     (self.raw_samples["chain"] == chain_idx)
                      & (self.raw_samples["warmup"] == 0), :
                 ].iloc[:, 3:-7]
+                samples.set_index(pd.RangeIndex(samples.shape[0]), inplace=True)
                 self.samples.append(samples)
         else:
             # use sample files generatd by stan's sampling function
@@ -230,6 +232,7 @@ class StanSessionAnalyzer:
                     self.result_dir, "chain_{}.csv".format(chain_idx))
                 raw_samples = pd.read_csv(sample_path, index_col=False,
                                           comment="#")
+                samples.set_index(pd.RangeIndex(samples.shape[0]), inplace=True)
                 self.raw_samples.append(raw_samples)
 
                 # extract sampled parameters
@@ -246,18 +249,24 @@ class StanSessionAnalyzer:
         for samples in self.samples:
             samples.columns = self.param_names
 
-    def simulate_chains(self):
+    def simulate_chains(self, num_samples=None, show_progress=False):
         """Simulate trajectory for all chains"""
+        if not num_samples:
+            num_samples = [samples.shape[0] for samples in self.samples]
+        elif isinstance(num_samples, int):
+            num_samples = [num_samples] * self.num_chains
+
         for chain_idx in range(self.num_chains):
             # get thetas
-            thetas = self.samples[chain_idx].iloc[:, 1:].to_numpy()
-            y = np.zeros((self.num_samples, self.timesteps.size))
+            thetas = self.samples[chain_idx].iloc[:num_samples[chain_idx],
+                                                  1:].to_numpy()
+            y = np.zeros((num_samples[chain_idx], self.timesteps.size))
 
             # simulate trajectory from each samples
             print("Simulating trajectories from chain {}...".format(chain_idx))
             for sample_idx, theta in tqdm(enumerate(thetas),
-                                          total=self.num_samples,
-                                          disable=not self.show_progress):
+                                          total=num_samples[chain_idx],
+                                          disable=not show_progress):
                 y[sample_idx, :] = self._simulate_trajectory(theta)
 
             self._plot_trajectories(chain_idx, y)
@@ -407,7 +416,7 @@ class StanMultiSessionAnalyzer:
                 os.path.join(self.result_root, result_dir), None, None, None,
                 None, None, use_summary=self.use_summary,
                 num_chains=self.num_chains, warmup=self.warmup,
-                param_names=self.param_names, y_ref=None, show_progress=False
+                param_names=self.param_names, y_ref=None
             )
 
         # make a directory for result

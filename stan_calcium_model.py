@@ -18,6 +18,8 @@ def main():
     num_iters = args.num_iters
     warmup = args.warmup
     thin = args.thin
+    adapt_delta = args.adapt_delta
+    max_treedepth = args.max_treedepth
     result_dir = args.result_dir
     prior_dir = args.prior_dir
     prior_chains = args.prior_chains
@@ -85,10 +87,13 @@ def main():
     sys.stdout.flush()
 
     # run Stan session
+    control = {"adapt_delta": adapt_delta, "max_treedepth": max_treedepth}
+    print("The following NUTS parameters will be used:")
+    print(control)
     stan_session = StanSession(stan_model, calcium_data, result_dir,
                                num_chains=num_chains, num_iters=num_iters,
                                warmup=warmup, thin=thin)
-    stan_session.run_sampling()
+    stan_session.run_sampling(control=control)
     _ = stan_session.gather_fit_result()
 
     analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,

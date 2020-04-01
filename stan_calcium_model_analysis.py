@@ -36,19 +36,17 @@ def main():
     if use_summary:
         analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
                                       use_summary=use_summary,
-                                      param_names=param_names, y_ref=y_ref_cell,
-                                      show_progress=show_progress)
+                                      param_names=param_names, y_ref=y_ref_cell)
     else:
         analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
                                       num_chains=num_chains, warmup=warmup,
-                                      param_names=param_names, y_ref=y_ref_cell,
-                                      show_progress=show_progress)
+                                      param_names=param_names, y_ref=y_ref_cell)
 
     # run tasks
     if "all" in tasks:
         tasks = ["simulate_chains", "plot_parameters", "get_r_squared"]
     if "simulate_chains" in tasks:
-        analyzer.simulate_chains()
+        analyzer.simulate_chains(show_progress=show_progress)
     if "plot_parameters" in tasks:
         analyzer.plot_parameters()
     if "get_r_squared" in tasks:
