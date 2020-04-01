@@ -61,7 +61,7 @@ def main():
     else:
         # no sample file provided. use Gaussian(1.0, 1.0) for all parameters
         print("Setting prior distribution to N(1.0, 1.0) for all parameters")
-        num_params = len(param_names)
+        num_params = len(param_names) - 1
         prior_mean = np.ones(num_params)
         prior_std = np.ones(num_params)
 
