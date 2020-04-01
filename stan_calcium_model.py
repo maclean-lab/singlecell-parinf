@@ -123,6 +123,10 @@ def get_args():
                             default=2000)
     arg_parser.add_argument("--warmup", dest="warmup", type=int, default=1000)
     arg_parser.add_argument("--thin", dest="thin", type=int, default=1)
+    arg_parser.add_argument("--adapt_delta", dest="adapt_delta", type=float,
+                            default=0.8)
+    arg_parser.add_argument("--max_treedepth", dest="max_treedepth", type=int,
+                            default=10)
     arg_parser.add_argument("--result_dir", dest="result_dir", metavar="DIR",
                             type=str, default=".")
     arg_parser.add_argument("--prior_dir", dest="prior_dir", type=str,
