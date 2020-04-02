@@ -3,7 +3,7 @@
 *.png
 *.pkl
 *.p
-slurm-*.out
+slurm*
 run_*.sh
 core.*
 
