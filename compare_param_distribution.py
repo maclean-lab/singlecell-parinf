@@ -52,9 +52,9 @@ def main():
         compare_sessions(ref_analyzer, test_analyzer,
                          os.path.join(result_dir, violin_plot_names[i]),
                          os.path.join(result_dir, ks_table_names[i]))
-        # alt_params = ["d1"]
-        # plot_alt_trajectories(ref_analyzer, test_analyzer, alt_params,
-        #                       os.path.join(result_dir, trajectory_dirs[i]))
+        alt_params = ["d1"]
+        plot_alt_trajectories(ref_analyzer, test_analyzer, alt_params,
+                              os.path.join(result_dir, trajectory_dirs[i]))
 
 def compare_sessions(ref_analyzer, test_analyzer, plot_name, table_name):
     result_table = pd.DataFrame(columns=["chain", "param", "stat", "p-value"])

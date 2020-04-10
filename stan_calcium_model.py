@@ -65,7 +65,7 @@ def main():
         prior_mean = np.ones(num_params)
         prior_std = np.ones(num_params)
 
-    if prior_std_scale != 1.0:
+    if prior_std_scale != 1.0 and not prior_spec_path:
         print("Scaling standard deviation of prior distribution by "
               + "{}...".format(prior_std_scale))
         prior_std *= prior_std_scale
