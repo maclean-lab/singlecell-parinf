@@ -72,7 +72,7 @@ model {
     for (j in 1:19) {
         theta[j] ~ normal(mu_prior[j], sigma_prior[j]);
     }
-    y_hat = integrate_ode_rk45(sho, y0, t0, ts, theta, x_r, x_i);
+    y_hat = integrate_ode_bdf(sho, y0, t0, ts, theta, x_r, x_i);
     for (t in 1:T) {
         y[t] ~ normal(y_hat[t, 4], sigma);
     }
