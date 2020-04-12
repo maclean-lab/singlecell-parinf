@@ -529,7 +529,8 @@ def get_prior_from_sample_files(prior_dir, prior_chains, use_summary=False,
     return prior_mean, prior_std
 
 def pdf_multi_plot(plot_func, plot_data, output_path, *args, num_rows=4,
-                   num_cols=2, titles=None, xticks=None, xtick_rotation=0):
+                   num_cols=2, titles=None, xticks=None, xtick_rotation=0,
+                   show_progress=False):
     """make multiple plots in a PDF"""
     num_subplots_per_page = num_rows * num_cols
     num_plots = len(plot_data)
@@ -539,7 +540,7 @@ def pdf_multi_plot(plot_func, plot_data, output_path, *args, num_rows=4,
 
     with PdfPages(output_path) as pdf:
         # generate each page
-        for page in range(num_pages):
+        for page in tqdm(range(num_pages), disable=not show_progress):
             # set page size as US letter
             plt.figure(figsize=(8.5, 11))
 
@@ -549,7 +550,7 @@ def pdf_multi_plot(plot_func, plot_data, output_path, *args, num_rows=4,
             else:
                 num_subplots = num_subplots_per_page
 
-            # plot each parameter
+            # make each subplot
             for plot_idx in range(num_subplots):
                 data_idx = page * num_subplots_per_page + plot_idx
                 plt.subplot(num_rows, num_cols, plot_idx + 1)
