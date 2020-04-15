@@ -10,6 +10,7 @@ def main():
     # get command-line arguments
     args = get_args()
     stan_model = args.stan_model
+    stan_backend = args.stan_backend
     cell_id = args.cell_id
     filter_type = args.filter_type
     moving_average_window = args.moving_average_window
@@ -90,8 +91,8 @@ def main():
     print("The following NUTS parameters will be used:")
     print(control)
     stan_session = StanSession(stan_model, calcium_data, result_dir,
-                               num_chains=num_chains, num_iters=num_iters,
-                               warmup=warmup, thin=thin)
+                               stan_backend=stan_backend, num_chains=num_chains,
+                               num_iters=num_iters, warmup=warmup, thin=thin)
     stan_session.run_sampling(control=control)
     _ = stan_session.gather_fit_result()
 
