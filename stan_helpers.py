@@ -19,23 +19,32 @@ import seaborn as sns
 from tqdm import tqdm
 
 from pystan import StanModel
+from cmdstanpy import CmdStanModel
 
 class StanSession:
-    def __init__(self, stan_model_path, data, result_dir, num_chains=4,
-                 num_iters=1000, warmup=1000, thin=1, rhat_upper_bound=1.1):
+    def __init__(self, stan_model_path, data, result_dir, stan_backend="pystan",
+                 num_chains=4, num_iters=1000, warmup=1000, thin=1,
+                 rhat_upper_bound=1.1):
         # load Stan model
         stan_model_path = os.path.basename(stan_model_path)
         self.model_name, model_ext = os.path.splitext(stan_model_path)
+        self.stan_backend = stan_backend
         if model_ext == ".stan":
             # load model from Stan code
-            self.model = StanModel(file=stan_model_path,
-                                   model_name=self.model_name)
+            if self.stan_backend == "pystan":
+                self.model = StanModel(file=stan_model_path,
+                                       model_name=self.model_name)
 
-            compiled_model_path = os.path.join(result_dir, "stan_model.pkl")
-            with open(compiled_model_path, "wb") as f:
-                pickle.dump(self.model, f)
+                compiled_model_path = os.path.join(result_dir, "stan_model.pkl")
+                with open(compiled_model_path, "wb") as f:
+                    pickle.dump(self.model, f)
 
-            print("Compiled stan model saved")
+                print("Compiled stan model saved")
+            elif self.stan_backend == "cmdstanpy":
+                self.model = CmdStanModel(stan_file=stan_model_path)
+            else:
+                raise RuntimeError(
+                    f"Unsupported Stan backend {self.stan_backend}")
         elif model_ext == ".pkl":
             # load saved model
             with open(stan_model_path, "rb") as f:
@@ -59,11 +68,25 @@ class StanSession:
 
     def run_sampling(self, control={}):
         """Run Stan sampling"""
+        if "max_treedepth" not in control:
+            control["max_treedepth"] = 10
+        if "adapt_delta" not in control:
+            control["adapt_delta"] = 0.8
+
         # run sampling
-        self.fit = self.model.sampling(
-            data=self.data, chains=self.num_chains, iter=self.num_iters,
-            warmup=self.warmup, thin=self.thin,
-            sample_file=os.path.join(self.result_dir, "chain"), control=control)
+        if self.stan_backend == "pystan":
+            self.fit = self.model.sampling(
+                data=self.data, chains=self.num_chains, iter=self.num_iters,
+                warmup=self.warmup, thin=self.thin,
+                sample_file=os.path.join(self.result_dir, "chain"),
+                control=control)
+        else:  # self.stan_backend == "cmdstanpy"
+            self.fit = self.model.sample(
+                data=self.data, chains=self.num_chains,
+                chain_ids=list(range(self.num_chains)), iter_warmup=self.warmup,
+                iter_sampling=self.num_iters - self.warmup, thin=self.thin,
+                max_treedepth=control["max_treedepth"],
+                adapt_delta=control["adapt_delta"])
         print("Stan sampling finished")
 
         # save fit object
@@ -74,7 +97,10 @@ class StanSession:
 
         # convert fit object to arviz's inference data
         print("Converting Stan fit object to Arviz inference data")
-        self.inference_data = az.from_pystan(self.fit)
+        if self.stan_backend == "pystan":
+            self.inference_data = az.from_pystan(self.fit)
+        else:  # self.stan_backend == "cmdstanpy"
+            self.inference_data = az.from_cmdstanpy(self.fit)
         inference_data_path = os.path.join(self.result_dir, "arviz_inf_data.nc")
         az.to_netcdf(self.inference_data, inference_data_path)
         print("Arviz inference data saved")
@@ -103,9 +129,13 @@ class StanSession:
             print("Stan summary saved")
 
         # save samples
-        fit_samples = self.fit.to_dataframe()
-        fit_samples_path = os.path.join(self.result_dir, "stan_fit_samples.csv")
-        fit_samples.to_csv(fit_samples_path)
+        if self.stan_backend == "pystan":
+            fit_samples = self.fit.to_dataframe()
+            fit_samples_path = os.path.join(self.result_dir,
+                                            "stan_fit_samples.csv")
+            fit_samples.to_csv(fit_samples_path)
+        else:  # self.stan_backend == "cmdstanpy"
+            self.fit.save_csvfiles(self.result_dir)
         if verbose:
             print("Stan samples saved")
 
@@ -456,6 +486,25 @@ def calcium_ode(t, y, theta):
             * (theta[17] - (1 + theta[13]) * y[3])
         - theta[16] * np.power(y[3], 2)
             / (np.power(theta[18], 2) + np.power(y[3], 2))
+    )
+
+    return dydt
+
+def calcium_ode_const(t, y, theta):
+    """System of ODEs for the calcium model"""
+    dydt = np.zeros(4)
+
+    dydt[0] = theta[0]* theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
+    dydt[1] = (12.0 * y[0] * y[0]) / (81.0 + y[0] * y[0]) - theta[4] * y[1]
+    dydt[2] = theta[5] * (y[3] + 16.0) * (16.0 / (y[3] * 16.0) - y[2])
+    beta = 1 + theta[6] * 70.0 / np.power(theta[6] + y[3], 2)
+    m_inf = y[1] * y[3] / ((theta[7] + y[1]) * (theta[8] + y[3]))
+    dydt[3] = 1 / beta * (
+        theta[9]
+            * (theta[10] * np.power(m_inf, 3) * np.power(y[2], 3) + theta[11])
+            * (39.0 - (1 + theta[9]) * y[3])
+        - theta[12] * np.power(y[3], 2)
+            / (np.power(theta[13], 2) + np.power(y[3], 2))
     )
 
     return dydt

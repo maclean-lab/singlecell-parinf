@@ -33,10 +33,8 @@ functions {
         real m_inf;
 
         dydt[1] = theta[1] * theta[2] * exp(-theta[3] * t) - theta[4] * y[1];
-        dydt[2] = (12.0 * y[1] * y[1])
-            / (81.0 + y[1] * y[1]) - theta[5] * y[2];
-        dydt[3] = theta[6] * (y[4] + 16.0)
-            * (16.0 / (y[4] * 16.0) - y[3]);
+        dydt[2] = (12.0 * y[1] * y[1]) / (81.0 + y[1] * y[1]) - theta[5] * y[2];
+        dydt[3] = theta[6] * (y[4] + 16.0) * (16.0 / (y[4] * 16.0) - y[3]);
         beta = 1 + theta[7] * 70.0 / pow(theta[7] + y[4], 2);
         m_inf = y[2] * y[4] / ((theta[8] + y[2]) * (theta[9] + y[4]));
         dydt[4] = 1 / beta * (

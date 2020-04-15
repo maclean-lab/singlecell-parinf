@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 import pandas as pd
 from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
-    get_prior_from_sample_files, calcium_ode
+    get_prior_from_sample_files, calcium_ode_const
 
 def main():
     # get command-line arguments
@@ -95,7 +95,7 @@ def main():
     stan_session.run_sampling(control=control)
     _ = stan_session.gather_fit_result()
 
-    analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
+    analyzer = StanSessionAnalyzer(result_dir, calcium_ode_const, 3, y0, t0, ts,
                                    use_summary=True, param_names=param_names,
                                    y_ref=y_ref)
     analyzer.simulate_chains()
