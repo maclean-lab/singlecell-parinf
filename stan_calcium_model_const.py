@@ -108,6 +108,8 @@ def get_args():
         description="Infer parameters of calcium mode using stan.")
     arg_parser.add_argument("--stan_model", dest="stan_model", metavar="MODEL",
                             type=str, required=True)
+    arg_parser.add_argument("--stan_backend", dest="stan_backend",
+                            metavar="BACKEND", type=str, default="pystan")
     arg_parser.add_argument("--cell_id", dest="cell_id", metavar="N", type=int,
                             default=0)
     arg_parser.add_argument("--filter_type", dest="filter_type",
