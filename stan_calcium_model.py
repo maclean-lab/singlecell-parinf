@@ -97,12 +97,12 @@ def main():
     stan_session.run_sampling(control=control)
     _ = stan_session.gather_fit_result()
 
-    analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
-                                   use_summary=True, param_names=param_names,
-                                   y_ref=y_ref)
-    analyzer.simulate_chains()
-    analyzer.plot_parameters()
-    analyzer.get_r_squared()
+    # analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
+    #                                use_summary=True, param_names=param_names,
+    #                                y_ref=y_ref)
+    # analyzer.simulate_chains()
+    # analyzer.plot_parameters()
+    # analyzer.get_r_squared()
 
 def get_args():
     """parse command line arguments"""

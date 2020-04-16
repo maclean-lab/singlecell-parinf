@@ -83,17 +83,18 @@ class StanSession:
         else:  # self.stan_backend == "cmdstanpy"
             self.fit = self.model.sample(
                 data=self.data, chains=self.num_chains,
-                chain_ids=list(range(self.num_chains)), iter_warmup=self.warmup,
+                iter_warmup=self.warmup,
                 iter_sampling=self.num_iters - self.warmup, thin=self.thin,
                 max_treedepth=control["max_treedepth"],
-                adapt_delta=control["adapt_delta"])
+                adapt_delta=control["adapt_delta"], output_dir=self.result_dir)
         print("Stan sampling finished")
 
         # save fit object
-        stan_fit_path = os.path.join(self.result_dir, "stan_fit.pkl")
-        with open(stan_fit_path, "wb") as f:
-            pickle.dump(self.fit, f)
-        print("Stan fit object saved")
+        if self.stan_backend == "pystan":
+            stan_fit_path = os.path.join(self.result_dir, "stan_fit.pkl")
+            with open(stan_fit_path, "wb") as f:
+                pickle.dump(self.fit, f)
+            print("Stan fit object saved")
 
         # convert fit object to arviz's inference data
         print("Converting Stan fit object to Arviz inference data")
@@ -114,15 +115,20 @@ class StanSession:
             sys.stdout.flush()
 
         # get summary of fit
-        summary_path = os.path.join(self.result_dir, "stan_fit_summary.txt")
-        with open(summary_path, "w") as sf:
-            sf.write(self.fit.stansummary())
+        if self.stan_backend == "pystan":
+            summary_path = os.path.join(self.result_dir, "stan_fit_summary.txt")
+            with open(summary_path, "w") as sf:
+                sf.write(self.fit.stansummary())
 
         fit_summary = self.fit.summary()
-        self.fit_summary = pd.DataFrame(
-            data=fit_summary["summary"], index=fit_summary["summary_rownames"],
-            columns=fit_summary["summary_colnames"]
-        )
+        if self.stan_backend == "pystan":
+            self.fit_summary = pd.DataFrame(
+                data=fit_summary["summary"],
+                index=fit_summary["summary_rownames"],
+                columns=fit_summary["summary_colnames"]
+            )
+        else:  # self.stan_backend == "cmdstanpy"
+            self.fit_summary = fit_summary
         fit_summary_path = os.path.join(self.result_dir, "stan_fit_summary.csv")
         self.fit_summary.to_csv(fit_summary_path)
         if verbose:
@@ -134,10 +140,11 @@ class StanSession:
             fit_samples_path = os.path.join(self.result_dir,
                                             "stan_fit_samples.csv")
             fit_samples.to_csv(fit_samples_path)
-        else:  # self.stan_backend == "cmdstanpy"
-            self.fit.save_csvfiles(self.result_dir)
-        if verbose:
-            print("Stan samples saved")
+
+        # TODO: rename sample files from cmdstan
+
+            if verbose:
+                print("Stan samples saved")
 
         # make plots using arviz
         # make trace plot
@@ -208,15 +215,16 @@ class StanSession:
 class StanSessionAnalyzer:
     """Analyze samples from a Stan sampling session"""
     def __init__(self, result_dir, ode, target_var_idx, y0, t0, timesteps,
-                 use_summary=False, num_chains=4, warmup=1000, param_names=None,
-                 y_ref=np.empty(0)):
+                 stan_backend="pystan", use_summary=False, num_chains=4,
+                 warmup=1000, param_names=None, y_ref=np.empty(0)):
         self.result_dir = result_dir
         self.ode = ode
         self.t0 = t0
         self.timesteps = timesteps
         self.y0 = y0
         self.target_var_idx = target_var_idx
-        self.use_summary = use_summary
+        self.stan_backend = stan_backend
+        self.use_summary = use_summary and not stan_backend == "cmdstanpy"
         self.num_chains = num_chains
         self.warmup = warmup
         self.param_names = param_names
@@ -255,8 +263,12 @@ class StanSessionAnalyzer:
         else:
             # use sample files generatd by stan's sampling function
             self.raw_samples = []
+            if self.stan_backend == "pystan":
+                chain_indices = list(range(self.num_chains))
+            else:  # self.stan_backend == "cmdstanpy"
+                chain_indices = list(range(1, self.num_chains + 1))
 
-            for chain_idx in range(self.num_chains):
+            for chain_idx in chain_indices:
                 # get raw samples
                 sample_path = os.path.join(
                     self.result_dir, "chain_{}.csv".format(chain_idx))
