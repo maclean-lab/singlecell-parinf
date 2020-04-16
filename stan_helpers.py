@@ -82,7 +82,8 @@ class StanSession:
                 control=control)
         else:  # self.stan_backend == "cmdstanpy"
             self.fit = self.model.sample(
-                data=self.data, chains=self.num_chains, iter_warmup=self.warmup,
+                data=self.data, chains=self.num_chains, cores=self.num_chains,
+                iter_warmup=self.warmup,
                 iter_sampling=self.num_iters - self.warmup, save_warmup=True,
                 thin=self.thin, max_treedepth=control["max_treedepth"],
                 adapt_delta=control["adapt_delta"], output_dir=self.result_dir)
