@@ -124,7 +124,7 @@ def main():
                                        thin=thin,
                                        rhat_upper_bound=rhat_upper_bound)
             stan_session.run_sampling()
-            _ = stan_session.gather_fit_result()
+            stan_session.gather_fit_result()
 
             # find chain combo with good R_hat value
             prior_chains = stan_session.get_good_chain_combo()

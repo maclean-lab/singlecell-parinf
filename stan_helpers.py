@@ -82,10 +82,9 @@ class StanSession:
                 control=control)
         else:  # self.stan_backend == "cmdstanpy"
             self.fit = self.model.sample(
-                data=self.data, chains=self.num_chains,
-                iter_warmup=self.warmup,
-                iter_sampling=self.num_iters - self.warmup, thin=self.thin,
-                max_treedepth=control["max_treedepth"],
+                data=self.data, chains=self.num_chains, iter_warmup=self.warmup,
+                iter_sampling=self.num_iters - self.warmup, save_warmup=True,
+                thin=self.thin, max_treedepth=control["max_treedepth"],
                 adapt_delta=control["adapt_delta"], output_dir=self.result_dir)
         print("Stan sampling finished")
 
@@ -177,8 +176,6 @@ class StanSession:
 
         sys.stdout.flush()
 
-        return self.fit_summary.loc["lp__", "Rhat"]
-
     def get_good_chain_combo(self):
         """Get a combination of chains with good R_hat value of log
         posteriors
@@ -263,18 +260,15 @@ class StanSessionAnalyzer:
         else:
             # use sample files generatd by stan's sampling function
             self.raw_samples = []
-            if self.stan_backend == "pystan":
-                chain_indices = list(range(self.num_chains))
-            else:  # self.stan_backend == "cmdstanpy"
-                chain_indices = list(range(1, self.num_chains + 1))
 
-            for chain_idx in chain_indices:
+            for chain_idx in range(self.num_chains):
                 # get raw samples
                 sample_path = os.path.join(
                     self.result_dir, "chain_{}.csv".format(chain_idx))
                 raw_samples = pd.read_csv(sample_path, index_col=False,
                                           comment="#")
-                samples.set_index(pd.RangeIndex(samples.shape[0]), inplace=True)
+                raw_samples.set_index(pd.RangeIndex(raw_samples.shape[0]),
+                                      inplace=True)
                 self.raw_samples.append(raw_samples)
 
                 # extract sampled parameters

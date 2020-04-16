@@ -26,6 +26,8 @@ def main():
     prior_chains = args.prior_chains
     prior_spec_path = args.prior_spec
     prior_std_scale = args.prior_std_scale
+    analysis_tasks = args.analysis_tasks
+    use_summary = args.use_summary
 
     # prepare data for Stan model
     print("Initializing data for cell {}...".format(cell_id))
@@ -95,14 +97,15 @@ def main():
                                stan_backend=stan_backend, num_chains=num_chains,
                                num_iters=num_iters, warmup=warmup, thin=thin)
     stan_session.run_sampling(control=control)
-    _ = stan_session.gather_fit_result()
+    stan_session.gather_fit_result()
 
-    # analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
-    #                                use_summary=True, param_names=param_names,
-    #                                y_ref=y_ref)
-    # analyzer.simulate_chains()
-    # analyzer.plot_parameters()
-    # analyzer.get_r_squared()
+    if analysis_tasks:
+        analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
+                                       use_summary=use_summary,
+                                       param_names=param_names, y_ref=y_ref)
+        analyzer.simulate_chains()
+        analyzer.plot_parameters()
+        analyzer.get_r_squared()
 
 def get_args():
     """parse command line arguments"""
@@ -140,6 +143,13 @@ def get_args():
                             default=None)
     arg_parser.add_argument("--prior_std_scale", dest="prior_std_scale",
                             type=float, default=1.0)
+    arg_parser.add_argument("--analysis_tasks", dest="analysis_tasks",
+                            nargs="+",
+                            choices=["all", "simulate_chains",
+                                     "plot_parameters", "get_r_squared"],
+                            default=None)
+    arg_parser.add_argument("--use_summary", dest="use_summary", default=False,
+                            action="store_true")
 
     return arg_parser.parse_args()
 

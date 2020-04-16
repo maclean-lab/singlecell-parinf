@@ -21,26 +21,31 @@ def main():
     show_progress = args.show_progress
 
     # initialize Stan analyzer
-    y_ref = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
-    y_ref_cell = y_ref[cell_id, :]
+    y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
+    y = y[cell_id, :]
+    t_end = y.size - 1
+    # apply preprocessing to the trajectory if specified
     if filter_type == "moving_average":
-        y_ref_cell = moving_average(y_ref_cell, window=moving_average_window)
-        y_ref_cell = np.squeeze(y_ref_cell)
-    y0 = np.array([0, 0, 0.7, y_ref_cell[t0]])
-    y_ref_cell = y_ref_cell[t0 + 1:]
-    t_end = 1000
+        y = moving_average(y, window=moving_average_window)
+        y = np.squeeze(y)
     ts = np.linspace(t0 + 1, t_end, t_end - t0)
+    # downsample trajectories
+    t_downsample = 300
+    y = np.concatenate((y[0:t_downsample], y[t_downsample::10]))
+    ts = np.concatenate((ts[0:t_downsample-t0], ts[t_downsample-t0::10]))
+    y0 = np.array([0, 0, 0.7, y[t0]])
+    y_ref = y[t0 + 1:]
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
     if use_summary:
         analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
                                       use_summary=use_summary,
-                                      param_names=param_names, y_ref=y_ref_cell)
+                                      param_names=param_names, y_ref=y_ref)
     else:
         analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
                                       num_chains=num_chains, warmup=warmup,
-                                      param_names=param_names, y_ref=y_ref_cell)
+                                      param_names=param_names, y_ref=y_ref)
 
     # run tasks
     if "all" in tasks:

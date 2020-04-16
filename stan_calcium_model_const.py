@@ -94,7 +94,7 @@ def main():
                                stan_backend=stan_backend, num_chains=num_chains,
                                num_iters=num_iters, warmup=warmup, thin=thin)
     stan_session.run_sampling(control=control)
-    _ = stan_session.gather_fit_result()
+    stan_session.gather_fit_result()
 
     analyzer = StanSessionAnalyzer(result_dir, calcium_ode_const, 3, y0, t0, ts,
                                    use_summary=True, param_names=param_names,
