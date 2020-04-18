@@ -1,17 +1,21 @@
 #!/usr/bin/env python
 import sys
 import collections
+from argparse import ArgumentParser
 import numpy as np
 import scipy.io
 import pandas as pd
 import matplotlib.pyplot as plt
 
 def main():
-    method = sys.argv[1]
-    threshold = 0.0 if len(sys.argv) < 3 else float(sys.argv[2])
+    args = get_args()
+    method = args.method
+    min_similarity = args.min_similarity
+    min_peak = args.min_peak
 
     # load similarity matrix
-    soptsc_vars = scipy.io.loadmat("../../result/SoptSC/SoptSC/workspace.mat")
+    soptsc_vars = scipy.io.loadmat(
+        "../../result/SoptSC/SoptSC_feature_3000/workspace.mat")
     similarity_matrix = soptsc_vars["W"]
 
     # plot similarity matrix
@@ -20,9 +24,11 @@ def main():
     elif method == "greedy":
         get_cells_greedy(similarity_matrix)
     elif method == "bfs":
-        get_cells_bfs(similarity_matrix, threshold=threshold)
+        get_cells_bfs(similarity_matrix, min_similarity=min_similarity,
+                      min_peak=min_peak)
     elif method == "dfs":
-        get_cells_dfs(similarity_matrix, threshold=threshold)
+        get_cells_dfs(similarity_matrix, min_similarity=min_similarity,
+                      min_peak=min_peak)
 
 def plot_similarity(similarity_matrix):
         plt.clf()
@@ -60,7 +66,7 @@ def get_cells_greedy(similarity_matrix, root=0, verbose=False):
     ordered_cells.to_csv("cells_by_similarity_greedy.txt", header=False,
                          index=False)
 
-def get_cells_bfs(similarity_matrix, root=0, threshold=0.0):
+def get_cells_bfs(similarity_matrix, root=0, min_similarity=0.0, min_peak=0.0):
     """get cell ordering using breadth-first search"""
     # initialize BFS
     num_cells = similarity_matrix.shape[0]
@@ -83,7 +89,7 @@ def get_cells_bfs(similarity_matrix, root=0, threshold=0.0):
         # add unvisited neighbors to the next level
         for neighbor in range(num_cells):
             if (neighbor != cell and not visited[neighbor]
-                    and similarity_matrix[cell, neighbor] > threshold):
+                    and similarity_matrix[cell, neighbor] > min_similarity):
                 next_level.append(neighbor)
                 visited[neighbor] = True
 
@@ -99,16 +105,17 @@ def get_cells_bfs(similarity_matrix, root=0, threshold=0.0):
     bfs_result = pd.DataFrame({"Cell": ordered_cells, "Parent": parents})
     bfs_result.to_csv("cells_by_similarity_bfs.txt", sep="\t", index=False)
 
-def get_cells_dfs(similarity_matrix, root=0, threshold=0.0):
+def get_cells_dfs(similarity_matrix, root=0, min_similarity=0.0, min_peak=0.0):
     """get cell ordering using depth-first search"""
     # initialize DFS
-    num_cells = similarity_matrix.shape[0]
+    unvisited_set = select_cells(min_peak=min_peak)
+    num_cells = len(unvisited_set)
     dfs_stack = collections.deque()
     parent_stack = collections.deque()
-    unvisited_set = set(range(num_cells))
     ordered_cells = np.zeros(num_cells, dtype=int)  # indexed by order of visit
-    parents = np.zeros(num_cells, dtype=int)        # indexed by cell ID
-    num_children = np.zeros(num_cells, dtype=int)   # indexed by cell ID
+    parents = np.zeros(num_cells, dtype=int)        # indexed by order of visit
+    num_children = np.zeros(similarity_matrix.shape[0], dtype=int) # indexed by
+                                                                   # cell ID
 
     # run DFS
     i = 0  # order of cell in DFS, not index of cell
@@ -130,7 +137,7 @@ def get_cells_dfs(similarity_matrix, root=0, threshold=0.0):
 
             # add unvisited neighbors to the stack
             for neighbor in unvisited_set:
-                if similarity_matrix[cell, neighbor] > threshold:
+                if similarity_matrix[cell, neighbor] > min_similarity:
                     dfs_stack.append(neighbor)
                     parent_stack.append(cell)
 
@@ -147,6 +154,25 @@ def get_cells_dfs(similarity_matrix, root=0, threshold=0.0):
 
     dfs_result = pd.DataFrame({"Cell": ordered_cells, "Parent": parents})
     dfs_result.to_csv("cells_by_similarity_dfs.txt", sep="\t", index=False)
+
+def select_cells(min_peak=0.0):
+    y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
+    selected = np.where(np.max(y, axis=1) >= min_peak)
+    selected = set(selected[0])
+
+    return selected
+
+def get_args():
+    """parse command line arguments"""
+    arg_parser = ArgumentParser(
+        description="Create a list of cells ordered by similarity")
+    arg_parser.add_argument("--method", dest="method", type=str, required=True)
+    arg_parser.add_argument("--min_similarity", dest="min_similarity",
+                            type=float, default=0.0)
+    arg_parser.add_argument("--min_peak", dest="min_peak", type=float,
+                            default=0.0)
+
+    return arg_parser.parse_args()
 
 if __name__ == "__main__":
     main()

@@ -29,19 +29,25 @@ class StanSession:
         stan_model_path = os.path.basename(stan_model_path)
         self.model_name, model_ext = os.path.splitext(stan_model_path)
         self.stan_backend = stan_backend
+        self.result_dir = result_dir
         if model_ext == ".stan":
             # load model from Stan code
             if self.stan_backend == "pystan":
                 self.model = StanModel(file=stan_model_path,
                                        model_name=self.model_name)
 
-                compiled_model_path = os.path.join(result_dir, "stan_model.pkl")
+                compiled_model_path = os.path.join(self.result_dir,
+                                                   "stan_model.pkl")
                 with open(compiled_model_path, "wb") as f:
                     pickle.dump(self.model, f)
 
                 print("Compiled stan model saved")
             elif self.stan_backend == "cmdstanpy":
-                self.model = CmdStanModel(stan_file=stan_model_path)
+                ecompiled_model_path = os.path.join(self.result_dir,
+                                                    self.model_name)
+                self.model = CmdStanModel(model_name=self.model_name,
+                                          stan_file=stan_model_path,
+                                          exe_file=compiled_model_path)
             else:
                 raise RuntimeError(
                     f"Unsupported Stan backend {self.stan_backend}")
@@ -57,7 +63,6 @@ class StanSession:
             sys.exit(1)
 
         self.data = data
-        self.result_dir = result_dir
         self.num_chains = num_chains
         self.num_iters = num_iters
         self.warmup = warmup

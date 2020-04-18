@@ -99,6 +99,7 @@ def main():
     stan_session.run_sampling(control=control)
     stan_session.gather_fit_result()
 
+    # run analysis on Stan results
     if analysis_tasks:
         analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
                                        use_summary=use_summary,
