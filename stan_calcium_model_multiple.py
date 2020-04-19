@@ -22,6 +22,8 @@ def main():
     num_iters = args.num_iters
     warmup = args.warmup
     thin = args.thin
+    adapt_delta = args.adapt_delta
+    max_treedepth = args.max_treedepth
     rhat_upper_bound = args.rhat_upper_bound
     result_dir = args.result_dir
     prior_std_scale = args.prior_std_scale
@@ -59,6 +61,7 @@ def main():
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
+    control = {"adapt_delta": adapt_delta, "max_treedepth": max_treedepth}
 
     max_num_tries = 3  # maximum number of tries of stan sampling
     # convert 1, 2, 3... to 1st, 2nd, 3rd...
@@ -123,7 +126,7 @@ def main():
                                        num_iters=num_iters, warmup=warmup,
                                        thin=thin,
                                        rhat_upper_bound=rhat_upper_bound)
-            stan_session.run_sampling()
+            stan_session.run_sampling(control=control)
             stan_session.gather_fit_result()
 
             # find chain combo with good R_hat value
@@ -187,6 +190,10 @@ def get_args():
                             default=2000)
     arg_parser.add_argument("--warmup", dest="warmup", type=int, default=1000)
     arg_parser.add_argument("--thin", dest="thin", type=int, default=1)
+    arg_parser.add_argument("--adapt_delta", dest="adapt_delta", type=float,
+                            default=0.8)
+    arg_parser.add_argument("--max_treedepth", dest="max_treedepth", type=int,
+                            default=10)
     arg_parser.add_argument("--rhat_upper_bound", dest="rhat_upper_bound",
                             type=float, default=1.1)
     arg_parser.add_argument("--result_dir", dest="result_dir", metavar="DIR",
