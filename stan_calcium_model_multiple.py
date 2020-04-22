@@ -139,11 +139,10 @@ def main():
                       + "{} cell (ID: {})".format(num2ord(cell_order), cell_id))
                 print("Running analysis on sampled result...")
 
-                analyzer = StanSessionAnalyzer(cell_dir, calcium_ode, 3, y0,
-                                               t0, ts, use_summary=True,
-                                               param_names=param_names,
-                                               y_ref=y_ref)
-                analyzer.simulate_chains()
+                analyzer = StanSessionAnalyzer(
+                    cell_dir, use_summary=True, param_names=param_names)
+                analyzer.simulate_chains(calcium_ode, t0, ts, y0, 3,
+                                         y_ref=y_ref)
                 analyzer.plot_parameters()
                 analyzer.get_r_squared()
             else:

@@ -96,10 +96,9 @@ def main():
     stan_session.run_sampling(control=control)
     stan_session.gather_fit_result()
 
-    analyzer = StanSessionAnalyzer(result_dir, calcium_ode_const, 3, y0, t0, ts,
-                                   use_summary=True, param_names=param_names,
-                                   y_ref=y_ref)
-    analyzer.simulate_chains()
+    analyzer = StanSessionAnalyzer(result_dir, use_summary=True,
+                                   param_names=param_names)
+    analyzer.simulate_chains(calcium_ode_const, t0, ts, y0, 3, y_ref=y_ref)
     analyzer.plot_parameters()
     analyzer.get_r_squared()
 

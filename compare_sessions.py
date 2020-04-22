@@ -14,24 +14,24 @@ param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
 
 def main():
     args = get_args()
-    cell_id = args.cell_id
+    # cell_id = args.cell_id
     result_dir = args.result_dir
     session_list_path = args.session_list
 
-    y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
-    y = y[cell_id, :]
-    t0 = 200
-    t_end = y.size - 1
-    ts = np.linspace(t0 + 1, t_end, t_end - t0)
-    # apply moving average filter
-    y = moving_average(y, window=20)
-    y = np.squeeze(y)
+    # y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
+    # y = y[cell_id, :]
+    # t0 = 200
+    # t_end = y.size - 1
+    # ts = np.linspace(t0 + 1, t_end, t_end - t0)
+    # # apply moving average filter
+    # y = moving_average(y, window=20)
+    # y = np.squeeze(y)
     # downsample trajectories
-    t_downsample = 300
-    y = np.concatenate((y[0:t_downsample], y[t_downsample::10]))
-    ts = np.concatenate((ts[0:t_downsample-t0], ts[t_downsample-t0::10]))
-    y0 = np.array([0, 0, 0.7, y[t0]])
-    y_ref = y[t0 + 1:]
+    # t_downsample = 300
+    # y = np.concatenate((y[0:t_downsample], y[t_downsample::10]))
+    # ts = np.concatenate((ts[0:t_downsample-t0], ts[t_downsample-t0::10]))
+    # y0 = np.array([0, 0, 0.7, y[t0]])
+    # y_ref = y[t0 + 1:]
 
     # create analyzers for all sessions
     session_list = pd.read_csv(session_list_path, delimiter="\t")
@@ -41,9 +41,9 @@ def main():
     session_chains = []
     for idx in range(num_sessions):
         # create a session analyzer for current session
-        analyzer = StanSessionAnalyzer(
-            session_list.loc[idx, "dir"], calcium_ode, 3, y0, t0, ts,
-            use_summary=True, param_names=param_names, y_ref=y_ref)
+        analyzer = StanSessionAnalyzer(session_list.loc[idx, "dir"],
+                                       use_summary=True,
+                                       param_names=param_names)
         session_analyzers.append(analyzer)
 
         # add chains of current session
