@@ -217,21 +217,14 @@ class StanSession:
 
 class StanSessionAnalyzer:
     """Analyze samples from a Stan sampling session"""
-    def __init__(self, result_dir, ode, target_var_idx, y0, t0, timesteps,
-                 stan_backend="pystan", use_summary=False, num_chains=4,
-                 warmup=1000, param_names=None, y_ref=np.empty(0)):
+    def __init__(self, result_dir, stan_backend="pystan", use_summary=False,
+                 num_chains=4, warmup=1000, param_names=None):
         self.result_dir = result_dir
-        self.ode = ode
-        self.t0 = t0
-        self.timesteps = timesteps
-        self.y0 = y0
-        self.target_var_idx = target_var_idx
         self.stan_backend = stan_backend
         self.use_summary = use_summary and not stan_backend == "cmdstanpy"
         self.num_chains = num_chains
         self.warmup = warmup
         self.param_names = param_names
-        self.y_ref = y_ref
 
         # load sample files
         print("Loading stan sample files...")
@@ -291,56 +284,56 @@ class StanSessionAnalyzer:
         for samples in self.samples:
             samples.columns = self.param_names
 
-    def simulate_chains(self, num_samples=None, show_progress=False):
+    def simulate_chains(self, ode, t0, ts, y0, target_var_idx,
+                        y_ref=np.empty(0), show_progress=False,
+                        integrator="dopri5", **integrator_params):
         """Simulate trajectory for all chains"""
-        if not num_samples:
-            num_samples = [samples.shape[0] for samples in self.samples]
-        elif isinstance(num_samples, int):
-            num_samples = [num_samples] * self.num_chains
-
         for chain_idx in range(self.num_chains):
             # get thetas
-            thetas = self.samples[chain_idx].iloc[:num_samples[chain_idx],
-                                                  1:].to_numpy()
-            y = np.zeros((num_samples[chain_idx], self.timesteps.size))
+            num_samples = self.samples[chain_idx].shape[0]
+            thetas = self.samples[chain_idx].iloc[:num_samples, 1:].to_numpy()
+            y = np.zeros((num_samples, ts.size))
 
             # simulate trajectory from each samples
             print("Simulating trajectories from chain {}...".format(chain_idx))
             for sample_idx, theta in tqdm(enumerate(thetas),
                                           total=num_samples[chain_idx],
                                           disable=not show_progress):
-                y[sample_idx, :] = self._simulate_trajectory(theta)
+                y[sample_idx, :] = self._simulate_trajectory(
+                    theta, t0, ts, y0, target_var_idx, integrator,
+                    **integrator_params)
 
-            self._plot_trajectories(chain_idx, y)
+            self._plot_trajectories(chain_idx, ts, y, y_ref=y_ref)
 
             sys.stdout.flush()
 
-    def _simulate_trajectory(self, theta):
+    def _simulate_trajectory(self, ode, theta, t0, ts, y0, target_var_idx,
+                             integrator="dopri5", **integrator_params):
         """Simulate a trajectory with sampled parameters"""
         # initialize ODE solver
-        solver = scipy.integrate.ode(self.ode)
-        solver.set_integrator("dopri5")
+        solver = scipy.integrate.ode(ode)
+        solver.set_integrator(integrator, **integrator_params)
         solver.set_f_params(theta)
-        solver.set_initial_value(self.y0, self.t0)
+        solver.set_initial_value(y0, t0)
 
         # perform numerical integration
-        y = np.zeros_like(self.timesteps)
+        y = np.zeros_like(ts)
         i = 0
-        while solver.successful() and i < self.timesteps.size:
-            solver.integrate(self.timesteps[i])
-            y[i] = solver.y[self.target_var_idx]
+        while solver.successful() and i < ts.size:
+            solver.integrate(ts[i])
+            y[i] = solver.y[target_var_idx]
 
             i += 1
 
         return y
 
-    def _plot_trajectories(self, chain_idx, y):
+    def _plot_trajectories(self, chain_idx, ts, y, y_ref=np.empty(0)):
         """Plot ODE solution (trajectory)"""
         plt.clf()
-        plt.plot(self.timesteps, y.T)
+        plt.plot(ts, y.T)
 
-        if self.y_ref.size > 0:
-            plt.plot(self.timesteps, self.y_ref, "ko", fillstyle="none")
+        if y_ref.size > 0:
+            plt.plot(ts, y_ref, "ko", fillstyle="none")
 
         figure_name = os.path.join(
             self.result_dir, "chain_{}_trajectories.png".format(chain_idx))
@@ -455,11 +448,9 @@ class StanMultiSessionAnalyzer:
         self.sample_analyzers = [None] * self.num_sessions
         for i, result_dir in enumerate(self.session_result_dirs):
             self.sample_analyzers[i] = StanSessionAnalyzer(
-                os.path.join(self.result_root, result_dir), None, None, None,
-                None, None, use_summary=self.use_summary,
-                num_chains=self.num_chains, warmup=self.warmup,
-                param_names=self.param_names, y_ref=None
-            )
+                os.path.join(self.result_root, result_dir),
+                use_summary=self.use_summary, num_chains=self.num_chains,
+                warmup=self.warmup, param_names=self.param_names)
 
         # make a directory for result
         self.analyzer_result_dir = os.path.join(self.result_root,
@@ -498,6 +489,26 @@ def calcium_ode(t, y, theta):
             * (theta[17] - (1 + theta[13]) * y[3])
         - theta[16] * np.power(y[3], 2)
             / (np.power(theta[18], 2) + np.power(y[3], 2))
+    )
+
+    return dydt
+
+def calcium_ode_equiv(t, y, theta):
+    """System of ODEs for the calcium model"""
+    dydt = np.zeros(4)
+
+    dydt[0] = theta[0]* theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
+    dydt[1] = (theta[4] * y[0] * y[0]) \
+        / (theta[5] + y[0] * y[0]) - theta[6] * y[1]
+    dydt[2] = theta[7] * (theta[8] - (y[3] + theta[8]) * y[2])
+    beta = np.power(theta[9] + y[3], 2) \
+        / (np.power(theta[9] + y[3], 2) + theta[9] * theta[10])
+    m_inf = y[1] * y[3] / ((theta[11] + y[1]) * (theta[12] + y[3]))
+    dydt[3] = 1 / beta * (
+        theta[13]
+            * (theta[14] * np.power(m_inf, 3) * np.power(y[2], 3) + theta[15])
+            * (theta[17] - (1 + theta[13]) * y[3])
+        - theta[16] * np.power(y[3], 2) / (theta[18] + y[3] * y[3])
     )
 
     return dydt

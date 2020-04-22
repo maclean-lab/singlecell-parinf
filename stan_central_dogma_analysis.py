@@ -16,10 +16,9 @@ def main():
 
     num_chains = 4
     warmup = 1000
-    analyzer = StanSessionAnalyzer(result_dir, central_dogma_ode, 1, y0, 0, ts,
-                                  num_chains=num_chains, warmup=warmup,
-                                  y_ref=y_ref)
-    analyzer.simulate_chains()
+    analyzer = StanSessionAnalyzer(result_dir, num_chains=num_chains,
+                                   warmup=warmup)
+    analyzer.simulate_chains(central_dogma_ode, 0, ts, y0, 1, y_ref=y_ref)
     analyzer.plot_parameters()
 
 def central_dogma_ode(t, y, theta):

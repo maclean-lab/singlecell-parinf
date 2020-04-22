@@ -101,10 +101,9 @@ def main():
 
     # run analysis on Stan results
     if analysis_tasks:
-        analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
-                                       use_summary=use_summary,
-                                       param_names=param_names, y_ref=y_ref)
-        analyzer.simulate_chains()
+        analyzer = StanSessionAnalyzer(result_dir, use_summary=use_summary,
+                                       param_names=param_names)
+        analyzer.simulate_chains(calcium_ode, t0, ts, y0, 3, y_ref=y_ref)
         analyzer.plot_parameters()
         analyzer.get_r_squared()
 

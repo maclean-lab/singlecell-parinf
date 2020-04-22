@@ -19,6 +19,8 @@ def main():
     warmup = args.warmup
     tasks = args.tasks
     show_progress = args.show_progress
+    integrator = args.integrator
+    integrator_method = args.integrator_method
 
     # initialize Stan analyzer
     y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
@@ -39,19 +41,20 @@ def main():
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
     if use_summary:
-        analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
-                                      use_summary=use_summary,
-                                      param_names=param_names, y_ref=y_ref)
+        analyzer = StanSessionAnalyzer(result_dir, use_summary=use_summary,
+                                      param_names=param_names)
     else:
-        analyzer = StanSessionAnalyzer(result_dir, calcium_ode, 3, y0, t0, ts,
-                                      num_chains=num_chains, warmup=warmup,
-                                      param_names=param_names, y_ref=y_ref)
+        analyzer = StanSessionAnalyzer(result_dir, num_chains=num_chains,
+                                       warmup=warmup, param_names=param_names)
 
     # run tasks
     if "all" in tasks:
         tasks = ["simulate_chains", "plot_parameters", "get_r_squared"]
     if "simulate_chains" in tasks:
-        analyzer.simulate_chains(show_progress=show_progress)
+        analyzer.simulate_chains(
+            calcium_ode, t0, ts, y0, 3, y_ref=y_ref,
+            show_progress=show_progress, integrator=integrator,
+            method=integrator_method)
     if "plot_parameters" in tasks:
         analyzer.plot_parameters()
     if "get_r_squared" in tasks:
@@ -59,8 +62,8 @@ def main():
 
 def get_args():
     """parse command line arguments"""
-    arg_parser = argparse.ArgumentParser(description="Analyze Stan sample "
-                                         + "files.")
+    arg_parser = argparse.ArgumentParser(
+        description="Analyze Stan sample files.")
     arg_parser.add_argument("--result_dir", dest="result_dir", metavar="DIR",
                             type=str, required=True)
     arg_parser.add_argument("--cell_id", dest="cell_id", metavar="N", type=int,
@@ -82,6 +85,10 @@ def get_args():
                             default=["all"])
     arg_parser.add_argument("--show_progress", dest="show_progress",
                             default=False, action="store_true")
+    arg_parser.add_argument("--integrator", dest="integrator", type=str,
+                            default="dopri5")
+    arg_parser.add_argument("--integrator_method", dest="integrator_method",
+                            type=str, default="adams")
 
     return arg_parser.parse_args()
 
