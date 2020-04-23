@@ -6,13 +6,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-result_dir = "../../result/SoptSC/SoptSC_similarity_matrix_stats"
+result_dir = "../../result/SoptSC/SoptSC_similarity_matrix_stats_feature_100"
 
 def main():
     # load similarity matrix
-    soptsc_vars = scipy.io.loadmat("../../result/SoptSC/SoptSC/workspace.mat")
+    soptsc_vars = scipy.io.loadmat(
+        "../../result/SoptSC/SoptSC_feature_100/workspace.mat")
     similarity_matrix = soptsc_vars["W"]
-    # plot_neighbor_stats(similarity_matrix)
+    plot_neighbor_stats(similarity_matrix)
     plot_similarity_scores(similarity_matrix)
 
 def plot_neighbor_stats(similarity_matrix):

@@ -90,6 +90,7 @@ def main():
     control = {"adapt_delta": adapt_delta, "max_treedepth": max_treedepth}
     print("The following NUTS parameters will be used:")
     print(control)
+    sys.stdout.flush()
     stan_session = StanSession(stan_model, calcium_data, result_dir,
                                stan_backend=stan_backend, num_chains=num_chains,
                                num_iters=num_iters, warmup=warmup, thin=thin)

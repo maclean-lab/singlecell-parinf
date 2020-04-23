@@ -14,24 +14,22 @@ def main():
                             default=None)
     arg_parser.add_argument("--cell_list", dest="cell_list", type=str,
                             default=None)
+    arg_parser.add_argument("--output", dest="output", type=str,
+                            default="trajecotries.pdf")
     args = arg_parser.parse_args()
 
     # load trajectories
     print("Loading trajectories")
     y_raw = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
 
-    figure_name = "trajectories"
-
     # apply filter
     if args.filter_type == "moving_average":
         y = moving_average(y_raw)
-        figure_name += "_moving_average"
     else:
         print("No filter specified or unknown type of filter. Using raw "
               + "trajectories")
 
         y = y_raw
-        figure_name += "_raw"
 
     cell_names = [f"cell {cell_id}" for cell_id in range(y.shape[0])]
 
@@ -39,13 +37,10 @@ def main():
     if args.cell_list:
         cell_list = pd.read_csv(args.cell_list, delimiter="\t", index_col=False)
         y = y[cell_list["Cell"], ]
-        figure_name += "_ordered"
         cell_names = [f"cell {cell_id}" for cell_id in cell_list["Cell"]]
 
-    figure_path = os.path.join("../../result", figure_name + ".pdf")
-
     # make the trajectory plot
-    pdf_multi_plot(plt.plot, y, figure_path, titles=cell_names,
+    pdf_multi_plot(plt.plot, y, args.output, titles=cell_names,
                    show_progress=True)
     print("Trajectory plot saved")
 

@@ -12,33 +12,34 @@ def main():
     method = args.method
     min_similarity = args.min_similarity
     min_peak = args.min_peak
+    output_file = args.output
 
     # load similarity matrix
     soptsc_vars = scipy.io.loadmat(
-        "../../result/SoptSC/SoptSC_feature_3000/workspace.mat")
+        "../../result/SoptSC/SoptSC_feature_100/workspace.mat")
     similarity_matrix = soptsc_vars["W"]
 
     # plot similarity matrix
     if method == "plot":
-        plot_similarity(similarity_matrix)
+        plot_similarity(similarity_matrix, output_file)
     elif method == "greedy":
-        get_cells_greedy(similarity_matrix)
+        get_cells_greedy(similarity_matrix, output_file)
     elif method == "bfs":
-        get_cells_bfs(similarity_matrix, min_similarity=min_similarity,
-                      min_peak=min_peak)
+        get_cells_bfs(similarity_matrix, output_file,
+                      min_similarity=min_similarity, min_peak=min_peak)
     elif method == "dfs":
-        get_cells_dfs(similarity_matrix, min_similarity=min_similarity,
-                      min_peak=min_peak)
+        get_cells_dfs(similarity_matrix, output_file,
+                      min_similarity=min_similarity, min_peak=min_peak)
 
-def plot_similarity(similarity_matrix):
+def plot_similarity(similarity_matrix, output_file):
         plt.clf()
         plt.figure(figsize=(16, 16))
         plt.imshow(similarity_matrix, cmap="gray")
         plt.colorbar()
-        plt.savefig("cell_similarity.png")
+        plt.savefig(output_file)
         plt.close()
 
-def get_cells_greedy(similarity_matrix, root=0, verbose=False):
+def get_cells_greedy(similarity_matrix, output_file, root=0, verbose=False):
     num_cells = similarity_matrix.shape[0]
     visited = np.full(num_cells, False, dtype=bool)
     ordered_cells = np.zeros(num_cells, dtype=np.int)
@@ -63,10 +64,10 @@ def get_cells_greedy(similarity_matrix, root=0, verbose=False):
             + "to their predecessors")
 
     ordered_cells = pd.Series(ordered_cells)
-    ordered_cells.to_csv("cells_by_similarity_greedy.txt", header=False,
-                         index=False)
+    ordered_cells.to_csv(output_file, header=False, index=False)
 
-def get_cells_bfs(similarity_matrix, root=0, min_similarity=0.0, min_peak=0.0):
+def get_cells_bfs(similarity_matrix, output_file, root=0, min_similarity=0.0,
+                  min_peak=0.0):
     """get cell ordering using breadth-first search"""
     # initialize BFS
     num_cells = similarity_matrix.shape[0]
@@ -103,9 +104,10 @@ def get_cells_bfs(similarity_matrix, root=0, min_similarity=0.0, min_peak=0.0):
             next_level = collections.deque()
 
     bfs_result = pd.DataFrame({"Cell": ordered_cells, "Parent": parents})
-    bfs_result.to_csv("cells_by_similarity_bfs.txt", sep="\t", index=False)
+    bfs_result.to_csv(output_file, sep="\t", index=False)
 
-def get_cells_dfs(similarity_matrix, root=0, min_similarity=0.0, min_peak=0.0):
+def get_cells_dfs(similarity_matrix, output_file, root=0, min_similarity=0.0,
+                  min_peak=0.0):
     """get cell ordering using depth-first search"""
     # initialize DFS
     unvisited_set = select_cells(min_peak=min_peak)
@@ -153,7 +155,7 @@ def get_cells_dfs(similarity_matrix, root=0, min_similarity=0.0, min_peak=0.0):
             print("{}\t{}\t{}".format(i, cell, children))
 
     dfs_result = pd.DataFrame({"Cell": ordered_cells, "Parent": parents})
-    dfs_result.to_csv("cells_by_similarity_dfs.txt", sep="\t", index=False)
+    dfs_result.to_csv(output_file, sep="\t", index=False)
 
 def select_cells(min_peak=0.0):
     y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
@@ -171,6 +173,8 @@ def get_args():
                             type=float, default=0.0)
     arg_parser.add_argument("--min_peak", dest="min_peak", type=float,
                             default=0.0)
+    arg_parser.add_argument("--output", dest="output", type=str,
+                            default="cell_list.txt")
 
     return arg_parser.parse_args()
 

@@ -296,12 +296,11 @@ class StanSessionAnalyzer:
 
             # simulate trajectory from each samples
             print("Simulating trajectories from chain {}...".format(chain_idx))
-            for sample_idx, theta in tqdm(enumerate(thetas),
-                                          total=num_samples[chain_idx],
+            for sample_idx, theta in tqdm(enumerate(thetas), total=num_samples,
                                           disable=not show_progress):
                 y[sample_idx, :] = self._simulate_trajectory(
-                    theta, t0, ts, y0, target_var_idx, integrator,
-                    **integrator_params)
+                    ode, theta, t0, ts, y0, target_var_idx,
+                    integrator=integrator, **integrator_params)
 
             self._plot_trajectories(chain_idx, ts, y, y_ref=y_ref)
 
