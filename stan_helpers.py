@@ -299,13 +299,8 @@ class StanSessionAnalyzer:
             for sample_idx, theta in tqdm(enumerate(thetas), total=num_samples,
                                           disable=not show_progress):
                 y[sample_idx, :] = self._simulate_trajectory(
-<<<<<<< HEAD
                     ode, theta, t0, ts, y0, target_var_idx,
                     integrator=integrator, **integrator_params)
-=======
-                    theta, t0, ts, y0, target_var_idx, integrator,
-                    **integrator_params)
->>>>>>> 6ea7bd3e2c1a870c3a9f6502b69cb541c0daee40
 
             self._plot_trajectories(chain_idx, ts, y, y_ref=y_ref)
 
