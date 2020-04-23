@@ -51,6 +51,7 @@ def main():
     if "all" in tasks:
         tasks = ["simulate_chains", "plot_parameters", "get_r_squared"]
     if "simulate_chains" in tasks:
+<<<<<<< HEAD
         integrator_params = {}
         if integrator == "vode":
             integrator_params["method"] = integrator_method
@@ -59,6 +60,12 @@ def main():
             calcium_ode, t0, ts, y0, 3, y_ref=y_ref,
             show_progress=show_progress, integrator=integrator,
             **integrator_params)
+=======
+        analyzer.simulate_chains(
+            calcium_ode, t0, ts, y0, 3, y_ref=y_ref,
+            show_progress=show_progress, integrator=integrator,
+            method=integrator_method)
+>>>>>>> 6ea7bd3e2c1a870c3a9f6502b69cb541c0daee40
     if "plot_parameters" in tasks:
         analyzer.plot_parameters()
     if "get_r_squared" in tasks:
