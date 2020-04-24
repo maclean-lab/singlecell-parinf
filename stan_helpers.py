@@ -22,28 +22,28 @@ from pystan import StanModel
 from cmdstanpy import CmdStanModel
 
 class StanSession:
-    def __init__(self, stan_model_path, data, result_dir, stan_backend="pystan",
-                 num_chains=4, num_iters=1000, warmup=1000, thin=1,
+    def __init__(self, stan_model_path, output_dir, stan_backend="pystan",
+                 data=None, num_chains=4, num_iters=1000, warmup=1000, thin=1,
                  rhat_upper_bound=1.1):
         # load Stan model
         stan_model_path = os.path.basename(stan_model_path)
         self.model_name, model_ext = os.path.splitext(stan_model_path)
         self.stan_backend = stan_backend
-        self.result_dir = result_dir
+        self.output_dir = output_dir
         if model_ext == ".stan":
             # load model from Stan code
             if self.stan_backend == "pystan":
                 self.model = StanModel(file=stan_model_path,
                                        model_name=self.model_name)
 
-                compiled_model_path = os.path.join(self.result_dir,
+                compiled_model_path = os.path.join(self.output_dir,
                                                    "stan_model.pkl")
                 with open(compiled_model_path, "wb") as f:
                     pickle.dump(self.model, f)
 
                 print("Compiled stan model saved")
             elif self.stan_backend == "cmdstanpy":
-                ecompiled_model_path = os.path.join(self.result_dir,
+                ecompiled_model_path = os.path.join(self.output_dir,
                                                     self.model_name)
                 self.model = CmdStanModel(model_name=self.model_name,
                                           stan_file=stan_model_path,
@@ -83,7 +83,7 @@ class StanSession:
             self.fit = self.model.sampling(
                 data=self.data, chains=self.num_chains, iter=self.num_iters,
                 warmup=self.warmup, thin=self.thin,
-                sample_file=os.path.join(self.result_dir, "chain"),
+                sample_file=os.path.join(self.output_dir, "chain"),
                 control=control)
         else:  # self.stan_backend == "cmdstanpy"
             self.fit = self.model.sample(
@@ -91,12 +91,12 @@ class StanSession:
                 iter_warmup=self.warmup,
                 iter_sampling=self.num_iters - self.warmup, save_warmup=True,
                 thin=self.thin, max_treedepth=control["max_treedepth"],
-                adapt_delta=control["adapt_delta"], output_dir=self.result_dir)
+                adapt_delta=control["adapt_delta"], output_dir=self.output_dir)
         print("Stan sampling finished")
 
         # save fit object
         if self.stan_backend == "pystan":
-            stan_fit_path = os.path.join(self.result_dir, "stan_fit.pkl")
+            stan_fit_path = os.path.join(self.output_dir, "stan_fit.pkl")
             with open(stan_fit_path, "wb") as f:
                 pickle.dump(self.fit, f)
             print("Stan fit object saved")
@@ -107,7 +107,7 @@ class StanSession:
             self.inference_data = az.from_pystan(self.fit)
         else:  # self.stan_backend == "cmdstanpy"
             self.inference_data = az.from_cmdstanpy(self.fit)
-        inference_data_path = os.path.join(self.result_dir, "arviz_inf_data.nc")
+        inference_data_path = os.path.join(self.output_dir, "arviz_inf_data.nc")
         az.to_netcdf(self.inference_data, inference_data_path)
         print("Arviz inference data saved")
 
@@ -121,7 +121,7 @@ class StanSession:
 
         # get summary of fit
         if self.stan_backend == "pystan":
-            summary_path = os.path.join(self.result_dir, "stan_fit_summary.txt")
+            summary_path = os.path.join(self.output_dir, "stan_fit_summary.txt")
             with open(summary_path, "w") as sf:
                 sf.write(self.fit.stansummary())
 
@@ -130,11 +130,10 @@ class StanSession:
             self.fit_summary = pd.DataFrame(
                 data=fit_summary["summary"],
                 index=fit_summary["summary_rownames"],
-                columns=fit_summary["summary_colnames"]
-            )
+                columns=fit_summary["summary_colnames"])
         else:  # self.stan_backend == "cmdstanpy"
             self.fit_summary = fit_summary
-        fit_summary_path = os.path.join(self.result_dir, "stan_fit_summary.csv")
+        fit_summary_path = os.path.join(self.output_dir, "stan_fit_summary.csv")
         self.fit_summary.to_csv(fit_summary_path)
         if verbose:
             print("Stan summary saved")
@@ -142,7 +141,7 @@ class StanSession:
         # save samples
         if self.stan_backend == "pystan":
             fit_samples = self.fit.to_dataframe()
-            fit_samples_path = os.path.join(self.result_dir,
+            fit_samples_path = os.path.join(self.output_dir,
                                             "stan_fit_samples.csv")
             fit_samples.to_csv(fit_samples_path)
 
@@ -155,7 +154,7 @@ class StanSession:
         # make trace plot
         plt.clf()
         az.plot_trace(self.inference_data)
-        trace_figure_path = os.path.join(self.result_dir, "stan_fit_trace.png")
+        trace_figure_path = os.path.join(self.output_dir, "stan_fit_trace.png")
         plt.savefig(trace_figure_path)
         plt.close()
         if verbose:
@@ -164,7 +163,7 @@ class StanSession:
         # make plot for posterior
         plt.clf()
         az.plot_posterior(self.inference_data)
-        posterior_figure_path = os.path.join(self.result_dir,
+        posterior_figure_path = os.path.join(self.output_dir,
                                              "stan_fit_posterior.png")
         plt.savefig(posterior_figure_path)
         plt.close()
@@ -174,7 +173,7 @@ class StanSession:
         # make pair plots
         plt.clf()
         az.plot_pair(self.inference_data)
-        pair_figure_path = os.path.join(self.result_dir, "stan_fit_pair.png")
+        pair_figure_path = os.path.join(self.output_dir, "stan_fit_pair.png")
         plt.savefig(pair_figure_path)
         plt.close()
         if verbose:
@@ -215,11 +214,15 @@ class StanSession:
         else:
             return None
 
+    def run_optimization(self):
+        optimized_params = self.model.optimizing(data=self.data)
+        print(optimized_params)
+
 class StanSessionAnalyzer:
     """Analyze samples from a Stan sampling session"""
-    def __init__(self, result_dir, stan_backend="pystan", use_summary=False,
+    def __init__(self, output_dir, stan_backend="pystan", use_summary=False,
                  num_chains=4, warmup=1000, param_names=None):
-        self.result_dir = result_dir
+        self.output_dir = output_dir
         self.stan_backend = stan_backend
         self.use_summary = use_summary and not stan_backend == "cmdstanpy"
         self.num_chains = num_chains
@@ -234,7 +237,7 @@ class StanSessionAnalyzer:
         if self.use_summary:
             # get number of chains and number of warmup iterations from
             # stan_fit_summary.txt
-            summary_path = os.path.join(self.result_dir, "stan_fit_summary.txt")
+            summary_path = os.path.join(self.output_dir, "stan_fit_summary.txt")
             with open(summary_path, "r") as summary_file:
                 lines = summary_file.readlines()
 
@@ -243,7 +246,7 @@ class StanSessionAnalyzer:
             self.warmup = int(sampling_params[2])
 
             # get raw samples
-            sample_path = os.path.join(self.result_dir, "stan_fit_samples.csv")
+            sample_path = os.path.join(self.output_dir, "stan_fit_samples.csv")
             self.raw_samples = pd.read_csv(sample_path, index_col=0)
 
             # extract sampled parameters
@@ -263,7 +266,7 @@ class StanSessionAnalyzer:
             for chain_idx in range(self.num_chains):
                 # get raw samples
                 sample_path = os.path.join(
-                    self.result_dir, "chain_{}.csv".format(chain_idx))
+                    self.output_dir, "chain_{}.csv".format(chain_idx))
                 raw_samples = pd.read_csv(sample_path, index_col=False,
                                           comment="#")
                 raw_samples.set_index(pd.RangeIndex(raw_samples.shape[0]),
@@ -287,7 +290,7 @@ class StanSessionAnalyzer:
     def simulate_chains(self, ode, t0, ts, y0, target_var_idx,
                         y_ref=np.empty(0), show_progress=False,
                         integrator="dopri5", **integrator_params):
-        """Simulate trajectory for all chains"""
+        """Simulate trajectories for all chains"""
         for chain_idx in range(self.num_chains):
             # get thetas
             num_samples = self.samples[chain_idx].shape[0]
@@ -335,7 +338,7 @@ class StanSessionAnalyzer:
             plt.plot(ts, y_ref, "ko", fillstyle="none")
 
         figure_name = os.path.join(
-            self.result_dir, "chain_{}_trajectories.png".format(chain_idx))
+            self.output_dir, "chain_{}_trajectories.png".format(chain_idx))
         plt.savefig(figure_name)
         plt.close()
 
@@ -370,7 +373,7 @@ class StanSessionAnalyzer:
 
         # save trace plot
         figure_name = os.path.join(
-            self.result_dir, "chain_{}_parameter_trace.png".format(chain_idx))
+            self.output_dir, "chain_{}_parameter_trace.png".format(chain_idx))
         plt.savefig(figure_name)
         plt.close()
 
@@ -390,7 +393,7 @@ class StanSessionAnalyzer:
 
         # save violin plot
         figure_name = os.path.join(
-            self.result_dir,
+            self.output_dir,
             "chain_{}_parameter_violin_plot.png".format(chain_idx)
         )
         plt.savefig(figure_name)
@@ -404,7 +407,7 @@ class StanSessionAnalyzer:
                                    edgecolor="#ffffff", linewidth=0.2),
                      diag_kws=dict(color="#191970", shade=True))
         figure_name = os.path.join(
-            self.result_dir,
+            self.output_dir,
             "chain_{}_parameter_pair_plot.png".format(chain_idx)
         )
         plt.savefig(figure_name)
@@ -424,18 +427,18 @@ class StanSessionAnalyzer:
             r_squared_df = pd.DataFrame(r_squared, index=self.param_names,
                                         columns=self.param_names)
             r_squared_df.to_csv(
-                os.path.join(self.result_dir,
+                os.path.join(self.output_dir,
                              "chain_{}_r_squared.csv".format(chain_idx)),
                 float_format="%.8f"
             )
 
 class StanMultiSessionAnalyzer:
-    def __init__(self, session_list, result_root, session_result_dirs,
+    def __init__(self, session_list, result_root, session_output_dirs,
                  use_summary=False, num_chains=4, warmup=1000,
                  param_names=None):
         self.session_list = session_list
         self.result_root = result_root
-        self.session_result_dirs = session_result_dirs
+        self.session_output_dirs = session_output_dirs
         self.use_summary = use_summary
         self.num_chains = num_chains
         self.warmup = warmup
@@ -445,9 +448,9 @@ class StanMultiSessionAnalyzer:
 
         # initialize sample anaylzers for all cells
         self.sample_analyzers = [None] * self.num_sessions
-        for i, result_dir in enumerate(self.session_result_dirs):
+        for i, output_dir in enumerate(self.session_output_dirs):
             self.sample_analyzers[i] = StanSessionAnalyzer(
-                os.path.join(self.result_root, result_dir),
+                os.path.join(self.result_root, output_dir),
                 use_summary=self.use_summary, num_chains=self.num_chains,
                 warmup=self.warmup, param_names=self.param_names)
 
@@ -547,11 +550,16 @@ def moving_average(x: np.ndarray, window: int = 20, verbose=True):
         sys.stdout.flush()
 
     # make x 2D if it is 1D
-    if len(x.shape) == 1:
+    num_dims = len(x.shape)
+    if num_dims == 1:
         x = x[np.newaxis, :]
 
     x_df = pd.DataFrame(x)
     x_moving_average = x_df.rolling(window=window, axis=1).mean().to_numpy()
+
+    # restore dimension if the given sequence was 1D
+    if num_dims == 1:
+        x = np.squeeze(x)
 
     return x_moving_average
 

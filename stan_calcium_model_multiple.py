@@ -121,7 +121,7 @@ def main():
             sys.stdout.flush()
 
             # run Stan session
-            stan_session = StanSession(stan_model, calcium_data, cell_dir,
+            stan_session = StanSession(stan_model, cell_dir, data=calcium_data,
                                        num_chains=num_chains,
                                        num_iters=num_iters, warmup=warmup,
                                        thin=thin,

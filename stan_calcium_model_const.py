@@ -91,9 +91,10 @@ def main():
     print("The following NUTS parameters will be used:")
     print(control)
     sys.stdout.flush()
-    stan_session = StanSession(stan_model, calcium_data, result_dir,
-                               stan_backend=stan_backend, num_chains=num_chains,
-                               num_iters=num_iters, warmup=warmup, thin=thin)
+    stan_session = StanSession(stan_model, result_dir,
+                               stan_backend=stan_backend, data=calcium_data,
+                               num_chains=num_chains, num_iters=num_iters,
+                               warmup=warmup, thin=thin)
     stan_session.run_sampling(control=control)
     stan_session.gather_fit_result()
 

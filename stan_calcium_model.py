@@ -94,9 +94,10 @@ def main():
     print("The following NUTS parameters will be used:")
     print(control)
     sys.stdout.flush()
-    stan_session = StanSession(stan_model, calcium_data, result_dir,
-                               stan_backend=stan_backend, num_chains=num_chains,
-                               num_iters=num_iters, warmup=warmup, thin=thin)
+    stan_session = StanSession(stan_model, result_dir,
+                               stan_backend=stan_backend, data=calcium_data,
+                               num_chains=num_chains, num_iters=num_iters,
+                               warmup=warmup, thin=thin)
     stan_session.run_sampling(control=control)
     stan_session.gather_fit_result()
 
@@ -104,9 +105,14 @@ def main():
     if analysis_tasks:
         analyzer = StanSessionAnalyzer(result_dir, use_summary=use_summary,
                                        param_names=param_names)
-        analyzer.simulate_chains(calcium_ode, t0, ts, y0, 3, y_ref=y_ref)
-        analyzer.plot_parameters()
-        analyzer.get_r_squared()
+        if "all" in tasks:
+            tasks = ["simulate_chains", "plot_parameters", "get_r_squared"]
+        if "simulate_chains" in tasks:
+            analyzer.simulate_chains(calcium_ode, t0, ts, y0, 3, y_ref=y_ref)
+        if "plot_parameters" in tasks:
+            analyzer.plot_parameters()
+        if "get_r_squared" in tasks:
+            analyzer.get_r_squared()
 
 def get_args():
     """parse command line arguments"""
@@ -115,7 +121,8 @@ def get_args():
     arg_parser.add_argument("--stan_model", dest="stan_model", metavar="MODEL",
                             type=str, required=True)
     arg_parser.add_argument("--stan_backend", dest="stan_backend",
-                            metavar="BACKEND", type=str, default="pystan")
+                            metavar="BACKEND", type=str, default="pystan",
+                            choices=["pystan", "cmdstanpy"])
     arg_parser.add_argument("--cell_id", dest="cell_id", metavar="N", type=int,
                             default=0)
     arg_parser.add_argument("--filter_type", dest="filter_type",
