@@ -69,7 +69,7 @@ def main():
 
         # run Stan optimization
         print(f"Running variational Bayes for cell {cell_id}")
-        vb_results = stan_session.model.optimizing(data=calcium_data)
+        vb_results = stan_session.model.vb(data=calcium_data)
         print(vb_results)
 
         """
