@@ -219,7 +219,7 @@ class StanSession:
         print(optimized_params)
 
     def run_variational_bayes(self):
-        vb_results = self.model.vb(sample_file="vb_samples",
+        vb_results = self.model.vb(data=self.data, sample_file="vb_samples",
                                    diagnostic_file="vb_diagnostic")
 
         return vb_results
