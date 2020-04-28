@@ -218,6 +218,12 @@ class StanSession:
         optimized_params = self.model.optimizing(data=self.data)
         print(optimized_params)
 
+    def run_variational_bayes(self):
+        vb_results = self.model.vb(sample_file="vb_samples",
+                                   diagnostic_file="vb_diagnostic")
+
+        return vb_results
+
 class StanSessionAnalyzer:
     """Analyze samples from a Stan sampling session"""
     def __init__(self, output_dir, stan_backend="pystan", use_summary=False,
@@ -559,7 +565,7 @@ def moving_average(x: np.ndarray, window: int = 20, verbose=True):
 
     # restore dimension if the given sequence was 1D
     if num_dims == 1:
-        x = np.squeeze(x)
+        x_moving_average = np.squeeze(x_moving_average)
 
     return x_moving_average
 
