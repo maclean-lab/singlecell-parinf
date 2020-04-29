@@ -14,6 +14,7 @@ def main():
     filter_type = args.filter_type
     moving_average_window = args.moving_average_window
     t0 = args.t0
+    stan_operation = args.stan_operation
     use_summary = args.use_summary
     num_chains = args.num_chains
     warmup = args.warmup
@@ -41,11 +42,15 @@ def main():
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
     if use_summary:
-        analyzer = StanSessionAnalyzer(result_dir, use_summary=use_summary,
-                                      param_names=param_names)
+        analyzer = StanSessionAnalyzer(result_dir,
+                                       stan_operation=stan_operation,
+                                       use_summary=use_summary,
+                                       param_names=param_names)
     else:
         analyzer = StanSessionAnalyzer(result_dir, num_chains=num_chains,
-                                       warmup=warmup, param_names=param_names)
+                                       warmup=warmup,
+                                       stan_operation=stan_operation,
+                                       param_names=param_names)
 
     # run tasks
     if "all" in tasks:
@@ -78,6 +83,8 @@ def get_args():
                             dest="moving_average_window", type=int, default=20)
     arg_parser.add_argument("--t0", dest="t0", metavar="T0", type=int,
                             default=200)
+    arg_parser.add_argument("--stan_operation", dest="stan_operation", type=str,
+                            default="sampling")
     arg_parser.add_argument("--use_summary", dest="use_summary", default=False,
                             action="store_true")
     arg_parser.add_argument("--num_chains", dest="num_chains", type=int,

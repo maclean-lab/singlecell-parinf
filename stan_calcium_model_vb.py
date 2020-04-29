@@ -7,7 +7,8 @@ import numpy as np
 import scipy.integrate
 import pandas as pd
 import matplotlib.pyplot as plt
-from stan_helpers import StanSession, moving_average, calcium_ode
+from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
+    calcium_ode
 
 def main():
     # get command-line arguments
@@ -52,6 +53,7 @@ def main():
     for cell_id in range(num_cells):
         # gather prepared data
         print(f"Initializing data for cell {cell_id}")
+        cell_dir = os.path.join(result_dir, f"cell-{cell_id:04d}")
         y0 = np.array([0, 0, 0.7, y[cell_id, t0]])
         y_ref = y[cell_id, t0 + 1:]
         calcium_data = {
@@ -69,26 +71,15 @@ def main():
 
         # run Stan optimization
         print(f"Running variational Bayes for cell {cell_id}")
-        vb_results = stan_session.model.vb(data=calcium_data,
-                                           sample_file="vb_samples",
-                                           diagnostic_file="vb_diagnostic")
-        print(vb_results)
+        _ = stan_session.model.vb(
+            data=calcium_data,
+            sample_file=os.path.join(cell_id, "chain_0.csv"),
+            diagnostic_file=os.path.join(cell_id, "vb_diagnostic"))
 
-        """
-        # simulate trajectory using optimized parameters
-        solver = scipy.integrate.ode(calcium_ode)
-        solver.set_integrator("dopri5")
-        solver.set_f_params(theta)
-        solver.set_initial_value(y0, t0)
-
-        # perform numerical integration
-        i = 0
-        while solver.successful() and i < ts.size:
-            solver.integrate(ts[i])
-            y_sim[cell_id, i] = solver.y[3]
-
-            i += 1
-        """
+        analyzer = StanSessionAnalyzer(cell_id, use_summary=False,
+                                       num_chains=1, warmup=0,
+                                       param_names=param_names)
+        analyzer.simulate_chains(calcium_ode, t0, ts, y0, 3, y_ref=y_ref)
 
 def get_args():
     """parse command line arguments"""

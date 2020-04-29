@@ -219,18 +219,22 @@ class StanSession:
         print(optimized_params)
 
     def run_variational_bayes(self):
-        vb_results = self.model.vb(data=self.data, sample_file="vb_samples",
-                                   diagnostic_file="vb_diagnostic")
+        sample_path = os.path.join(self.output_dir, "chain_0.csv")
+        diagnostic_path = os.path.join(self.output_dir, "vb_diagnostic.txt")
+        vb_results = self.model.vb(data=self.data, sample_file=sample_path,
+                                   diagnostic_file=diagnostic_path)
 
         return vb_results
 
 class StanSessionAnalyzer:
-    """Analyze samples from a Stan sampling session"""
-    def __init__(self, output_dir, stan_backend="pystan", use_summary=False,
-                 num_chains=4, warmup=1000, param_names=None):
+    """Analyze samples from a Stan sampling/varitional Bayes session"""
+    def __init__(self, output_dir, stan_backend="pystan",
+                 stan_operation="sampling", use_summary=False, num_chains=4,
+                 warmup=1000, param_names=None):
         self.output_dir = output_dir
         self.stan_backend = stan_backend
-        self.use_summary = use_summary and not stan_backend == "cmdstanpy"
+        self.stan_operation = stan_operation
+        self.use_summary = use_summary
         self.num_chains = num_chains
         self.warmup = warmup
         self.param_names = param_names
@@ -280,7 +284,12 @@ class StanSessionAnalyzer:
                 self.raw_samples.append(raw_samples)
 
                 # extract sampled parameters
-                self.samples.append(raw_samples.iloc[self.warmup:, 7:])
+                if self.stan_operation == "sampling":
+                    first_col_idx = 7
+                else:
+                    first_col_idx = 3
+                self.samples.append(
+                    raw_samples.iloc[self.warmup:, first_col_idx:])
 
         self.num_samples = self.samples[0].shape[0]
         self.num_params = self.samples[0].shape[1]
