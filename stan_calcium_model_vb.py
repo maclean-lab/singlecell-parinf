@@ -19,6 +19,7 @@ def main():
     t0 = args.t0
     num_cells = args.num_cells
     result_dir = args.result_dir
+    prior_std_scale = args.prior_std_scale
 
     # prepare data for Stan model
     # get trajectory and time
@@ -46,6 +47,10 @@ def main():
     num_params = len(param_names) - 1
     prior_mean = np.ones(num_params)
     prior_std = np.ones(num_params)
+    if prior_std_scale != 1.0:
+        print("Scaling standard deviation of prior distribution by "
+              + "{}...".format(prior_std_scale))
+        prior_std *= prior_std_scale
 
     # get stan model
     stan_session = StanSession(stan_model, result_dir)
@@ -70,10 +75,11 @@ def main():
             "sigma_prior": prior_std
         }
         print("Data initialized")
-        sys.stdout.flush()
 
         # run Stan optimization
         print(f"Running variational Bayes for cell {cell_id}")
+        sys.stdout.flush()
+
         _ = stan_session.model.vb(
             data=calcium_data,
             sample_file=os.path.join(cell_dir, "chain_0.csv"),
@@ -100,6 +106,8 @@ def get_args():
                             default=0)
     arg_parser.add_argument("--result_dir", dest="result_dir", metavar="DIR",
                             type=str, default=".")
+    arg_parser.add_argument("--prior_std_scale", dest="prior_std_scale",
+                            type=float, default=1.0)
 
     return arg_parser.parse_args()
 
