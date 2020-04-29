@@ -51,9 +51,12 @@ def main():
     stan_session = StanSession(stan_model, result_dir)
 
     for cell_id in range(num_cells):
-        # gather prepared data
         print(f"Initializing data for cell {cell_id}")
         cell_dir = os.path.join(result_dir, f"cell-{cell_id:04d}")
+        if not os.path.exists(cell_dir):
+            os.mkdir(cell_dir)
+
+        # gather prepared data
         y0 = np.array([0, 0, 0.7, y[cell_id, t0]])
         y_ref = y[cell_id, t0 + 1:]
         calcium_data = {
@@ -73,10 +76,10 @@ def main():
         print(f"Running variational Bayes for cell {cell_id}")
         _ = stan_session.model.vb(
             data=calcium_data,
-            sample_file=os.path.join(cell_id, "chain_0.csv"),
-            diagnostic_file=os.path.join(cell_id, "vb_diagnostic"))
+            sample_file=os.path.join(cell_dir, "chain_0.csv"),
+            diagnostic_file=os.path.join(cell_dir, "vb_diagnostic"))
 
-        analyzer = StanSessionAnalyzer(cell_id, use_summary=False,
+        analyzer = StanSessionAnalyzer(cell_dir, use_summary=False,
                                        num_chains=1, warmup=0,
                                        param_names=param_names)
         analyzer.simulate_chains(calcium_ode, t0, ts, y0, 3, y_ref=y_ref)
