@@ -85,9 +85,9 @@ def main():
             sample_file=os.path.join(cell_dir, "chain_0.csv"),
             diagnostic_file=os.path.join(cell_dir, "vb_diagnostic"))
 
-        analyzer = StanSessionAnalyzer(cell_dir, use_summary=False,
-                                       num_chains=1, warmup=0,
-                                       param_names=param_names)
+        analyzer = StanSessionAnalyzer(cell_dir, stan_operation="vb",
+                                       use_summary=False, num_chains=1,
+                                       warmup=0, param_names=param_names)
         analyzer.simulate_chains(calcium_ode, t0, ts, y0, 3, y_ref=y_ref)
 
 def get_args():

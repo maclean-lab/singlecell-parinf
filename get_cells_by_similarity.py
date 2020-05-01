@@ -2,6 +2,7 @@
 import sys
 import collections
 from argparse import ArgumentParser
+import random
 import numpy as np
 import scipy.io
 import pandas as pd
@@ -10,6 +11,7 @@ import matplotlib.pyplot as plt
 def main():
     args = get_args()
     method = args.method
+    shuffle_children = args.shuffle_children
     min_similarity = args.min_similarity
     min_peak = args.min_peak
     output_file = args.output
@@ -26,9 +28,11 @@ def main():
         get_cells_greedy(similarity_matrix, output_file)
     elif method == "bfs":
         get_cells_bfs(similarity_matrix, output_file,
+                      shuffle_children=shuffle_children,
                       min_similarity=min_similarity, min_peak=min_peak)
     elif method == "dfs":
         get_cells_dfs(similarity_matrix, output_file,
+                      shuffle_children=shuffle_children,
                       min_similarity=min_similarity, min_peak=min_peak)
 
 def plot_similarity(similarity_matrix, output_file):
@@ -66,8 +70,8 @@ def get_cells_greedy(similarity_matrix, output_file, root=0, verbose=False):
     ordered_cells = pd.Series(ordered_cells)
     ordered_cells.to_csv(output_file, header=False, index=False)
 
-def get_cells_bfs(similarity_matrix, output_file, root=0, min_similarity=0.0,
-                  min_peak=0.0):
+def get_cells_bfs(similarity_matrix, output_file, root=0,
+                  shuffle_children=False, min_similarity=0.0, min_peak=0.0):
     """get cell ordering using breadth-first search"""
     # initialize BFS
     num_cells = similarity_matrix.shape[0]
@@ -106,8 +110,8 @@ def get_cells_bfs(similarity_matrix, output_file, root=0, min_similarity=0.0,
     bfs_result = pd.DataFrame({"Cell": ordered_cells, "Parent": parents})
     bfs_result.to_csv(output_file, sep="\t", index=False)
 
-def get_cells_dfs(similarity_matrix, output_file, root=0, min_similarity=0.0,
-                  min_peak=0.0):
+def get_cells_dfs(similarity_matrix, output_file, root=0,
+                  shuffle_children=False, min_similarity=0.0, min_peak=0.0):
     """get cell ordering using depth-first search"""
     # initialize DFS
     unvisited_set = select_cells(min_peak=min_peak)
@@ -137,11 +141,20 @@ def get_cells_dfs(similarity_matrix, output_file, root=0, min_similarity=0.0,
                 num_children[parent] += 1
             i += 1
 
-            # add unvisited neighbors to the stack
+            # find unvisited neighbors
+            unvisited_neighbors = []
             for neighbor in unvisited_set:
                 if similarity_matrix[cell, neighbor] > min_similarity:
-                    dfs_stack.append(neighbor)
-                    parent_stack.append(cell)
+                    unvisited_neighbors.append(neighbor)
+
+            # shuffle unvisited neighbors if specified
+            if shuffle_children:
+                random.shuffle(unvisited_neighbors)
+
+            # add unvisited neighbors to the stack
+            for neighbor in unvisited_neighbors:
+                dfs_stack.append(neighbor)
+                parent_stack.append(cell)
 
     if i + 1 < num_cells:
         print("Warning: {} cell(s) not visited".format(num_cells - i - 1))
@@ -169,6 +182,8 @@ def get_args():
     arg_parser = ArgumentParser(
         description="Create a list of cells ordered by similarity")
     arg_parser.add_argument("--method", dest="method", type=str, required=True)
+    arg_parser.add_argument("--shuffle_children", dest="shuffle_children",
+                            default=False, action="store_true")
     arg_parser.add_argument("--min_similarity", dest="min_similarity",
                             type=float, default=0.0)
     arg_parser.add_argument("--min_peak", dest="min_peak", type=float,
