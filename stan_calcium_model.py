@@ -4,12 +4,14 @@ import argparse
 import numpy as np
 import pandas as pd
 from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
-    get_prior_from_sample_files, calcium_ode
+    get_prior_from_sample_files, calcium_ode_original, calcium_ode_equiv, \
+    calcium_ode_const
 
 def main():
     # get command-line arguments
     args = get_args()
     stan_model = args.stan_model
+    ode_variant = args.ode_variant
     stan_backend = args.stan_backend
     cell_id = args.cell_id
     filter_type = args.filter_type
@@ -49,6 +51,12 @@ def main():
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
+    if ode_variant == "equiv":
+        calcium_ode = calcium_ode_equiv
+    elif ode_variant == "const":
+        calcium_ode = calcium_ode_const
+    else:
+        calcium_ode = calcium_ode_original
 
     # get prior distribution
     if prior_dir:
@@ -120,6 +128,9 @@ def get_args():
         description="Infer parameters of calcium mode using stan.")
     arg_parser.add_argument("--stan_model", dest="stan_model", metavar="MODEL",
                             type=str, required=True)
+    arg_parser.add_argument("--ode_variant", dest="ode_variant", type=str,
+                            default="original",
+                            choices=["original", "equiv", "const"])
     arg_parser.add_argument("--stan_backend", dest="stan_backend",
                             metavar="BACKEND", type=str, default="pystan",
                             choices=["pystan", "cmdstanpy"])

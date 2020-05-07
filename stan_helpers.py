@@ -230,7 +230,7 @@ class StanSessionAnalyzer:
     """Analyze samples from a Stan sampling/varitional Bayes session"""
     def __init__(self, output_dir, stan_backend="pystan",
                  stan_operation="sampling", use_summary=False, num_chains=4,
-                 warmup=1000, param_names=None):
+                 warmup=1000, param_names=None, verbose=False):
         self.output_dir = output_dir
         self.stan_backend = stan_backend
         self.stan_operation = stan_operation
@@ -240,8 +240,9 @@ class StanSessionAnalyzer:
         self.param_names = param_names
 
         # load sample files
-        print("Loading stan sample files...")
-        sys.stdout.flush()
+        if verbose:
+            print("Loading stan sample files...")
+            sys.stdout.flush()
 
         self.samples = []
         if self.use_summary:
@@ -489,7 +490,7 @@ class StanMultiSessionAnalyzer:
                        xticks=self.session_list, xtick_rotation=90)
 
 # utility functions
-def calcium_ode(t, y, theta):
+def calcium_ode_original(t, y, theta):
     """System of ODEs for the calcium model"""
     dydt = np.zeros(4)
 
@@ -511,7 +512,7 @@ def calcium_ode(t, y, theta):
     return dydt
 
 def calcium_ode_equiv(t, y, theta):
-    """System of ODEs for the calcium model"""
+    """Equivalent system of ODEs for the calcium model"""
     dydt = np.zeros(4)
 
     dydt[0] = theta[0]* theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]

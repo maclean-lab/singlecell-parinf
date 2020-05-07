@@ -4,12 +4,14 @@ import argparse
 import numpy as np
 import scipy.integrate
 import matplotlib.pyplot as plt
-from stan_helpers import StanSessionAnalyzer, calcium_ode, moving_average
+from stan_helpers import StanSessionAnalyzer, moving_average, \
+    calcium_ode_original, calcium_ode_equiv, calcium_ode_const
 
 def main():
     # unpack arguments
     args = get_args()
     result_dir = args.result_dir
+    ode_variant = args.ode_variant
     cell_id = args.cell_id
     filter_type = args.filter_type
     moving_average_window = args.moving_average_window
@@ -41,6 +43,13 @@ def main():
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
+    if ode_variant == "equiv":
+        calcium_ode = calcium_ode_equiv
+    elif ode_variant == "const":
+        calcium_ode = calcium_ode_const
+    else:
+        calcium_ode = calcium_ode_original
+
     if use_summary:
         analyzer = StanSessionAnalyzer(result_dir,
                                        stan_operation=stan_operation,
@@ -77,6 +86,9 @@ def get_args():
                             type=str, required=True)
     arg_parser.add_argument("--cell_id", dest="cell_id", metavar="N", type=int,
                             default=0)
+    arg_parser.add_argument("--ode_variant", dest="ode_variant", type=str,
+                            default="original",
+                            choices=["original", "equiv", "const"])
     arg_parser.add_argument("--filter_type", dest="filter_type",
                             choices=["none", "moving_average"], default="none")
     arg_parser.add_argument("--moving_average_window",
