@@ -26,8 +26,8 @@ class StanSession:
                  data=None, num_chains=4, num_iters=1000, warmup=1000, thin=1,
                  rhat_upper_bound=1.1):
         # load Stan model
-        stan_model_path = os.path.basename(stan_model_path)
-        self.model_name, model_ext = os.path.splitext(stan_model_path)
+        stan_model_filename = os.path.basename(stan_model_path)
+        self.model_name, model_ext = os.path.splitext(stan_model_filename)
         self.stan_backend = stan_backend
         self.output_dir = output_dir
         if model_ext == ".stan":
