@@ -303,29 +303,35 @@ class StanSessionAnalyzer:
         for samples in self.samples:
             samples.columns = self.param_names
 
-    def simulate_chains(self, ode, t0, ts, y0, target_var_idx,
-                        y_ref=np.empty(0), show_progress=False,
-                        integrator="dopri5", **integrator_params):
+    def simulate_chains(self, ode, t0, ts, y0, y_ref=None, show_progress=False,
+                        var_names=None, integrator="dopri5",
+                        **integrator_params):
         """Simulate trajectories for all chains"""
+        num_vars = y0.size
+        if y_ref is None:
+            y_ref = [None] * num_vars
+        if var_names is None:
+            var_names = [None] * num_vars
+
         for chain_idx in range(self.num_chains):
             # get thetas
             num_samples = self.samples[chain_idx].shape[0]
             thetas = self.samples[chain_idx].iloc[:num_samples, 1:].to_numpy()
-            y = np.zeros((num_samples, ts.size))
+            y = np.zeros((num_samples, ts.size, num_vars))
 
             # simulate trajectory from each samples
             print("Simulating trajectories from chain {}...".format(chain_idx))
             for sample_idx, theta in tqdm(enumerate(thetas), total=num_samples,
                                           disable=not show_progress):
-                y[sample_idx, :] = self._simulate_trajectory(
-                    ode, theta, t0, ts, y0, target_var_idx,
-                    integrator=integrator, **integrator_params)
+                y[sample_idx, :, :] = self._simulate_trajectory(
+                    ode, theta, t0, ts, y0, integrator=integrator,
+                    **integrator_params)
 
-            self._plot_trajectories(chain_idx, ts, y, y_ref=y_ref)
+            self._plot_trajectories(chain_idx, ts, y, y_ref, var_names)
 
             sys.stdout.flush()
 
-    def _simulate_trajectory(self, ode, theta, t0, ts, y0, target_var_idx,
+    def _simulate_trajectory(self, ode, theta, t0, ts, y0,
                              integrator="dopri5", **integrator_params):
         """Simulate a trajectory with sampled parameters"""
         # initialize ODE solver
@@ -335,24 +341,34 @@ class StanSessionAnalyzer:
         solver.set_initial_value(y0, t0)
 
         # perform numerical integration
-        y = np.zeros_like(ts)
+        y = np.zeros((ts.size, y0.size))
         i = 0
         while solver.successful() and i < ts.size:
             solver.integrate(ts[i])
-            y[i] = solver.y[target_var_idx]
+            y[i, :] = solver.y
 
             i += 1
 
         return y
 
-    def _plot_trajectories(self, chain_idx, ts, y, y_ref=np.empty(0)):
+    def _plot_trajectories(self, chain_idx, ts, y, y_ref, var_names):
         """Plot ODE solution (trajectory)"""
+        num_vars = len(y_ref)
+
         plt.clf()
-        plt.plot(ts, y.T)
+        plt.figure(figsize=(num_vars * 4, 4))
 
-        if y_ref.size > 0:
-            plt.plot(ts, y_ref, "ko", fillstyle="none")
+        for var_idx in range(num_vars):
+            plt.subplot(1, num_vars, var_idx + 1)
+            plt.plot(ts, y[:, :, var_idx].T)
 
+            if y_ref[var_idx] is not None:
+                plt.plot(ts, y_ref[var_idx], "ko", fillstyle="none")
+
+            if var_names[var_idx]:
+                plt.title(var_names[var_idx])
+
+        plt.tight_layout()
         figure_name = os.path.join(
             self.output_dir, "chain_{}_trajectories.png".format(chain_idx))
         plt.savefig(figure_name)
@@ -377,7 +393,7 @@ class StanSessionAnalyzer:
         samples = self.samples[chain_idx].to_numpy()
 
         plt.clf()
-        plt.figure(figsize=(6, self.num_params*2))
+        plt.figure(figsize=(6, self.num_params * 2))
 
         # plot trace of each parameter
         for idx in range(self.num_params):

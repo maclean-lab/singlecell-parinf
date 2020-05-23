@@ -42,6 +42,7 @@ def main():
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
+    var_names = ["PLC", "IP3", "h", "Ca"]
     if ode_variant == "equiv":
         calcium_ode = calcium_ode_equiv
     elif ode_variant == "const":
@@ -71,9 +72,9 @@ def main():
     integrator_params = {}
     if integrator == "vode":
         integrator_params["method"] = integrator_method
-    analyzer.simulate_chains(calcium_ode, t0, ts, y0, 3, y_ref=y_ref,
-            show_progress=show_progress, integrator=integrator,
-            **integrator_params)
+    analyzer.simulate_chains(calcium_ode, t0, ts, y0, y_ref=y_ref,
+        var_names=var_names, show_progress=show_progress,
+        integrator=integrator, **integrator_params)
 
 def get_args():
     """parse command line arguments"""

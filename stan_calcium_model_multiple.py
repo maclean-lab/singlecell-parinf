@@ -63,6 +63,7 @@ def main():
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
+    var_names = ["PLC", "IP3", "h", "Ca"]
     if ode_variant == "equiv":
         calcium_ode = calcium_ode_equiv
     elif ode_variant == "const":
@@ -108,12 +109,12 @@ def main():
 
         # gather prepared data
         y0 = np.array([0, 0, 0.7, y[cell_id, t0]])
-        y_ref = y[cell_id, t0 + 1:]
+        y_ref = [None, None, None, y[cell_id, t0 + 1:]]
         calcium_data = {
             "N": 4,
             "T": T,
             "y0": y0,
-            "y": y_ref,
+            "y": y_ref[3],
             "t0": t0,
             "ts": ts,
             "mu_prior": prior_mean,
@@ -149,8 +150,8 @@ def main():
 
                 analyzer = StanSessionAnalyzer(
                     cell_dir, use_summary=True, param_names=param_names)
-                analyzer.simulate_chains(calcium_ode, t0, ts, y0, 3,
-                                         y_ref=y_ref)
+                analyzer.simulate_chains(calcium_ode, t0, ts, y0, y_ref=y_ref,
+                                         var_names=var_names)
                 analyzer.plot_parameters()
                 analyzer.get_r_squared()
             else:

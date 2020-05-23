@@ -39,10 +39,11 @@ def main():
     y = np.concatenate((y[0:t_downsample], y[t_downsample::10]))
     ts = np.concatenate((ts[0:t_downsample-t0], ts[t_downsample-t0::10]))
     y0 = np.array([0, 0, 0.7, y[t0]])
-    y_ref = y[t0 + 1:]
+    y_ref = [None, None, None, y[t0 + 1:]]
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
+    var_names = ["PLC", "IP3", "h", "Ca"]
     if ode_variant == "equiv":
         calcium_ode = calcium_ode_equiv
     elif ode_variant == "const":
@@ -70,9 +71,8 @@ def main():
             integrator_params["method"] = integrator_method
 
         analyzer.simulate_chains(
-            calcium_ode, t0, ts, y0, 3, y_ref=y_ref,
-            show_progress=show_progress, integrator=integrator,
-            **integrator_params)
+            calcium_ode, t0, ts, y0, y_ref=y_ref, show_progress=show_progress,
+            var_names=var_names, integrator=integrator, **integrator_params)
     if "plot_parameters" in tasks:
         analyzer.plot_parameters()
     if "get_r_squared" in tasks:

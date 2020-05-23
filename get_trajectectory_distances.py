@@ -33,7 +33,7 @@ def main():
 
         y = y_raw
 
-    # Reorder cells if given a list of cells
+    # reorder cells if given a list of cells
     if args.cell_list:
         cell_list = pd.read_csv(args.cell_list, delimiter="\t", index_col=False)
         y = y[cell_list["Cell"], ]
