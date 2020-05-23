@@ -38,7 +38,7 @@ functions {
         dydt[3] = theta[8] * (theta[9] - (y[4] + theta[9]) * y[3]);
         beta = pow(theta[10] + y[4], 2)
             / (pow(theta[10] + y[4], 2) + theta[10] * theta[11]);
-        m_inf = y[2] * y[4] / (theta[12] + y[4]);
+        m_inf = y[4] / (theta[12] + y[4]);
         dydt[4] = beta * (
             theta[13]
                 * (theta[14] * pow(m_inf, 3) * pow(y[3], 2) + theta[15])
