@@ -5,7 +5,7 @@ import numpy as np
 import scipy.integrate
 import matplotlib.pyplot as plt
 from stan_helpers import StanSessionAnalyzer, moving_average, \
-    calcium_ode_original, calcium_ode_equiv, calcium_ode_const
+    calcium_ode_vanilla, calcium_ode_equiv, calcium_ode_const
 
 def main():
     # unpack arguments
@@ -49,7 +49,7 @@ def main():
     elif ode_variant == "const":
         calcium_ode = calcium_ode_const
     else:
-        calcium_ode = calcium_ode_original
+        calcium_ode = calcium_ode_vanilla
 
     if use_summary:
         analyzer = StanSessionAnalyzer(result_dir,

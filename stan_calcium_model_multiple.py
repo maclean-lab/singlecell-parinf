@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 import pandas as pd
 from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
-    get_prior_from_sample_files, calcium_ode_original, calcium_ode_equiv, \
+    get_prior_from_sample_files, calcium_ode_vanilla, calcium_ode_equiv, \
     calcium_ode_const
 
 def main():
@@ -69,7 +69,7 @@ def main():
     elif ode_variant == "const":
         calcium_ode = calcium_ode_const
     else:
-        calcium_ode = calcium_ode_original
+        calcium_ode = calcium_ode_vanilla
     control = {"adapt_delta": adapt_delta, "max_treedepth": max_treedepth}
 
     max_num_tries = 3  # maximum number of tries of stan sampling

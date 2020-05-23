@@ -5,8 +5,8 @@ import numpy as np
 from scipy.stats import ks_2samp
 import pandas as pd
 import matplotlib.pyplot as plt
-from stan_helpers import StanSessionAnalyzer, moving_average, calcium_ode, \
-    pdf_multi_plot
+from stan_helpers import StanSessionAnalyzer, moving_average, \
+    calcium_ode_vanilla, pdf_multi_plot
 
 param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                 "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr", "eta1",

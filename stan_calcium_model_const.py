@@ -44,8 +44,9 @@ def main():
     y = np.concatenate((y[0:t_downsample], y[t_downsample::10]))
     ts = np.concatenate((ts[0:t_downsample-t0], ts[t_downsample-t0::10]))
     T = ts.size
-    param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "KoffIP3", "a",
-                   "Ke", "d1", "d5", "epr", "eta1", "eta2", "eta3", "k3"]
+    param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
+                   "KoffIP3", "a", "dinh", "Ke", "Be", "d5", "epr", "eta1",
+                   "eta2", "eta3", "c0", "k3"]
     var_names = ["PLC", "IP3", "h", "Ca"]
 
     # get prior distribution
