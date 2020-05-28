@@ -11,7 +11,7 @@ parameter list
 3: Katp               3
 4: KoffPLC            4
 5: Vplc               5
-6: Kip3               6
+6: Kip3_sq            6
 7: KoffIP3            7
 8: a                  8
 9: dinh               9
@@ -24,7 +24,7 @@ parameter list
 16: eta2              15
 17: eta3              16
 18: c0                17
-19: k3                18
+19: k3_sq             18
 */
 functions {
     real[] sho(real t, real[] y, real[] theta, real[] x_r, int[] x_i) {

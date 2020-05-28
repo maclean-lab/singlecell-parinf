@@ -387,6 +387,7 @@ class StanSessionAnalyzer:
             self._make_pair_plot(chain_idx)
 
             sys.stdout.flush()
+            sys.stderr.flush()
 
     def _make_trace_plot(self, chain_idx):
         """Make trace plots for parameters"""
@@ -558,10 +559,10 @@ def calcium_ode_const(t, y, theta):
     beta = np.power(theta[9] + y[3], 2) \
         / (np.power(theta[9] + y[3], 2) + theta[9] * theta[10])
     m_inf = y[3] / (theta[11] + y[3])
-    dydt[4] = beta * (
+    dydt[3] = beta * (
         theta[12]
             * (theta[13] * np.power(m_inf, 3) * np.power(y[2], 2) + theta[14])
-            * (theta[16] - (1 + theta[12]) * y[4])
+            * (theta[16] - (1 + theta[12]) * y[3])
         - theta[15] * y[3] * y[3] / (theta[17] + y[3] * y[3])
     )
 
