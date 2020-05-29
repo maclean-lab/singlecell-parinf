@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
     get_prior_from_sample_files, calcium_ode_vanilla, calcium_ode_equiv, \
-    calcium_ode_const
+    calcium_ode_const_1
 
 def main():
     # get command-line arguments
@@ -55,7 +55,7 @@ def main():
     if ode_variant == "equiv":
         calcium_ode = calcium_ode_equiv
     elif ode_variant == "const":
-        calcium_ode = calcium_ode_const
+        calcium_ode = calcium_ode_const_1
     else:
         calcium_ode = calcium_ode_vanilla
 

@@ -548,7 +548,7 @@ def calcium_ode_equiv(t, y, theta):
 
     return dydt
 
-def calcium_ode_const(t, y, theta):
+def calcium_ode_const_1(t, y, theta):
     """System of ODEs for the calcium model"""
     dydt = np.zeros(4)
 
@@ -564,6 +564,26 @@ def calcium_ode_const(t, y, theta):
             * (theta[13] * np.power(m_inf, 3) * np.power(y[2], 2) + theta[14])
             * (theta[16] - (1 + theta[12]) * y[3])
         - theta[15] * y[3] * y[3] / (theta[17] + y[3] * y[3])
+    )
+
+    return dydt
+
+def calcium_ode_const_2(t, y, theta):
+    """System of ODEs for the calcium model"""
+    dydt = np.zeros(4)
+
+    dydt[0] = theta[0] * theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
+    dydt[1] = (theta[4] * y[0] * y[0]) \
+        / (theta[5] + y[0] * y[0]) - theta[6] * y[1]
+    dydt[2] = theta[7] * (theta[8] - (y[3] + theta[8]) * y[2])
+    beta = np.power(theta[9] + y[3], 2) \
+        / (np.power(theta[9] + y[3], 2) + theta[9] * theta[10])
+    m_inf = y[1] * y[3] / ((0.13 + y[1]) * (0.0823 + y[3]))
+    dydt[3] = beta * (
+        theta[11]
+            * (theta[12] * np.power(m_inf, 3) * np.power(y[2], 2) + theta[13])
+            * (theta[15] - (1 + theta[11]) * y[3])
+        - theta[14] * y[3] * y[3] / (theta[16] + y[3] * y[3])
     )
 
     return dydt

@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 import pandas as pd
 from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
-    get_prior_from_sample_files, calcium_ode_const
+    get_prior_from_sample_files, calcium_ode_const_2
 
 def main():
     # get command-line arguments
@@ -46,8 +46,8 @@ def main():
     ts = np.concatenate((ts[0:t_downsample-t0], ts[t_downsample-t0::10]))
     T = ts.size
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
-                   "KoffIP3", "a", "dinh", "Ke", "Be", "d5", "epr", "eta1",
-                   "eta2", "eta3", "c0", "k3"]
+                   "KoffIP3", "a", "dinh", "Ke", "Be", "epr", "eta1", "eta2",
+                   "eta3", "c0", "k3"]
     var_names = ["PLC", "IP3", "h", "Ca"]
 
     # get prior distribution
@@ -103,7 +103,7 @@ def main():
 
     analyzer = StanSessionAnalyzer(result_dir, use_summary=True,
                                    param_names=param_names)
-    analyzer.simulate_chains(calcium_ode_const, t0, ts, y0, y_ref=y_ref,
+    analyzer.simulate_chains(calcium_ode_const_2, t0, ts, y0, y_ref=y_ref,
                              var_names=var_names)
     analyzer.plot_parameters()
     analyzer.get_r_squared()
