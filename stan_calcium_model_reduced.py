@@ -53,7 +53,9 @@ def main():
     y0_ca = y0_ca[cell_id]
     param_names = ["sigma", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
+    num_params = len(param_names) - 1
     var_names = ["h", "Ca"]
+    num_vars = len(var_names)
 
     # get prior distribution
     if prior_dir:
@@ -69,7 +71,6 @@ def main():
     else:
         # no sample file provided. use Gaussian(1.0, 1.0) for all parameters
         print("Setting prior distribution to N(1.0, 1.0) for all parameters")
-        num_params = len(param_names) - 1
         prior_mean = np.ones(num_params)
         prior_std = np.ones(num_params)
 
@@ -85,9 +86,9 @@ def main():
     y_ref = [None, y]
     T = ts.size
     calcium_data = {
-        "N": len(var_names),
+        "N": num_vars,
         "T": T,
-        "num_params": len(param_names),
+        "num_params": num_params,
         "y0": y0,
         "y": y_ref[1],
         "t0": t0,

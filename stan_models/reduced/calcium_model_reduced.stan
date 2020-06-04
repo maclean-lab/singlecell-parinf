@@ -37,15 +37,15 @@ functions {
     }
 }
 data {
-    int<lower=1> N;           // number of variables
-    int<lower=1> T;           // number of time steps
-    int<lower=1> num_params;  // number of parameters
-    real y0[N];               // initial values
-    real y[T];                // values at all time points
-    real t0;                  // initial time point
-    real ts[T];               // all time points
-    real mu_prior[12];        // mean of prior
-    real sigma_prior[12];     // standard deviation of prior
+    int<lower=1> N;                   // number of variables
+    int<lower=1> T;                   // number of time steps
+    int<lower=1> num_params;          // number of parameters
+    real y0[N];                       // initial values
+    real y[T];                        // values at all time points
+    real t0;                          // initial time point
+    real ts[T];                       // all time points
+    real mu_prior[num_params];        // mean of prior
+    real sigma_prior[num_params];     // standard deviation of prior
 }
 transformed data {
     real x_r[0];
