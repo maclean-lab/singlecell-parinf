@@ -7,7 +7,7 @@ from pystan import StanModel
 def main():
     args = get_args()
     model_path = args.model
-    output_path = args.output_path
+    output_path = args.output
 
     model_name = os.path.splitext(os.path.basename(model_path))[0]
     model = StanModel(file=model_path, model_name=model_name)
