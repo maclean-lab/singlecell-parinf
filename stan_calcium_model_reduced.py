@@ -81,7 +81,7 @@ def main():
     # gather prepared data
     # y0 = np.array([0, 0, 0.7, y[t0]])
     # y_ref = [None, None, None, y[t0 + 1:]]
-    y0 = np.array([0, 0, 0.7, y0_ca])
+    y0 = np.array([0.7, y0_ca])
     y_ref = [None, y]
     T = ts.size
     calcium_data = {
