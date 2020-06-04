@@ -4,14 +4,13 @@ import argparse
 import numpy as np
 import pandas as pd
 from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
-    get_prior_from_sample_files, calcium_ode_vanilla, calcium_ode_equiv, \
-    preprocess_trajectories
+    get_prior_from_sample_files, preprocess_trajectories
+from stan_helpers import calcium_ode_reduced as calcium_ode
 
 def main():
     # get command-line arguments
     args = get_args()
     stan_model = args.stan_model
-    ode_variant = args.ode_variant
     stan_backend = args.stan_backend
     cell_id = args.cell_id
     filter_type = args.filter_type
@@ -52,14 +51,9 @@ def main():
         moving_average_window=moving_average_window, downsample_offset=300)
     y = y[cell_id, :]
     y0_ca = y0_ca[cell_id]
-    param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
-                   "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
+    param_names = ["sigma", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
-    var_names = ["PLC", "IP3", "h", "Ca"]
-    if ode_variant == "equiv":
-        calcium_ode = calcium_ode_equiv
-    else:
-        calcium_ode = calcium_ode_vanilla
+    var_names = ["h", "Ca"]
 
     # get prior distribution
     if prior_dir:
@@ -88,13 +82,14 @@ def main():
     # y0 = np.array([0, 0, 0.7, y[t0]])
     # y_ref = [None, None, None, y[t0 + 1:]]
     y0 = np.array([0, 0, 0.7, y0_ca])
-    y_ref = [None, None, None, y]
+    y_ref = [None, y]
     T = ts.size
     calcium_data = {
-        "N": 4,
+        "N": len(var_names),
         "T": T,
+        "num_params": len(param_names),
         "y0": y0,
-        "y": y_ref[3],
+        "y": y_ref[1],
         "t0": t0,
         "ts": ts,
         "mu_prior": prior_mean,
@@ -135,9 +130,6 @@ def get_args():
         description="Infer parameters of calcium mode using stan.")
     arg_parser.add_argument("--stan_model", dest="stan_model", metavar="MODEL",
                             type=str, required=True)
-    arg_parser.add_argument("--ode_variant", dest="ode_variant", type=str,
-                            default="original",
-                            choices=["original", "equiv", "const"])
     arg_parser.add_argument("--stan_backend", dest="stan_backend",
                             metavar="BACKEND", type=str, default="pystan",
                             choices=["pystan", "cmdstanpy"])

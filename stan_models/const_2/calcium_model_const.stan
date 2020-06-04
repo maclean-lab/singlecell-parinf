@@ -65,7 +65,7 @@ transformed data {
 }
 parameters {
     real<lower=0> sigma;
-    real<lower=0> theta[18];
+    real<lower=0> theta[17];
 }
 model {
     real y_hat[T, N];

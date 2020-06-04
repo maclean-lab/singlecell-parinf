@@ -65,8 +65,8 @@ def compare_params(analyzers, session_ids, chain_list, result_dir):
         # go over each chain in a session
         for idx in range(num_sessions):
             for chain in chain_list[idx]:
-                test_sample = analyzers[idx].samples[chain][param].to_numpy()
-                param_samples.append(test_sample)
+                chain_sample = analyzers[idx].samples[chain][param].to_numpy()
+                param_samples.append(chain_sample)
 
         all_samples.append(param_samples)
 

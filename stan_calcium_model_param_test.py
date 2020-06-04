@@ -5,7 +5,7 @@ import numpy as np
 import scipy.integrate
 import matplotlib.pyplot as plt
 from stan_helpers import StanSessionAnalyzer, moving_average, \
-    calcium_ode_vanilla, calcium_ode_equiv, calcium_ode_const_1
+    calcium_ode_vanilla, calcium_ode_equiv
 
 def main():
     # unpack arguments
@@ -45,8 +45,6 @@ def main():
     var_names = ["PLC", "IP3", "h", "Ca"]
     if ode_variant == "equiv":
         calcium_ode = calcium_ode_equiv
-    elif ode_variant == "const":
-        calcium_ode = calcium_ode_const_1
     else:
         calcium_ode = calcium_ode_vanilla
 

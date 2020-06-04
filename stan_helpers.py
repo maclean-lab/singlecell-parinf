@@ -508,7 +508,7 @@ class StanMultiSessionAnalyzer:
 
 # utility functions
 def calcium_ode_vanilla(t, y, theta):
-    """System of ODEs for the calcium model"""
+    """Original calcium model from Yao 2016"""
     dydt = np.zeros(4)
 
     dydt[0] = theta[0]* theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
@@ -529,7 +529,7 @@ def calcium_ode_vanilla(t, y, theta):
     return dydt
 
 def calcium_ode_equiv(t, y, theta):
-    """Equivalent system of ODEs for the calcium model"""
+    """Calcium model with equivalent ODEs"""
     dydt = np.zeros(4)
 
     dydt[0] = theta[0]* theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
@@ -549,7 +549,7 @@ def calcium_ode_equiv(t, y, theta):
     return dydt
 
 def calcium_ode_const_1(t, y, theta):
-    """System of ODEs for the calcium model"""
+    """Calcium model with d_1 set to constants"""
     dydt = np.zeros(4)
 
     dydt[0] = theta[0] * theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
@@ -569,7 +569,7 @@ def calcium_ode_const_1(t, y, theta):
     return dydt
 
 def calcium_ode_const_2(t, y, theta):
-    """System of ODEs for the calcium model"""
+    """Calcium model with d_1 and d_5 set to constants"""
     dydt = np.zeros(4)
 
     dydt[0] = theta[0] * theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
@@ -588,13 +588,52 @@ def calcium_ode_const_2(t, y, theta):
 
     return dydt
 
-def low_pass_filter(x):
-    """Apply a low-pass filter for a trajectory"""
-    sos = scipy.signal.butter(5, 1, btype="lowpass", analog=True,
-                              output="sos")
-    x_filtered = scipy.signal.sosfilt(sos, x)
+def calcium_ode_reduced(t, y, theta):
+    """Calcium model with h and Ca2+ only"""
+    dydt = np.zeros(2)
 
-    return x_filtered
+    dydt[0] = theta[0] * (theta[1] - (y[1] + theta[1]) * y[0])
+    beta = np.power(theta[2] + y[1], 2) \
+        / (np.power(theta[2] + y[1], 2) + theta[2] * theta[3])
+    m_inf = theta[4] * y[1] / (theta[5] + y[1])
+    dydt[1] = beta * (
+        theta[6]
+            * (theta[7] * np.power(m_inf, 3) * np.power(y[0], 3) + theta[8])
+            * (theta[10] - (1 + theta[6]) * y[1])
+        - theta[9] * y[1] * y[1] / (theta[11] + y[1] * y[1])
+    )
+
+    return dydt
+
+def preprocess_trajectories(t0, filter_type=None, moving_average_window=20,
+                            downsample_offset=-1, downsample_factor=10,
+                            verbose=False):
+    """Preprocess raw trajectories with filter and downsampling"""
+    if verbose:
+        print("Loading calcium trajectories...")
+    y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
+
+    # filter the trajectories
+    if filter_type == "moving_average":
+        y = moving_average(y, window=moving_average_window, verbose=verbose)
+    elif filter_type is not None and verbose:
+        print(f"Unsupported filter {filter_type}. The trajectories will not "
+              + "be filtered.")
+
+    # downsample the trajectories
+    t_end = y.shape[1] - 1
+    if downsample_offset >= 0 and downsample_factor > 1:
+        ts = np.concatenate((
+            np.arange(t0 + 1, downsample_offset),
+            np.arange(downsample_offset, t_end + 1, downsample_factor)
+        ))
+    else:
+        ts = np.arange(t0 + 1, t_end + 1)
+
+    y0 = y[:, t0]
+    y = y[:, ts]
+
+    return y, y0, ts
 
 def moving_average(x: np.ndarray, window: int = 20, verbose=True):
     """Compute moving average of trajectories"""

@@ -7,8 +7,8 @@ import numpy as np
 import scipy.integrate
 import pandas as pd
 import matplotlib.pyplot as plt
-from stan_helpers import StanSession, moving_average, calcium_ode, \
-    pdf_multi_plot
+from stan_helpers import StanSession, moving_average, pdf_multi_plot
+from stan_helpers import calcium_ode_vanilla as calcium_ode
 
 def main():
     # get command-line arguments
