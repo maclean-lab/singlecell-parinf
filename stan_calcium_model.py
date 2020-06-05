@@ -3,9 +3,9 @@ import sys
 import argparse
 import numpy as np
 import pandas as pd
+import stan_helpers
 from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
-    get_prior_from_sample_files, calcium_ode_vanilla, calcium_ode_equiv, \
-    preprocess_trajectories
+    get_prior_from_sample_files, load_trajectories
 
 def main():
     # get command-line arguments
@@ -47,7 +47,7 @@ def main():
     # t_downsample = 300
     # y = np.concatenate((y[0:t_downsample], y[t_downsample::10]))
     # ts = np.concatenate((ts[0:t_downsample-t0], ts[t_downsample-t0::10]))
-    y, y0_ca, ts = preprocess_trajectories(
+    y, y0_ca, ts = load_trajectories(
         t0, filter_type=filter_type,
         moving_average_window=moving_average_window, downsample_offset=300)
     y = y[cell_id, :]
@@ -56,10 +56,7 @@ def main():
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
     var_names = ["PLC", "IP3", "h", "Ca"]
-    if ode_variant == "equiv":
-        calcium_ode = calcium_ode_equiv
-    else:
-        calcium_ode = calcium_ode_vanilla
+    calcium_ode = getattr(stan_helpers, "calcium_ode_" + ode_variant)
 
     # get prior distribution
     if prior_dir:
@@ -119,14 +116,15 @@ def main():
     if analysis_tasks:
         analyzer = StanSessionAnalyzer(result_dir, use_summary=use_summary,
                                        param_names=param_names)
-        if "all" in tasks:
-            tasks = ["simulate_chains", "plot_parameters", "get_r_squared"]
-        if "simulate_chains" in tasks:
+        if "all" in analysis_tasks:
+            analysis_tasks = ["simulate_chains", "plot_parameters",
+                              "get_r_squared"]
+        if "simulate_chains" in analysis_tasks:
             analyzer.simulate_chains(calcium_ode, t0, ts, y0, y_ref=y_ref,
                                      var_names=var_names)
-        if "plot_parameters" in tasks:
+        if "plot_parameters" in analysis_tasks:
             analyzer.plot_parameters()
-        if "get_r_squared" in tasks:
+        if "get_r_squared" in analysis_tasks:
             analyzer.get_r_squared()
 
 def get_args():
@@ -136,8 +134,8 @@ def get_args():
     arg_parser.add_argument("--stan_model", dest="stan_model", metavar="MODEL",
                             type=str, required=True)
     arg_parser.add_argument("--ode_variant", dest="ode_variant", type=str,
-                            default="original",
-                            choices=["original", "equiv", "const"])
+                            default="vanilla",
+                            choices=["vanilla", "equiv", "const"])
     arg_parser.add_argument("--stan_backend", dest="stan_backend",
                             metavar="BACKEND", type=str, default="pystan",
                             choices=["pystan", "cmdstanpy"])

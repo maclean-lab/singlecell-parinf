@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 import pandas as pd
 from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
-    get_prior_from_sample_files, preprocess_trajectories
+    get_prior_from_sample_files, load_trajectories
 from stan_helpers import calcium_ode_reduced as calcium_ode
 
 def main():
@@ -46,7 +46,7 @@ def main():
     # t_downsample = 300
     # y = np.concatenate((y[0:t_downsample], y[t_downsample::10]))
     # ts = np.concatenate((ts[0:t_downsample-t0], ts[t_downsample-t0::10]))
-    y, y0_ca, ts = preprocess_trajectories(
+    y, y0_ca, ts = load_trajectories(
         t0, filter_type=filter_type,
         moving_average_window=moving_average_window, downsample_offset=300)
     y = y[cell_id, :]
@@ -115,14 +115,14 @@ def main():
     if analysis_tasks:
         analyzer = StanSessionAnalyzer(result_dir, use_summary=use_summary,
                                        param_names=param_names)
-        if "all" in tasks:
-            tasks = ["simulate_chains", "plot_parameters", "get_r_squared"]
-        if "simulate_chains" in tasks:
+        if "all" in analysis_tasks:
+            analysis_tasks = ["simulate_chains", "plot_parameters", "get_r_squared"]
+        if "simulate_chains" in analysis_tasks:
             analyzer.simulate_chains(calcium_ode, t0, ts, y0, y_ref=y_ref,
                                      var_names=var_names)
-        if "plot_parameters" in tasks:
+        if "plot_parameters" in analysis_tasks:
             analyzer.plot_parameters()
-        if "get_r_squared" in tasks:
+        if "get_r_squared" in analysis_tasks:
             analyzer.get_r_squared()
 
 def get_args():

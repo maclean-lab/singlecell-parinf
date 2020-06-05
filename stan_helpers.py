@@ -605,9 +605,9 @@ def calcium_ode_reduced(t, y, theta):
 
     return dydt
 
-def preprocess_trajectories(t0, filter_type=None, moving_average_window=20,
-                            downsample_offset=-1, downsample_factor=10,
-                            verbose=False):
+def load_trajectories(t0, filter_type=None, moving_average_window=20,
+                      downsample_offset=-1, downsample_factor=10,
+                      verbose=False):
     """Preprocess raw trajectories with filter and downsampling"""
     if verbose:
         print("Loading calcium trajectories...")

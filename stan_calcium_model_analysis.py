@@ -4,8 +4,8 @@ import argparse
 import numpy as np
 import scipy.integrate
 import matplotlib.pyplot as plt
-from stan_helpers import StanSessionAnalyzer, moving_average, \
-    calcium_ode_vanilla, calcium_ode_equiv, calcium_ode_const_2
+import stan_helpers
+from stan_helpers import StanSessionAnalyzer, moving_average
 
 def main():
     # unpack arguments
@@ -20,6 +20,8 @@ def main():
     use_summary = args.use_summary
     num_chains = args.num_chains
     warmup = args.warmup
+    var_mask = args.var_mask
+    param_mask = args.param_mask
     tasks = args.tasks
     show_progress = args.show_progress
     integrator = args.integrator
@@ -40,16 +42,27 @@ def main():
     ts = np.concatenate((ts[0:t_downsample-t0], ts[t_downsample-t0::10]))
     y0 = np.array([0, 0, 0.7, y[t0]])
     y_ref = [None, None, None, y[t0 + 1:]]
+
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
+    # filter parameters
+    if param_mask:
+        param_names = [param_names[i + 1] for i in range(len(param_mask))
+                       if param_mask[i] == "1"]
+        param_names = ["sigma"] + param_names
+
     var_names = ["PLC", "IP3", "h", "Ca"]
-    if ode_variant == "equiv":
-        calcium_ode = calcium_ode_equiv
-    elif ode_variant == "const":
-        calcium_ode = calcium_ode_const_2
-    else:
-        calcium_ode = calcium_ode_vanilla
+    # filter variables
+    if var_mask:
+        var_names = [var_names[i] for i in range(len(var_mask))
+                     if var_mask[i] == "1"]
+        y0 = np.array(
+            [y0[i] for i in range(len(var_mask)) if var_mask[i] == "1"])
+        y_ref = [y_ref[i] for i in range(len(var_mask)) if var_mask[i] == "1"]
+
+    # get ODE function
+    calcium_ode = getattr(stan_helpers, "calcium_ode_" + ode_variant)
 
     if use_summary:
         analyzer = StanSessionAnalyzer(result_dir,
@@ -87,8 +100,9 @@ def get_args():
     arg_parser.add_argument("--cell_id", dest="cell_id", metavar="N", type=int,
                             default=0)
     arg_parser.add_argument("--ode_variant", dest="ode_variant", type=str,
-                            default="original",
-                            choices=["original", "equiv", "const"])
+                            default="vanilla",
+                            choices=["vanilla", "equiv", "const_1", "const_2",
+                                     "reduced"])
     arg_parser.add_argument("--filter_type", dest="filter_type",
                             choices=["none", "moving_average"], default="none")
     arg_parser.add_argument("--moving_average_window",
@@ -102,6 +116,8 @@ def get_args():
     arg_parser.add_argument("--num_chains", dest="num_chains", type=int,
                             default=4)
     arg_parser.add_argument("--warmup", dest="warmup", type=int, default=1000)
+    arg_parser.add_argument("--var_mask", type=str, default=None)
+    arg_parser.add_argument("--param_mask", type=str, default=None)
     arg_parser.add_argument("--tasks", dest="tasks", nargs="+",
                             choices=["all", "simulate_chains",
                                      "plot_parameters", "get_r_squared"],
