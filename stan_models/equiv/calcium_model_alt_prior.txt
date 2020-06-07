@@ -4,7 +4,7 @@ L	10	2
 Katp	0.0083	0.05
 KoffPLC	1.25	1
 Vplc	1	1
-Kip3	0.5	0.25
+Kip3	0.25	0.1
 KoffIP3	1.25	1
 a	1	1
 dinh	0.4	0.1
