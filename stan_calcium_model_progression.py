@@ -22,8 +22,8 @@ def main():
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
     analyzer = StanMultiSessionAnalyzer(cell_list, result_root, cell_dirs,
-                                       use_summary=True,
-                                       param_names=param_names)
+                                        use_summary=True,
+                                        param_names=param_names)
     analyzer.plot_parameter_violin()
 
 def get_args():
