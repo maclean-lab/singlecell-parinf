@@ -652,6 +652,7 @@ def load_trajectories(t0, filter_type=None, moving_average_window=20,
 
     y0 = y[:, t0]
     y = y[:, ts]
+    ts -= t0
 
     return y, y0, ts
 
