@@ -4,8 +4,8 @@ import argparse
 import numpy as np
 import scipy.integrate
 import matplotlib.pyplot as plt
-from stan_helpers import StanSessionAnalyzer, moving_average, \
-    calcium_ode_vanilla, calcium_ode_equiv
+import stan_helpers
+from stan_helpers import StanSessionAnalyzer, moving_average
 
 def main():
     # unpack arguments
@@ -43,10 +43,7 @@ def main():
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
     var_names = ["PLC", "IP3", "h", "Ca"]
-    if ode_variant == "equiv":
-        calcium_ode = calcium_ode_equiv
-    else:
-        calcium_ode = calcium_ode_vanilla
+    calcium_ode = getattr(stan_helpers, "calcium_ode_" + ode_variant)
 
     if use_summary:
         analyzer = StanSessionAnalyzer(result_dir,

@@ -12,11 +12,13 @@ def main():
     # get command-line arguments
     args = get_args()
     stan_model = args.stan_model
-    ode_variant = args.ode_variant
     cell_list_path = args.cell_list
     num_cells = args.num_cells
     filter_type = args.filter_type
     moving_average_window = args.moving_average_window
+    var_mask = args.var_mask
+    param_mask = args.param_mask
+    ode_variant = args.ode_variant
     t0 = args.t0
     downsample_offset = args.downsample_offset
     prior_id = args.prior_cell
@@ -59,7 +61,18 @@ def main():
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
                    "eta1", "eta2", "eta3", "c0", "k3"]
+    # filter parameters
+    if param_mask:
+        param_names = [param_names[i + 1] for i, mask in enumerate(param_mask)
+                       if mask == "1"]
+        param_names = ["sigma"] + param_names
+
     var_names = ["PLC", "IP3", "h", "Ca"]
+    # filter variables
+    if var_mask:
+        var_names = [var_names[i] for i, mask in enumerate(var_mask)
+                     if mask == "1"]
+
     calcium_ode = getattr(stan_helpers, "calcium_ode_" + ode_variant)
     control = {"adapt_delta": adapt_delta, "max_treedepth": max_treedepth}
 
@@ -102,11 +115,15 @@ def main():
         # gather prepared data
         y0 = np.array([0, 0, 0.7, y0_ca[cell_id]])
         y_ref = [None, None, None, y[cell_id, :]]
+        if var_mask:
+            y0 = np.array(
+                [y0[i] for i, mask in enumerate(var_mask) if mask == "1"])
+            y_ref = [y_ref[i] for i, mask in enumerate(var_mask) if mask == "1"]
         calcium_data = {
             "N": 4,
             "T": T,
             "y0": y0,
-            "y": y_ref[3],
+            "y": y_ref[-1],
             "t0": t0,
             "ts": ts,
             "mu_prior": prior_mean,
