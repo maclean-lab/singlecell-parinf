@@ -93,7 +93,7 @@ def main():
             integrator_params["method"] = integrator_method
 
         analyzer.simulate_chains(
-            calcium_ode, t0, ts, y0, y_ref=y_ref, show_progress=show_progress,
+            calcium_ode, 0, ts, y0, y_ref=y_ref, show_progress=show_progress,
             var_names=var_names, integrator=integrator, **integrator_params)
     if "plot_parameters" in tasks:
         analyzer.plot_parameters()

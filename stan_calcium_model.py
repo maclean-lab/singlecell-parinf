@@ -93,7 +93,7 @@ def main():
         "T": T,
         "y0": y0,
         "y": y_ref[-1],
-        "t0": t0,
+        "t0": 0,
         "ts": ts,
         "mu_prior": prior_mean,
         "sigma_prior": prior_std
@@ -122,7 +122,7 @@ def main():
                               "get_r_squared"]
         if "simulate_chains" in analysis_tasks:
             calcium_ode = getattr(stan_helpers, "calcium_ode_" + ode_variant)
-            analyzer.simulate_chains(calcium_ode, t0, ts, y0, y_ref=y_ref,
+            analyzer.simulate_chains(calcium_ode, 0, ts, y0, y_ref=y_ref,
                                      var_names=var_names)
         if "plot_parameters" in analysis_tasks:
             analyzer.plot_parameters()
