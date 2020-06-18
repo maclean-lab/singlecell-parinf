@@ -10,6 +10,7 @@ def main():
     first_cell = args.first_cell
     last_cell = args.last_cell
     result_root = args.result_root
+    show_progress = args.show_progress
 
     # get cell list
     cell_list = pd.read_csv(cell_list_path, delimiter="\t", index_col=False)
@@ -24,21 +25,19 @@ def main():
     analyzer = StanMultiSessionAnalyzer(cell_list, result_root, cell_dirs,
                                         use_summary=True,
                                         param_names=param_names)
-    analyzer.plot_parameter_violin()
+    analyzer.plot_parameter_violin(show_progress=show_progress)
 
 def get_args():
     """Parse command line arguments"""
     arg_parser = argparse.ArgumentParser(
         description="Analyze sampling result from a list of cells"
     )
-    arg_parser.add_argument("--cell_list", dest="cell_list", type=str,
-                            required=True)
-    arg_parser.add_argument("--first_cell", dest="first_cell", type=int,
-                            required=True)
-    arg_parser.add_argument("--last_cell", dest="last_cell", type=int,
-                            required=True)
-    arg_parser.add_argument("--result_root", dest="result_root", type=str,
-                            required=True)
+    arg_parser.add_argument("--cell_list", type=str, required=True)
+    arg_parser.add_argument("--first_cell", type=int, required=True)
+    arg_parser.add_argument("--last_cell", type=int, required=True)
+    arg_parser.add_argument("--result_root", type=str, required=True)
+    arg_parser.add_argument("--show_progress", default=False,
+                            action="store_true")
 
     return arg_parser.parse_args()
 

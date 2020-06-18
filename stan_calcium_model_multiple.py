@@ -21,6 +21,8 @@ def main():
     downsample_offset = args.downsample_offset
     prior_id = args.prior_cell
     prior_chains = args.prior_chains
+    prior_clip_min = args.prior_clip_min
+    prior_clip_max = args.prior_clip_max
     prior_std_scale = args.prior_std_scale
     num_chains = args.num_chains
     num_iters = args.num_iters
@@ -89,7 +91,7 @@ def main():
                 prior_std *= prior_std_scale
 
             # restrict standard deviation of prior
-            prior_std = np.clip(prior_std, 1e-3, 5)
+            prior_std = np.clip(prior_std, prior_clip_min, prior_clip_max)
 
             prior_chains = None  # reset prior chains
         else:
@@ -166,7 +168,8 @@ def get_args():
     arg_parser.add_argument("--stan_model", metavar="MODEL", type=str,
                             required=True)
     arg_parser.add_argument("--ode_variant", type=str, default="vanilla",
-                            choices=["vanilla", "equiv"])
+                            choices=["vanilla", "equiv_1", "equiv_2",
+                                     "const_1", "const_2"])
     arg_parser.add_argument("--cell_list", type=str, required=True)
     arg_parser.add_argument("--num_cells", type=int, default=100)
     arg_parser.add_argument("--filter_type", default=None,
@@ -178,6 +181,8 @@ def get_args():
     arg_parser.add_argument("--prior_chains", type=int, nargs="+",
                             default=[2])
     arg_parser.add_argument("--prior_std_scale",  type=float, default=1.0)
+    arg_parser.add_argument("--prior_clip_min",  type=float, default=0.001)
+    arg_parser.add_argument("--prior_clip_max",  type=float, default=5)
     arg_parser.add_argument("--num_chains", type=int, default=4)
     arg_parser.add_argument("--num_iters", type=int, default=2000)
     arg_parser.add_argument("--warmup", type=int, default=1000)

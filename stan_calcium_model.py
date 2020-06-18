@@ -4,8 +4,8 @@ import argparse
 import numpy as np
 import pandas as pd
 import stan_helpers
-from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
-    get_prior_from_sample_files, load_trajectories
+from stan_helpers import StanSession, StanSessionAnalyzer, load_trajectories, \
+    get_prior_from_sample_files
 
 def main():
     # get command-line arguments
@@ -123,7 +123,8 @@ def get_args():
     arg_parser.add_argument("--stan_model", metavar="MODEL", type=str,
                             required=True)
     arg_parser.add_argument("--ode_variant", type=str, default="vanilla",
-                            choices=["vanilla", "equiv", "const"])
+                            choices=["vanilla", "equiv_1", "equiv_2",
+                                     "const_1", "const_2"])
     arg_parser.add_argument("--stan_backend",  metavar="BACKEND", type=str,
                             default="pystan", choices=["pystan", "cmdstanpy"])
     arg_parser.add_argument("--cell_id", type=int, default=0)

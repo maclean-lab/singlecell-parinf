@@ -493,7 +493,7 @@ class StanMultiSessionAnalyzer:
         if not os.path.exists(self.analyzer_result_dir):
             os.mkdir(self.analyzer_result_dir)
 
-    def plot_parameter_violin(self):
+    def plot_parameter_violin(self, show_progress=False):
         """make violin plots of all parameters"""
         # gather all samples
         all_samples = [np.vstack(analyzer.samples)
@@ -504,14 +504,15 @@ class StanMultiSessionAnalyzer:
 
         pdf_multi_plot(plt.violinplot, all_samples, output_path, num_rows=4,
                        num_cols=1, titles=self.param_names,
-                       xticks=self.session_list, xtick_rotation=90)
+                       xticks=self.session_list, xtick_rotation=90,
+                       show_progress=show_progress)
 
 # utility functions
 def calcium_ode_vanilla(t, y, theta):
     """Original calcium model from Yao 2016"""
     dydt = np.zeros(4)
 
-    dydt[0] = theta[0]* theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
+    dydt[0] = theta[0] * theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
     dydt[1] = (theta[4] * y[0] * y[0]) \
         / (theta[5] * theta[5] + y[0] * y[0]) - theta[6] * y[1]
     dydt[2] = theta[7] * (y[3] + theta[8]) \
@@ -522,17 +523,16 @@ def calcium_ode_vanilla(t, y, theta):
         theta[13]
             * (theta[14] * np.power(m_inf, 3) * np.power(y[2], 3) + theta[15])
             * (theta[17] - (1 + theta[13]) * y[3])
-        - theta[16] * np.power(y[3], 2)
-            / (np.power(theta[18], 2) + np.power(y[3], 2))
+        - theta[16] * y[3] * y[3] / (np.power(theta[18], 2) + y[3] * y[3])
     )
 
     return dydt
 
-def calcium_ode_equiv(t, y, theta):
+def calcium_ode_equiv_1(t, y, theta):
     """Calcium model with equivalent ODEs"""
     dydt = np.zeros(4)
 
-    dydt[0] = theta[0]* theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
+    dydt[0] = theta[0] * theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
     dydt[1] = (theta[4] * y[0] * y[0]) \
         / (theta[5] + y[0] * y[0]) - theta[6] * y[1]
     dydt[2] = theta[7] * (theta[8] - (y[3] + theta[8]) * y[2])
@@ -543,7 +543,27 @@ def calcium_ode_equiv(t, y, theta):
         theta[13]
             * (theta[14] * np.power(m_inf, 3) * np.power(y[2], 3) + theta[15])
             * (theta[17] - (1 + theta[13]) * y[3])
-        - theta[16] * np.power(y[3], 2) / (theta[18] + y[3] * y[3])
+        - theta[16] * y[3] * y[3] / (theta[18] + y[3] * y[3])
+    )
+
+    return dydt
+
+def calcium_ode_equiv_2(t, y, theta):
+    """Calcium model with equivalent ODEs"""
+    dydt = np.zeros(4)
+
+    dydt[0] = theta[0] * np.exp(-theta[1] * t) - theta[2] * y[0]
+    dydt[1] = (theta[3] * y[0] * y[0]) \
+        / (theta[4] + y[0] * y[0]) - theta[5] * y[1]
+    dydt[2] = theta[6] * (theta[7] - (y[3] + theta[7]) * y[2])
+    beta = np.power(theta[8] + y[3], 2) \
+        / (np.power(theta[8] + y[3], 2) + theta[8] * theta[9])
+    m_inf = y[1] * y[3] / ((theta[10] + y[1]) * (theta[11] + y[3]))
+    dydt[3] = beta * (
+        theta[12]
+            * (theta[13] * np.power(m_inf, 3) * np.power(y[2], 3) + theta[14])
+            * (theta[16] - (1 + theta[12]) * y[3])
+        - theta[15] * y[3] * y[3] / (theta[17] + y[3] * y[3])
     )
 
     return dydt
