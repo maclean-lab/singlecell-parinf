@@ -182,8 +182,7 @@ def get_args():
     arg_parser = argparse.ArgumentParser(
         description="Infer parameters of calclium model for multiple cells "
                     + "using Stan")
-    arg_parser.add_argument("--stan_model", metavar="MODEL", type=str,
-                            required=True)
+    arg_parser.add_argument("--stan_model", type=str, required=True)
     arg_parser.add_argument("--ode_variant", type=str, default="vanilla",
                             choices=["vanilla", "equiv_1", "equiv_2",
                                      "const_1", "const_2"])
@@ -194,9 +193,11 @@ def get_args():
     arg_parser.add_argument("--moving_average_window", type=int, default=20)
     arg_parser.add_argument("--t0", type=int, default=200)
     arg_parser.add_argument("--downsample_offset", type=int, default=300)
-    arg_parser.add_argument("--prior_cell", type=int, default=0)
+    arg_parser.add_argument("--var_mask", type=str, default=None)
+    arg_parser.add_argument("--param_mask", type=str, default=None)
+    arg_parser.add_argument("--prior_cell", type=int, required=True)
     arg_parser.add_argument("--prior_chains", type=int, nargs="+",
-                            default=[2])
+                            default=[0, 1, 2, 3])
     arg_parser.add_argument("--prior_std_scale",  type=float, default=1.0)
     arg_parser.add_argument("--prior_clip_min",  type=float, default=0.001)
     arg_parser.add_argument("--prior_clip_max",  type=float, default=5)

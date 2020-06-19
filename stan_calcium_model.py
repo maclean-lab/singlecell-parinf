@@ -137,13 +137,13 @@ def get_args():
                             required=True)
     arg_parser.add_argument("--stan_backend",  metavar="BACKEND", type=str,
                             default="pystan", choices=["pystan", "cmdstanpy"])
+    arg_parser.add_argument("--ode_variant", type=str, default="vanilla",
+                            choices=["vanilla", "equiv_1", "equiv_2",
+                                     "const_1", "const_2"])
     arg_parser.add_argument("--cell_id", type=int, default=0)
     arg_parser.add_argument("--filter_type", default=None,
                             choices=["moving_average"])
     arg_parser.add_argument("--moving_average_window", type=int, default=20)
-    arg_parser.add_argument("--ode_variant", type=str, default="vanilla",
-                            choices=["vanilla", "equiv_1", "equiv_2",
-                                     "const_1", "const_2"])
     arg_parser.add_argument("--t0", type=int, default=200)
     arg_parser.add_argument("--downsample_offset", type=int, default=300)
     arg_parser.add_argument("--var_mask", type=str, default=None)
