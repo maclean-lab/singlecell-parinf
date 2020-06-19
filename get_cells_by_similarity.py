@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 def main():
     args = get_args()
     method = args.method
+    root_cell = args.root_cell
     stochastic = args.stochastic
     min_similarity = args.min_similarity
     min_peak = args.min_peak
@@ -25,21 +26,23 @@ def main():
     if method == "plot":
         plot_similarity(similarity_matrix, output_file)
     elif method == "greedy":
-        get_cells_greedy(similarity_matrix, output_file)
+        get_cells_greedy(similarity_matrix, output_file, root=root_cell)
     elif method == "bfs":
-        get_cells_bfs(similarity_matrix, output_file, stochastic=stochastic,
-                      min_similarity=min_similarity, min_peak=min_peak)
+        get_cells_bfs(similarity_matrix, output_file, root=root_cell,
+                      stochastic=stochastic, min_similarity=min_similarity,
+                      min_peak=min_peak)
     elif method == "dfs":
-        get_cells_dfs(similarity_matrix, output_file, stochastic=stochastic,
-                      min_similarity=min_similarity, min_peak=min_peak)
+        get_cells_dfs(similarity_matrix, output_file, root=root_cell,
+                      stochastic=stochastic, min_similarity=min_similarity,
+                      min_peak=min_peak)
 
 def plot_similarity(similarity_matrix, output_file):
-        plt.clf()
-        plt.figure(figsize=(16, 16))
-        plt.imshow(similarity_matrix, cmap="gray")
-        plt.colorbar()
-        plt.savefig(output_file)
-        plt.close()
+    plt.clf()
+    plt.figure(figsize=(16, 16))
+    plt.imshow(similarity_matrix, cmap="gray")
+    plt.colorbar()
+    plt.savefig(output_file)
+    plt.close()
 
 def get_cells_greedy(similarity_matrix, output_file, root=0, verbose=False):
     num_cells = similarity_matrix.shape[0]
@@ -179,15 +182,12 @@ def get_args():
     """parse command line arguments"""
     arg_parser = ArgumentParser(
         description="Create a list of cells ordered by similarity")
-    arg_parser.add_argument("--method", dest="method", type=str, required=True)
-    arg_parser.add_argument("--stochastic", dest="stochastic",
-                            default=False, action="store_true")
-    arg_parser.add_argument("--min_similarity", dest="min_similarity",
-                            type=float, default=0.0)
-    arg_parser.add_argument("--min_peak", dest="min_peak", type=float,
-                            default=0.0)
-    arg_parser.add_argument("--output", dest="output", type=str,
-                            default="cell_list.txt")
+    arg_parser.add_argument("--method", type=str, required=True)
+    arg_parser.add_argument("--root_cell", type=int, default=0)
+    arg_parser.add_argument("--stochastic", default=False, action="store_true")
+    arg_parser.add_argument("--min_similarity", type=float, default=0.0)
+    arg_parser.add_argument("--min_peak", type=float, default=0.0)
+    arg_parser.add_argument("--output", type=str, required=True)
 
     return arg_parser.parse_args()
 

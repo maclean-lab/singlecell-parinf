@@ -5,12 +5,14 @@ This folder contains ordered lists of cells generated from similarity matrices.
 ### File names
 Each cell list is named by the following format:
 ```
-{method}_{soptsc_params}_{min_similarity}_{min_peak}[_{deterministic|stochastic}].txt
+{method}_{soptsc_params}_root_{cell_id}_{min_similarity}_{min_peak}
+[_{deterministic|stochastic}].txt
 ```
 where
 * `method` is the graph traversal method used for generating the list.
 * `soptsc_params` shows the parameters used in SoptSC to get similarity matrix,
 e.g. number of features.
+* `cell_id` is the numeric ID of the first cell in the list.
 * `min_similarity` is the minimum similarity score for two cells to be
 considered neighbors.
 * `min_peak` is the lowest possible peak value of a cell's calcium response

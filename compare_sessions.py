@@ -8,14 +8,20 @@ import matplotlib.pyplot as plt
 from stan_helpers import StanSessionAnalyzer, moving_average, \
     calcium_ode_vanilla, pdf_multi_plot
 
-param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
-                "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr", "eta1",
-                "eta2", "eta3", "c0", "k3"]
-
 def main():
     args = get_args()
     result_dir = args.result_dir
     session_list_path = args.session_list
+    param_mask = args.param_mask
+
+    param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
+                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
+                    "eta1", "eta2", "eta3", "c0", "k3"]
+
+    if param_mask:
+        param_names = [param_names[i + 1] for i, mask in enumerate(param_mask)
+                       if mask == "1"]
+        param_names = ["sigma"] + param_names
 
     # create analyzers for all sessions
     session_list = pd.read_csv(session_list_path, delimiter="\t")
@@ -35,9 +41,10 @@ def main():
         session_chains.append([int(c) for c in chains.split(",")])
 
     compare_params(session_analyzers, session_list["id"],
-                   session_chains, result_dir)
+                   session_chains, result_dir, param_names)
 
-def compare_params(analyzers, session_ids, chain_list, result_dir):
+def compare_params(analyzers, session_ids, chain_list, result_dir,
+                   param_names):
     """make violin plots for parameters sampled from different Stan
     sessions
     """
@@ -95,6 +102,7 @@ def get_args():
         description="Compare results of different Stan sessions.")
     arg_parser.add_argument("--session_list", type=str, required=True)
     arg_parser.add_argument("--result_dir", type=str, required=True)
+    arg_parser.add_argument("--param_mask", type=str, default=None)
 
     return arg_parser.parse_args()
 
