@@ -183,7 +183,7 @@ def get_args():
     arg_parser = ArgumentParser(
         description="Create a list of cells ordered by similarity")
     arg_parser.add_argument("--method", type=str, required=True)
-    arg_parser.add_argument("--root_cell", type=int, default=0)
+    arg_parser.add_argument("--root_cell", type=int, required=True)
     arg_parser.add_argument("--stochastic", default=False, action="store_true")
     arg_parser.add_argument("--min_similarity", type=float, default=0.0)
     arg_parser.add_argument("--min_peak", type=float, default=0.0)
