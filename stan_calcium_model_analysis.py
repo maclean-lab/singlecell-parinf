@@ -108,9 +108,7 @@ def get_args():
     arg_parser.add_argument("--cell_id", type=int, default=0)
     arg_parser.add_argument("--var_mask", type=str, default=None)
     arg_parser.add_argument("--param_mask", type=str, default=None)
-    arg_parser.add_argument("--ode_variant", type=str, default="vanilla",
-                            choices=["vanilla", "equiv", "const_1", "const_2",
-                                     "reduced"])
+    arg_parser.add_argument("--ode_variant", type=str,required=True)
     arg_parser.add_argument("--filter_type", default=None,
                             choices=[None, "moving_average"])
     arg_parser.add_argument("--moving_average_window", type=int, default=20)

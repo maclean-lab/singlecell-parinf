@@ -135,9 +135,7 @@ def get_args():
     arg_parser.add_argument("--stan_model", type=str, required=True)
     arg_parser.add_argument("--stan_backend",  type=str, default="pystan",
                             choices=["pystan", "cmdstanpy"])
-    arg_parser.add_argument("--ode_variant", type=str, default="vanilla",
-                            choices=["vanilla", "equiv_1", "equiv_2",
-                                     "const_1", "const_2"])
+    arg_parser.add_argument("--ode_variant", type=str,required=True)
     arg_parser.add_argument("--cell_id", type=int, default=0)
     arg_parser.add_argument("--filter_type", default=None,
                             choices=["moving_average"])

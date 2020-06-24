@@ -183,9 +183,7 @@ def get_args():
         description="Infer parameters of calclium model for multiple cells "
                     + "using Stan")
     arg_parser.add_argument("--stan_model", type=str, required=True)
-    arg_parser.add_argument("--ode_variant", type=str, default="vanilla",
-                            choices=["vanilla", "equiv_1", "equiv_2",
-                                     "const_1", "const_2"])
+    arg_parser.add_argument("--ode_variant", type=str, required=True)
     arg_parser.add_argument("--cell_list", type=str, required=True)
     arg_parser.add_argument("--num_cells", type=int, default=100)
     arg_parser.add_argument("--filter_type", default=None,
