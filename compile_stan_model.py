@@ -11,10 +11,11 @@ def main():
 
     model_name = os.path.splitext(os.path.basename(model_path))[0]
     model = StanModel(file=model_path, model_name=model_name)
+    print("Stan model compiled.")
 
     with open(output_path, "wb") as f:
         pickle.dump(model, f)
-        print(f"Saved compiled Stan model to {output_path}")
+        print(f"Compiled Stan model saved to {output_path}.")
 
 def get_args():
     arg_parser = argparse.ArgumentParser(
