@@ -229,12 +229,12 @@ class StanSession:
 class StanSessionAnalyzer:
     """Analyze samples from a Stan sampling/varitional Bayes session"""
     def __init__(self, output_dir, stan_backend="pystan",
-                 stan_operation="sampling", use_summary=False, num_chains=4,
+                 stan_operation="sampling", use_fit_export=False, num_chains=4,
                  warmup=1000, param_names=None, verbose=False):
         self.output_dir = output_dir
         self.stan_backend = stan_backend
         self.stan_operation = stan_operation
-        self.use_summary = use_summary
+        self.use_fit_export = use_fit_export
         self.num_chains = num_chains
         self.warmup = warmup
         self.param_names = param_names
@@ -245,7 +245,7 @@ class StanSessionAnalyzer:
             sys.stdout.flush()
 
         self.samples = []
-        if self.use_summary:
+        if self.use_fit_export:
             # get number of chains and number of warmup iterations from
             # stan_fit_summary.txt
             summary_path = os.path.join(self.output_dir, "stan_fit_summary.txt")
@@ -467,12 +467,12 @@ class StanSessionAnalyzer:
 
 class StanMultiSessionAnalyzer:
     def __init__(self, session_list, result_root, session_output_dirs,
-                 use_summary=False, num_chains=4, warmup=1000,
+                 use_fit_export=False, num_chains=4, warmup=1000,
                  param_names=None):
         self.session_list = session_list
         self.result_root = result_root
         self.session_output_dirs = session_output_dirs
-        self.use_summary = use_summary
+        self.use_fit_export = use_fit_export
         self.num_chains = num_chains
         self.warmup = warmup
         self.param_names = param_names
@@ -484,7 +484,7 @@ class StanMultiSessionAnalyzer:
         for i, output_dir in enumerate(self.session_output_dirs):
             self.sample_analyzers[i] = StanSessionAnalyzer(
                 os.path.join(self.result_root, output_dir),
-                use_summary=self.use_summary, num_chains=self.num_chains,
+                use_fit_export=self.use_fit_export, num_chains=self.num_chains,
                 warmup=self.warmup, param_names=self.param_names)
 
         # make a directory for result
@@ -699,59 +699,72 @@ def load_stan_sample_files(sample_dir, num_chains, include_warmup_iters=False):
 
     return stan_samples
 
-def load_stan_fit_samples(sample_file):
+def load_stan_fit_samples(sample_file, include_warmup_iters=False):
     """Load samples output by StanFit4Model"""
     stan_samples = []
-
     raw_samples = pd.read_csv(sample_file, index_col=0)
+    chains = np.unique(raw_samples["chain"])
+
+    # add samples for each chain
+    for chain_idx in chains:
+        samples = raw_samples.loc[raw_samples["chain"] == chain_idx, :]
+        # remove rows for warmup iterations
+        if not include_warmup_iters:
+            samples = samples.loc[samples["warmup"] == 0, :]
+        # keep columns for parameters only
+        samples = samples.iloc[3:-7]
+        # reset row indices
+        samples.set_index(pd.RangeIndex(samples.shape[0]), inplace=True)
+        stan_samples.append(samples)
 
     return stan_samples
 
 def load_arviz_inference_data(data_file):
     """Load samples from Arviz's InferenceData"""
-    pass
+    stan_samples = []
 
-def get_prior_from_sample_files(prior_dir, prior_chains, use_summary=False,
-                                verbose=True):
-    """Get prior distribution from a previous run, if provided"""
+    # get samples from saved InferenceData
+    inf_data = az.from_netcdf(data_file)
+    num_chains = inf_data.sample_stats.dims["chain"]
+    sigma_array = inf_data.posterior["sigma"].values
+    theta_array = inf_data.posterior["theta"].values
+
+    # gather samples for each chain
+    for chain_idx in range(num_chains):
+        samples = np.concatenate((sigma_array[chain_idx, :, np.newaxis],
+                                  theta_array[chain_idx, :, :]), axis=1)
+        stan_samples.append(pd.DataFrame(samples))
+
+    return stan_samples
+
+def get_prior_from_samples(prior_dir, prior_chains,
+                           sample_source="sample_files", verbose=True):
+    """Get prior distribution from sampled parameters"""
     if verbose:
-        print("Getting prior distribution from chain "
-              + "{}...".format(", ".join(str(c) for c in prior_chains)))
+        chain_str = ", ".join(map(str, prior_chains))
+        print(f"Getting prior distribution from chain(s) {chain_str}...")
         sys.stdout.flush()
 
-    # get sampled parameters
-    if use_summary:
-        # get samples output by stan fit object
-        sample_path = os.path.join(prior_dir, "stan_fit_samples.csv")
-        samples = pd.read_csv(sample_path, index_col=0)
-        prior_thetas = samples.loc[
-            (samples["chain"].isin(prior_chains) & samples["warmup"] == 0), :
-        ].iloc[:, 4:-7]
-        prior_mean = prior_thetas.mean().to_numpy()
-        prior_std = prior_thetas.std().to_numpy()
-    else:
-        # get samples from stan sample file
-        prior_thetas = []
+    # load sampled parameters
+    if sample_source == "sample_files":
+        stan_samples = load_stan_sample_files(prior_dir, max(prior_chains) + 1)
+    elif sample_source == "fit_export":
+        fit_sample_file = os.path.join(prior_dir, "stan_fit_samples.csv")
+        stan_samples = load_stan_fit_samples(fit_sample_file)
+    else:  # sample_source == Arviz InferenceData
+        inf_data_file = os.path.join(prior_dir, "arviz_inf_data.nc")
+        stan_samples = load_arviz_inference_data(inf_data_file)
 
-        for chain in prior_chains:
-            sample_path = os.path.join(prior_dir, "chain_{}.csv".format(chain))
+    # retrieve samples from specified chains
+    prior_thetas = [samples.iloc[:, 1:]
+                    for chain_idx, samples in enumerate(stan_samples)
+                    if chain_idx in prior_chains]
+    prior_thetas_combined = pd.concat(prior_thetas)
 
-            # get number of warm-up iterations from sample file
-            with open(sample_path, "r") as sf:
-                for line in sf:
-                    if "warmup=" in line:
-                        prior_warmup = int(line.strip().split("=")[-1])
-                        break
+    # compute prior mean and standard deviation
+    prior_mean = prior_thetas_combined.mean().to_numpy()
+    prior_std = prior_thetas_combined.std().to_numpy()
 
-            # get parameters from sample file
-            prior_samples = pd.read_csv(sample_path, index_col=False,
-                                        comment="#")
-            prior_thetas.append(prior_samples.iloc[prior_warmup:, 8:])
-
-        # get mean and standard deviation of sampled parameters
-        prior_thetas_combined = pd.concat(prior_thetas)
-        prior_mean = prior_thetas_combined.mean().to_numpy()
-        prior_std = prior_thetas_combined.std().to_numpy()
 
     return prior_mean, prior_std
 

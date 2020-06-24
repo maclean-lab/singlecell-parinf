@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 import pandas as pd
 from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
-    get_prior_from_sample_files, calcium_ode_const_2
+    get_prior_from_samples, calcium_ode_const_2
 
 def main():
     # get command-line arguments
@@ -23,7 +23,7 @@ def main():
     max_treedepth = args.max_treedepth
     result_dir = args.result_dir
     prior_dir = args.prior_dir
-    prior_use_summary = args.prior_use_summary
+    prior_use_fit_export = args.prior_use_fit_export
     prior_chains = args.prior_chains
     prior_spec_path = args.prior_spec
     prior_std_scale = args.prior_std_scale
@@ -52,8 +52,8 @@ def main():
 
     # get prior distribution
     if prior_dir:
-        prior_mean, prior_std = get_prior_from_sample_files(
-            prior_dir, prior_chains, use_summary=prior_use_summary)
+        prior_mean, prior_std = get_prior_from_samples(
+            prior_dir, prior_chains, use_fit_export=prior_use_fit_export)
     elif prior_spec_path:
         print(f"Getting prior distribution from {prior_spec_path}...")
         prior_spec = pd.read_csv(prior_spec_path, delimiter="\t", index_col=0)
@@ -101,7 +101,7 @@ def main():
     stan_session.run_sampling(control=control)
     stan_session.gather_fit_result()
 
-    analyzer = StanSessionAnalyzer(result_dir, use_summary=True,
+    analyzer = StanSessionAnalyzer(result_dir, use_fit_export=True,
                                    param_names=param_names)
     analyzer.simulate_chains(calcium_ode_const_2, t0, ts, y0, y_ref=y_ref,
                              var_names=var_names)
@@ -138,7 +138,7 @@ def get_args():
                             type=str, default=".")
     arg_parser.add_argument("--prior_dir", dest="prior_dir", type=str,
                             default=None)
-    arg_parser.add_argument("--prior_use_summary", dest="prior_use_summary",
+    arg_parser.add_argument("--prior_use_fit_export", dest="prior_use_fit_export",
                             default=False, action="store_true")
     arg_parser.add_argument("--prior_chains", dest="prior_chains", type=int,
                             nargs="+", default=[0, 1, 2, 3])

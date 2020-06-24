@@ -8,7 +8,7 @@ import scipy.integrate
 import pandas as pd
 import matplotlib.pyplot as plt
 from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
-    calcium_ode
+    calcium_ode_vanilla
 
 def main():
     # get command-line arguments
@@ -86,9 +86,9 @@ def main():
             diagnostic_file=os.path.join(cell_dir, "vb_diagnostic"))
 
         analyzer = StanSessionAnalyzer(cell_dir, stan_operation="vb",
-                                       use_summary=False, num_chains=1,
+                                       use_fit_export=False, num_chains=1,
                                        warmup=0, param_names=param_names)
-        analyzer.simulate_chains(calcium_ode, t0, ts, y0, 3, y_ref=y_ref)
+        analyzer.simulate_chains(calcium_ode_vanilla, t0, ts, y0, y_ref=y_ref)
 
 def get_args():
     """parse command line arguments"""

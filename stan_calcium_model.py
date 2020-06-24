@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import stan_helpers
 from stan_helpers import StanSession, StanSessionAnalyzer, load_trajectories, \
-    get_prior_from_sample_files
+    get_prior_from_samples
 
 def main():
     # get command-line arguments
@@ -32,7 +32,7 @@ def main():
     max_treedepth = args.max_treedepth
     result_dir = args.result_dir
     analysis_tasks = args.analysis_tasks
-    use_summary = args.use_summary
+    use_fit_export = args.use_fit_export
 
     # prepare data for Stan model
     print("Initializing data for cell {}...".format(cell_id))
@@ -55,7 +55,7 @@ def main():
 
     # get prior distribution
     if prior_dir:
-        prior_mean, prior_std = get_prior_from_sample_files(
+        prior_mean, prior_std = get_prior_from_samples(
             prior_dir, prior_chains)
     elif prior_spec_path:
         print(f"Getting prior distribution from {prior_spec_path}...")
@@ -115,7 +115,7 @@ def main():
 
     # run analysis on Stan results
     if analysis_tasks:
-        analyzer = StanSessionAnalyzer(result_dir, use_summary=use_summary,
+        analyzer = StanSessionAnalyzer(result_dir, use_fit_export=use_fit_export,
                                        param_names=param_names)
         if "all" in analysis_tasks:
             analysis_tasks = ["simulate_chains", "plot_parameters",
@@ -133,10 +133,9 @@ def get_args():
     """parse command line arguments"""
     arg_parser = argparse.ArgumentParser(
         description="Infer parameters of calcium mode using stan.")
-    arg_parser.add_argument("--stan_model", metavar="MODEL", type=str,
-                            required=True)
-    arg_parser.add_argument("--stan_backend",  metavar="BACKEND", type=str,
-                            default="pystan", choices=["pystan", "cmdstanpy"])
+    arg_parser.add_argument("--stan_model", type=str, required=True)
+    arg_parser.add_argument("--stan_backend",  type=str, default="pystan",
+                            choices=["pystan", "cmdstanpy"])
     arg_parser.add_argument("--ode_variant", type=str, default="vanilla",
                             choices=["vanilla", "equiv_1", "equiv_2",
                                      "const_1", "const_2"])
@@ -163,7 +162,7 @@ def get_args():
     arg_parser.add_argument("--analysis_tasks", nargs="+", default=None,
                             choices=["all", "simulate_chains",
                                      "plot_parameters", "get_r_squared"])
-    arg_parser.add_argument("--use_summary", default=False,
+    arg_parser.add_argument("--use_fit_export", default=False,
                             action="store_true")
 
     return arg_parser.parse_args()

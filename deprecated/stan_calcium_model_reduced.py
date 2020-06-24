@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 import pandas as pd
 from stan_helpers import StanSession, StanSessionAnalyzer, moving_average, \
-    get_prior_from_sample_files, load_trajectories
+    get_prior_from_samples, load_trajectories
 from stan_helpers import calcium_ode_reduced as calcium_ode
 
 def main():
@@ -28,7 +28,7 @@ def main():
     prior_spec_path = args.prior_spec
     prior_std_scale = args.prior_std_scale
     analysis_tasks = args.analysis_tasks
-    use_summary = args.use_summary
+    use_fit_export = args.use_fit_export
 
     # prepare data for Stan model
     print("Initializing data for cell {}...".format(cell_id))
@@ -59,7 +59,7 @@ def main():
 
     # get prior distribution
     if prior_dir:
-        prior_mean, prior_std = get_prior_from_sample_files(prior_dir,
+        prior_mean, prior_std = get_prior_from_samples(prior_dir,
                                                             prior_chains)
     elif prior_spec_path:
         print(f"Getting prior distribution from {prior_spec_path}...")
@@ -113,7 +113,7 @@ def main():
 
     # run analysis on Stan results
     if analysis_tasks:
-        analyzer = StanSessionAnalyzer(result_dir, use_summary=use_summary,
+        analyzer = StanSessionAnalyzer(result_dir, use_fit_export=use_fit_export,
                                        param_names=param_names)
         if "all" in analysis_tasks:
             analysis_tasks = ["simulate_chains", "plot_parameters", "get_r_squared"]
@@ -167,7 +167,7 @@ def get_args():
                             choices=["all", "simulate_chains",
                                      "plot_parameters", "get_r_squared"],
                             default=None)
-    arg_parser.add_argument("--use_summary", dest="use_summary", default=False,
+    arg_parser.add_argument("--use_fit_export", dest="use_fit_export", default=False,
                             action="store_true")
 
     return arg_parser.parse_args()

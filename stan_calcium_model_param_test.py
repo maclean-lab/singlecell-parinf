@@ -17,7 +17,7 @@ def main():
     moving_average_window = args.moving_average_window
     t0 = args.t0
     stan_operation = args.stan_operation
-    use_summary = args.use_summary
+    use_fit_export = args.use_fit_export
     num_chains = args.num_chains
     warmup = args.warmup
     show_progress = args.show_progress
@@ -45,10 +45,10 @@ def main():
     var_names = ["PLC", "IP3", "h", "Ca"]
     calcium_ode = getattr(stan_helpers, "calcium_ode_" + ode_variant)
 
-    if use_summary:
+    if use_fit_export:
         analyzer = StanSessionAnalyzer(result_dir,
                                        stan_operation=stan_operation,
-                                       use_summary=use_summary,
+                                       use_fit_export=use_fit_export,
                                        param_names=param_names)
     else:
         analyzer = StanSessionAnalyzer(result_dir, num_chains=num_chains,
@@ -90,7 +90,7 @@ def get_args():
                             default=200)
     arg_parser.add_argument("--stan_operation", dest="stan_operation", type=str,
                             default="sampling")
-    arg_parser.add_argument("--use_summary", dest="use_summary", default=False,
+    arg_parser.add_argument("--use_fit_export", dest="use_fit_export", default=False,
                             action="store_true")
     arg_parser.add_argument("--num_chains", dest="num_chains", type=int,
                             default=4)

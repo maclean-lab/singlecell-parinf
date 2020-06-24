@@ -20,7 +20,7 @@ def main():
     t0 = args.t0
     downsample_offset = args.downsample_offset
     stan_operation = args.stan_operation
-    use_summary = args.use_summary
+    use_fit_export = args.use_fit_export
     num_chains = args.num_chains
     warmup = args.warmup
     tasks = args.tasks
@@ -73,10 +73,10 @@ def main():
     # get ODE function
     calcium_ode = getattr(stan_helpers, "calcium_ode_" + ode_variant)
 
-    if use_summary:
+    if use_fit_export:
         analyzer = StanSessionAnalyzer(result_dir,
                                        stan_operation=stan_operation,
-                                       use_summary=use_summary,
+                                       use_fit_export=use_fit_export,
                                        param_names=param_names)
     else:
         analyzer = StanSessionAnalyzer(result_dir, num_chains=num_chains,
@@ -118,7 +118,7 @@ def get_args():
     arg_parser.add_argument("--downsample_offset", type=int, default=300)
     arg_parser.add_argument("--var_mask", type=str, default=None)
     arg_parser.add_argument("--stan_operation", type=str, default="sampling")
-    arg_parser.add_argument("--use_summary", default=False, action="store_true")
+    arg_parser.add_argument("--use_fit_export", default=False, action="store_true")
     arg_parser.add_argument("--num_chains", type=int, default=4)
     arg_parser.add_argument("--warmup", type=int, default=1000)
     arg_parser.add_argument("--tasks", nargs="+", default="all",

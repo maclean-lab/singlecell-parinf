@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import stan_helpers
 from stan_helpers import StanSession, StanSessionAnalyzer, load_trajectories, \
-    get_prior_from_sample_files
+    get_prior_from_samples
 
 def main():
     # get command-line arguments
@@ -95,7 +95,7 @@ def main():
         if prior_chains:
             print("Updating prior distribution from the "
                   + f"{num2ord(cell_order - 1)} cell (ID: {prior_id})...")
-            prior_mean, prior_std = get_prior_from_sample_files(prior_dir,
+            prior_mean, prior_std = get_prior_from_samples(prior_dir,
                                                                 prior_chains)
 
             if prior_std_scale != 1.0:
@@ -156,7 +156,7 @@ def main():
                 print("Running analysis on sampled result...")
 
                 analyzer = StanSessionAnalyzer(
-                    cell_dir, use_summary=True, param_names=param_names)
+                    cell_dir, use_fit_export=True, param_names=param_names)
                 analyzer.simulate_chains(calcium_ode, 0, ts, y0, y_ref=y_ref,
                                          var_names=var_names)
                 analyzer.plot_parameters()

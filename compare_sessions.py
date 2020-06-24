@@ -32,7 +32,7 @@ def main():
     for idx in range(num_sessions):
         # create a session analyzer for current session
         analyzer = StanSessionAnalyzer(session_list.loc[idx, "dir"],
-                                       use_summary=True,
+                                       use_fit_export=True,
                                        param_names=param_names)
         session_analyzers.append(analyzer)
 
