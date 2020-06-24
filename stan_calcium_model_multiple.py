@@ -96,7 +96,7 @@ def main():
             print("Updating prior distribution from the "
                   + f"{num2ord(cell_order - 1)} cell (ID: {prior_id})...")
             prior_mean, prior_std = get_prior_from_samples(prior_dir,
-                                                                prior_chains)
+                                                           prior_chains)
 
             if prior_std_scale != 1.0:
                 print("Scaling standard deviation of prior distribution "

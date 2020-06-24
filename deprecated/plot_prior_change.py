@@ -19,8 +19,7 @@ def main():
     prior_stds = np.empty((num_params, num_cells))
     for i in range(num_cells):
         chain = 0 if cell_ids[i] != 0 else 2
-        prior_mean, prior_std = get_prior_from_samples(result_dir_root,
-                                                            chain)
+        prior_mean, prior_std = get_prior_from_samples(result_dir_root, chain)
         prior_means[:, i] = prior_mean
         prior_stds[:, i] = prior_std
 

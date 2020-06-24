@@ -55,8 +55,7 @@ def main():
 
     # get prior distribution
     if prior_dir:
-        prior_mean, prior_std = get_prior_from_samples(
-            prior_dir, prior_chains)
+        prior_mean, prior_std = get_prior_from_samples(prior_dir, prior_chains)
     elif prior_spec_path:
         print(f"Getting prior distribution from {prior_spec_path}...")
         prior_spec = pd.read_csv(prior_spec_path, delimiter="\t", index_col=0)

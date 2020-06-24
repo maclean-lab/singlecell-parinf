@@ -765,7 +765,6 @@ def get_prior_from_samples(prior_dir, prior_chains,
     prior_mean = prior_thetas_combined.mean().to_numpy()
     prior_std = prior_thetas_combined.std().to_numpy()
 
-
     return prior_mean, prior_std
 
 def pdf_multi_plot(plot_func, plot_data, output_path, *args, num_rows=4,
