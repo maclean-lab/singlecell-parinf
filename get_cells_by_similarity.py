@@ -160,13 +160,13 @@ def get_cells_dfs(similarity_matrix, output_file, root=0, stochastic=False,
     if i + 1 < num_cells:
         print("Warning: {} cell(s) not visited".format(num_cells - i - 1))
 
-    # find cells with more than 1 child
-    print("Cells with more than 1 child:")
-    print("order\tcell\tchildren")
-    for i, cell in enumerate(ordered_cells):
-        if num_children[cell] > 1:
-            children = np.squeeze(np.argwhere(parents == cell))
-            print("{}\t{}\t{}".format(i, cell, children))
+    # # find cells with more than 1 child
+    # print("Cells with more than 1 child:")
+    # print("order\tcell\tchildren")
+    # for i, cell in enumerate(ordered_cells):
+    #     if num_children[cell] > 1:
+    #         children = np.squeeze(np.argwhere(parents == cell))
+    #         print("{}\t{}\t{}".format(i, cell, children))
 
     dfs_result = pd.DataFrame({"Cell": ordered_cells, "Parent": parents})
     dfs_result.to_csv(output_file, sep="\t", index=False)

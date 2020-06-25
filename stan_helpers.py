@@ -715,7 +715,7 @@ def load_stan_sample_files(sample_dir, num_chains, include_warmup_iters=False):
 
         # get samples
         chain_samples = pd.read_csv(sample_path, index_col=False, comment="#")
-        stan_samples.append(chain_samples.iloc[num_warmup_iters:, 8:])
+        stan_samples.append(chain_samples.iloc[num_warmup_iters:, 7:])
 
     return stan_samples
 
@@ -758,7 +758,7 @@ def load_arviz_inference_data(data_file):
     return stan_samples
 
 def get_prior_from_samples(prior_dir, prior_chains,
-                           sample_source="sample_files", verbose=True):
+                           sample_source="arviz_inf_data", verbose=True):
     """Get prior distribution from sampled parameters"""
     if verbose:
         chain_str = ", ".join(map(str, prior_chains))
