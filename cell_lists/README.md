@@ -5,8 +5,7 @@ This folder contains ordered lists of cells generated from similarity matrices.
 ### File names
 Each cell list is named by the following format:
 ```
-{method}_{soptsc_params}_root_{cell_id}_{min_similarity}_{min_peak}
-[_{deterministic|stochastic}].txt
+{method}_{soptsc_params}_root_{cell_id}_{min_similarity}_{min_peak}[_{note}].txt
 ```
 where
 * `method` is the graph traversal method used for generating the list.
@@ -19,9 +18,14 @@ considered neighbors.
 trajectory for the cell to be included in the cell list. In other words, if the
 trajectory of a cell is lower than `min_peak` everywhere, it will not be in the
 list.
-* `deterministic|stochastic` is an optional descriptor, which indicates whether
-new nodes are added to the FIFO queue of BFS or stack of DFS in a deterministic
-or stochastic manner.
+* `note` is optional and can be one of the following:
+    * `deterministic` or `stochastic` indicates whether new nodes are added to
+    the FIFO queue of BFS or stack of DFS in a deterministic or stochastic
+    manner.
+    * `reversed_{branch_cell_id}_{idx}` is appended for reversed cell lists
+    from an existing DFS or BFS list. Lists with the same `branch_cell_id` share
+    the same tail starting from the cell with numeric ID `branch_cell_id` but
+    may have different heads before that cell.
 
 ### File content
 Each file contains a tab-delimited table.

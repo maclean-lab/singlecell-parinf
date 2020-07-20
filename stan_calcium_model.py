@@ -3,7 +3,7 @@ import sys
 import argparse
 import numpy as np
 import pandas as pd
-import stan_helpers
+import calcium_models
 from stan_helpers import StanSession, StanSessionAnalyzer, load_trajectories, \
     get_prior_from_samples
 
@@ -32,7 +32,7 @@ def main():
     max_treedepth = args.max_treedepth
     result_dir = args.result_dir
     analysis_tasks = args.analysis_tasks
-    use_fit_export = args.use_fit_export
+    sample_source = args.sample_source
 
     # prepare data for Stan model
     print("Initializing data for cell {}...".format(cell_id))
@@ -108,19 +108,19 @@ def main():
     stan_session = StanSession(stan_model, result_dir,
                                stan_backend=stan_backend, data=calcium_data,
                                num_chains=num_chains, num_iters=num_iters,
-                               warmup=warmup, thin=thin)
-    stan_session.run_sampling(control=control)
+                               warmup=warmup, thin=thin, control=control)
+    stan_session.run_sampling()
     stan_session.gather_fit_result()
 
     # run analysis on Stan results
     if analysis_tasks:
-        analyzer = StanSessionAnalyzer(result_dir, use_fit_export=use_fit_export,
+        analyzer = StanSessionAnalyzer(result_dir, sample_source=sample_source,
                                        param_names=param_names)
         if "all" in analysis_tasks:
             analysis_tasks = ["simulate_chains", "plot_parameters",
                               "get_r_squared"]
         if "simulate_chains" in analysis_tasks:
-            calcium_ode = getattr(stan_helpers, "calcium_ode_" + ode_variant)
+            calcium_ode = getattr(calcium_models, "calcium_ode_" + ode_variant)
             analyzer.simulate_chains(calcium_ode, 0, ts, y0, y_ref=y_ref,
                                      var_names=var_names)
         if "plot_parameters" in analysis_tasks:
@@ -159,8 +159,8 @@ def get_args():
     arg_parser.add_argument("--analysis_tasks", nargs="+", default=None,
                             choices=["all", "simulate_chains",
                                      "plot_parameters", "get_r_squared"])
-    arg_parser.add_argument("--use_fit_export", default=False,
-                            action="store_true")
+    arg_parser.add_argument("--sample_source", type=str,
+                            default="arviz_inf_data")
 
     return arg_parser.parse_args()
 

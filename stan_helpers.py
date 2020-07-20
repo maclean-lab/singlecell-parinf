@@ -24,7 +24,7 @@ from cmdstanpy import CmdStanModel
 class StanSession:
     def __init__(self, stan_model_path, output_dir, stan_backend="pystan",
                  data=None, num_chains=4, num_iters=1000, warmup=1000, thin=1,
-                 rhat_upper_bound=1.1):
+                 control={}, rhat_upper_bound=1.1):
         # load Stan model
         stan_model_filename = os.path.basename(stan_model_path)
         self.model_name, model_ext = os.path.splitext(stan_model_filename)
@@ -43,7 +43,7 @@ class StanSession:
 
                 print("Compiled stan model saved")
             elif self.stan_backend == "cmdstanpy":
-                ecompiled_model_path = os.path.join(self.output_dir,
+                compiled_model_path = os.path.join(self.output_dir,
                                                     self.model_name)
                 self.model = CmdStanModel(model_name=self.model_name,
                                           stan_file=stan_model_path,
@@ -67,16 +67,17 @@ class StanSession:
         self.num_iters = num_iters
         self.warmup = warmup
         self.thin = thin
+        self.control = control
         self.rhat_upper_bound = rhat_upper_bound
 
         sys.stdout.flush()
 
-    def run_sampling(self, control={}):
+    def run_sampling(self):
         """Run Stan sampling"""
-        if "max_treedepth" not in control:
-            control["max_treedepth"] = 10
-        if "adapt_delta" not in control:
-            control["adapt_delta"] = 0.8
+        if "max_treedepth" not in self.control:
+            self.control["max_treedepth"] = 10
+        if "adapt_delta" not in self.control:
+            self.control["adapt_delta"] = 0.8
 
         # run sampling
         if self.stan_backend == "pystan":
@@ -84,14 +85,15 @@ class StanSession:
                 data=self.data, chains=self.num_chains, iter=self.num_iters,
                 warmup=self.warmup, thin=self.thin,
                 sample_file=os.path.join(self.output_dir, "chain"),
-                control=control)
+                control=self.control)
         else:  # self.stan_backend == "cmdstanpy"
             self.fit = self.model.sample(
                 data=self.data, chains=self.num_chains, cores=self.num_chains,
                 iter_warmup=self.warmup,
                 iter_sampling=self.num_iters - self.warmup, save_warmup=True,
-                thin=self.thin, max_treedepth=control["max_treedepth"],
-                adapt_delta=control["adapt_delta"], output_dir=self.output_dir)
+                thin=self.thin, max_treedepth=self.control["max_treedepth"],
+                adapt_delta=self.control["adapt_delta"],
+                output_dir=self.output_dir)
         print("Stan sampling finished")
 
         # save fit object
@@ -145,10 +147,10 @@ class StanSession:
                                             "stan_fit_samples.csv")
             fit_samples.to_csv(fit_samples_path)
 
-        # TODO: rename sample files from cmdstan
-
             if verbose:
                 print("Stan samples saved")
+
+        # TODO: rename sample files from cmdstan
 
         # make plots using arviz
         # make trace plot
@@ -216,7 +218,8 @@ class StanSession:
 
     def run_optimization(self):
         optimized_params = self.model.optimizing(data=self.data)
-        print(optimized_params)
+
+        return optimized_params
 
     def run_variational_bayes(self):
         sample_path = os.path.join(self.output_dir, "chain_0.csv")
@@ -229,12 +232,12 @@ class StanSession:
 class StanSessionAnalyzer:
     """Analyze samples from a Stan sampling/varitional Bayes session"""
     def __init__(self, output_dir, stan_backend="pystan",
-                 stan_operation="sampling", use_fit_export=False, num_chains=4,
-                 warmup=1000, param_names=None, verbose=False):
+                 stan_operation="sampling", sample_source="arviz_inf_data",
+                 num_chains=4, warmup=1000, param_names=None, verbose=False):
         self.output_dir = output_dir
         self.stan_backend = stan_backend
         self.stan_operation = stan_operation
-        self.use_fit_export = use_fit_export
+        self.sample_source = sample_source
         self.num_chains = num_chains
         self.warmup = warmup
         self.param_names = param_names
@@ -245,32 +248,7 @@ class StanSessionAnalyzer:
             sys.stdout.flush()
 
         self.samples = []
-        if self.use_fit_export:
-            # get number of chains and number of warmup iterations from
-            # stan_fit_summary.txt
-            summary_path = os.path.join(self.output_dir, "stan_fit_summary.txt")
-            with open(summary_path, "r") as summary_file:
-                lines = summary_file.readlines()
-
-            sampling_params = re.findall(r"\d+", lines[1])
-            self.num_chains = int(sampling_params[0])
-            self.warmup = int(sampling_params[2])
-
-            # get raw samples
-            sample_path = os.path.join(self.output_dir, "stan_fit_samples.csv")
-            self.raw_samples = pd.read_csv(sample_path, index_col=0)
-
-            # extract sampled parameters
-            for chain_idx in range(self.num_chains):
-                # TODO: consider drop columns by name, rather than hard code
-                # indexing
-                samples = self.raw_samples.loc[
-                    (self.raw_samples["chain"] == chain_idx)
-                     & (self.raw_samples["warmup"] == 0), :
-                ].iloc[:, 3:-7]
-                samples.set_index(pd.RangeIndex(samples.shape[0]), inplace=True)
-                self.samples.append(samples)
-        else:
+        if self.sample_source == "sample_files":
             # use sample files generatd by stan's sampling function
             self.raw_samples = []
 
@@ -291,6 +269,27 @@ class StanSessionAnalyzer:
                     first_col_idx = 3
                 self.samples.append(
                     raw_samples.iloc[self.warmup:, first_col_idx:])
+        elif self.sample_source == "fit_export":
+            # get number of chains and number of warmup iterations from
+            # stan_fit_summary.txt
+            summary_path = os.path.join(self.output_dir, "stan_fit_summary.txt")
+            with open(summary_path, "r") as summary_file:
+                lines = summary_file.readlines()
+
+            sampling_params = re.findall(r"\d+", lines[1])
+            self.num_chains = int(sampling_params[0])
+            self.warmup = int(sampling_params[2])
+
+            # get samples
+            sample_path = os.path.join(self.output_dir, "stan_fit_samples.csv")
+            self.raw_samples = pd.read_csv(sample_path, index_col=0)
+            self.samples = load_stan_fit_samples(sample_path)
+
+        else:  # sample_source == "arviz_inf_data":
+            sample_path = os.path.join(self.output_dir, "arviz_inf_data.nc")
+            self.raw_samples = az.from_netcdf(sample_path)
+            self.num_chains = self.raw_samples.sample_stats.dims["chain"]
+            self.samples = load_arviz_inference_data(sample_path)
 
         self.num_samples = self.samples[0].shape[0]
         self.num_params = self.samples[0].shape[1]
@@ -467,12 +466,12 @@ class StanSessionAnalyzer:
 
 class StanMultiSessionAnalyzer:
     def __init__(self, session_list, result_root, session_output_dirs,
-                 use_fit_export=False, num_chains=4, warmup=1000,
+                 sample_source="arviz_inf_data", num_chains=4, warmup=1000,
                  param_names=None):
         self.session_list = session_list
         self.result_root = result_root
         self.session_output_dirs = session_output_dirs
-        self.use_fit_export = use_fit_export
+        self.sample_source = sample_source
         self.num_chains = num_chains
         self.warmup = warmup
         self.param_names = param_names
@@ -484,7 +483,7 @@ class StanMultiSessionAnalyzer:
         for i, output_dir in enumerate(self.session_output_dirs):
             self.sample_analyzers[i] = StanSessionAnalyzer(
                 os.path.join(self.result_root, output_dir),
-                use_fit_export=self.use_fit_export, num_chains=self.num_chains,
+                sample_source=self.sample_source, num_chains=self.num_chains,
                 warmup=self.warmup, param_names=self.param_names)
 
         # make a directory for result
@@ -502,149 +501,40 @@ class StanMultiSessionAnalyzer:
         all_samples = all_samples.T
         output_path = os.path.join(self.analyzer_result_dir, "param_violin.pdf")
 
+        xtick_pos = np.arange(1, self.num_sessions + 1)
         pdf_multi_plot(plt.violinplot, all_samples, output_path, num_rows=4,
                        num_cols=1, titles=self.param_names,
-                       xticks=self.session_list, xtick_rotation=90,
-                       show_progress=show_progress)
+                       xticks=self.session_list, xtick_pos=xtick_pos,
+                       xtick_rotation=90, show_progress=show_progress)
+
+    def plot_rhat(self):
+        """make plots for R^hat for all parameters and log posterior"""
+        if not isinstance(self.sample_analyzers[0].raw_samples,
+                          az.InferenceData):
+            raise TypeError("Cannot plot R^hat if samples are not loaded "
+                            + "from Arviz's InferenceData")
+
+        rhats = np.zeros((len(self.param_names) + 1, self.num_sessions))
+
+        for i, analyzer in enumerate(self.sample_analyzers):
+            inf_data = analyzer.raw_samples
+
+            # get R^hat for parameters
+            param_rhats = az.rhat(inf_data, method="split")
+            rhats[0, i] = param_rhats["sigma"].item()
+            rhats[1:-1, i] = param_rhats["theta"].to_masked_array()
+
+            # get R^hat for log posterior
+            stat_rhats = az.rhat(inf_data.sample_stats, method="split")
+            rhats[-1, i] = stat_rhats["lp"].item()
+
+        # plot all R^hat's
+        output_path = os.path.join(self.analyzer_result_dir, "rhats.pdf")
+        pdf_multi_plot(plt.plot, rhats, output_path, ".", num_rows=4,
+                       num_cols=1, titles=self.param_names + ["lp"],
+                       xticks=self.session_list, xtick_rotation=90)
 
 # utility functions
-def calcium_ode_vanilla(t, y, theta):
-    """Original calcium model from Yao 2016"""
-    dydt = np.zeros(4)
-
-    dydt[0] = theta[0] * theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
-    dydt[1] = (theta[4] * y[0] * y[0]) \
-        / (theta[5] * theta[5] + y[0] * y[0]) - theta[6] * y[1]
-    dydt[2] = theta[7] * (y[3] + theta[8]) \
-        * (theta[8] / (y[3] * theta[8]) - y[2])
-    beta_inv = 1 + theta[9] * theta[10] / np.power(theta[9] + y[3], 2)
-    m_inf = y[1] * y[3] / ((theta[11] + y[1]) * (theta[12] + y[3]))
-    dydt[3] = 1 / beta_inv * (
-        theta[13]
-            * (theta[14] * np.power(m_inf, 3) * np.power(y[2], 3) + theta[15])
-            * (theta[17] - (1 + theta[13]) * y[3])
-        - theta[16] * y[3] * y[3] / (np.power(theta[18], 2) + y[3] * y[3])
-    )
-
-    return dydt
-
-def calcium_ode_equiv_1(t, y, theta):
-    """Calcium model with equivalent ODEs"""
-    dydt = np.zeros(4)
-
-    dydt[0] = theta[0] * theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
-    dydt[1] = (theta[4] * y[0] * y[0]) \
-        / (theta[5] + y[0] * y[0]) - theta[6] * y[1]
-    dydt[2] = theta[7] * (theta[8] - (y[3] + theta[8]) * y[2])
-    beta = np.power(theta[9] + y[3], 2) \
-        / (np.power(theta[9] + y[3], 2) + theta[9] * theta[10])
-    m_inf = y[1] * y[3] / ((theta[11] + y[1]) * (theta[12] + y[3]))
-    dydt[3] = beta * (
-        theta[13]
-            * (theta[14] * np.power(m_inf, 3) * np.power(y[2], 3) + theta[15])
-            * (theta[17] - (1 + theta[13]) * y[3])
-        - theta[16] * y[3] * y[3] / (theta[18] + y[3] * y[3])
-    )
-
-    return dydt
-
-def calcium_ode_equiv_2(t, y, theta):
-    """Calcium model with equivalent ODEs"""
-    dydt = np.zeros(4)
-
-    dydt[0] = theta[0] * np.exp(-theta[1] * t) - theta[2] * y[0]
-    dydt[1] = (theta[3] * y[0] * y[0]) \
-        / (theta[4] + y[0] * y[0]) - theta[5] * y[1]
-    dydt[2] = theta[6] * (theta[7] - (y[3] + theta[7]) * y[2])
-    beta = np.power(theta[8] + y[3], 2) \
-        / (np.power(theta[8] + y[3], 2) + theta[8] * theta[9])
-    m_inf = y[1] * y[3] / ((theta[10] + y[1]) * (theta[11] + y[3]))
-    dydt[3] = beta * (
-        theta[12]
-            * (theta[13] * np.power(m_inf, 3) * np.power(y[2], 3) + theta[14])
-            * (theta[16] - (1 + theta[12]) * y[3])
-        - theta[15] * y[3] * y[3] / (theta[17] + y[3] * y[3])
-    )
-
-    return dydt
-
-def calcium_ode_const_1(t, y, theta):
-    """Calcium model with d_1 set to constants"""
-    dydt = np.zeros(4)
-
-    dydt[0] = theta[0] * theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
-    dydt[1] = (theta[4] * y[0] * y[0]) \
-        / (theta[5] + y[0] * y[0]) - theta[6] * y[1]
-    dydt[2] = theta[7] * (theta[8] - (y[3] + theta[8]) * y[2])
-    beta = np.power(theta[9] + y[3], 2) \
-        / (np.power(theta[9] + y[3], 2) + theta[9] * theta[10])
-    m_inf = y[3] / (theta[11] + y[3])
-    dydt[3] = beta * (
-        theta[12]
-            * (theta[13] * np.power(m_inf, 3) * np.power(y[2], 2) + theta[14])
-            * (theta[16] - (1 + theta[12]) * y[3])
-        - theta[15] * y[3] * y[3] / (theta[17] + y[3] * y[3])
-    )
-
-    return dydt
-
-def calcium_ode_const_2(t, y, theta):
-    """Calcium model with d_1 and d_5 set to constants"""
-    dydt = np.zeros(4)
-
-    dydt[0] = theta[0] * theta[1] * np.exp(-theta[2] * t) - theta[3] * y[0]
-    dydt[1] = (theta[4] * y[0] * y[0]) \
-        / (theta[5] + y[0] * y[0]) - theta[6] * y[1]
-    dydt[2] = theta[7] * (theta[8] - (y[3] + theta[8]) * y[2])
-    beta = np.power(theta[9] + y[3], 2) \
-        / (np.power(theta[9] + y[3], 2) + theta[9] * theta[10])
-    m_inf = y[1] * y[3] / ((0.13 + y[1]) * (0.0823 + y[3]))
-    dydt[3] = beta * (
-        theta[11]
-            * (theta[12] * np.power(m_inf, 3) * np.power(y[2], 2) + theta[13])
-            * (theta[15] - (1 + theta[11]) * y[3])
-        - theta[14] * y[3] * y[3] / (theta[16] + y[3] * y[3])
-    )
-
-    return dydt
-
-def calcium_ode_const_3(t, y, theta):
-    """Calcium model with equivalent ODEs and d_1 set to constant"""
-    dydt = np.zeros(4)
-
-    dydt[0] = theta[0] * np.exp(-theta[1] * t) - theta[2] * y[0]
-    dydt[1] = (theta[3] * y[0] * y[0]) \
-        / (theta[4] + y[0] * y[0]) - theta[5] * y[1]
-    dydt[2] = theta[6] * (theta[7] - (y[3] + theta[7]) * y[2])
-    beta = np.power(theta[8] + y[3], 2) \
-        / (np.power(theta[8] + y[3], 2) + theta[8] * theta[9])
-    m_inf = y[1] * y[3] / ((0.13 + y[1]) * (theta[11] + y[3]))
-    dydt[3] = beta * (
-        theta[11]
-            * (theta[12] * np.power(m_inf, 3) * np.power(y[2], 3) + theta[13])
-            * (theta[15] - (1 + theta[11]) * y[3])
-        - theta[14] * y[3] * y[3] / (theta[16] + y[3] * y[3])
-    )
-
-    return dydt
-
-def calcium_ode_reduced(t, y, theta):
-    """Calcium model with h and Ca2+ only"""
-    dydt = np.zeros(2)
-
-    dydt[0] = theta[0] * (theta[1] - (y[1] + theta[1]) * y[0])
-    beta = np.power(theta[2] + y[1], 2) \
-        / (np.power(theta[2] + y[1], 2) + theta[2] * theta[3])
-    m_inf = theta[4] * y[1] / (theta[5] + y[1])
-    dydt[1] = beta * (
-        theta[6]
-            * (theta[7] * np.power(m_inf, 3) * np.power(y[0], 3) + theta[8])
-            * (theta[10] - (1 + theta[6]) * y[1])
-        - theta[9] * y[1] * y[1] / (theta[11] + y[1] * y[1])
-    )
-
-    return dydt
-
 def load_trajectories(t0, filter_type=None, moving_average_window=20,
                       downsample_offset=-1, downsample_factor=10,
                       verbose=False):
@@ -788,14 +678,14 @@ def get_prior_from_samples(prior_dir, prior_chains,
     return prior_mean, prior_std
 
 def pdf_multi_plot(plot_func, plot_data, output_path, *args, num_rows=4,
-                   num_cols=2, titles=None, xticks=None, xtick_rotation=0,
-                   show_progress=False):
+                   num_cols=2, titles=None, xticks=None, xtick_pos=None,
+                   xtick_rotation=0, show_progress=False):
     """make multiple plots in a PDF"""
     num_subplots_per_page = num_rows * num_cols
     num_plots = len(plot_data)
     num_pages = math.ceil(num_plots / num_subplots_per_page)
-    if xticks is not None:
-        xtick_pos = np.arange(1, len(xticks) + 1)
+    if xticks is not None and xtick_pos is None:
+        xtick_pos = np.arange(len(xticks))
 
     with PdfPages(output_path) as pdf:
         # generate each page

@@ -4,7 +4,7 @@ import os
 import argparse
 import numpy as np
 import pandas as pd
-import stan_helpers
+import calcium_models
 from stan_helpers import StanSession, StanSessionAnalyzer, load_trajectories, \
     get_prior_from_samples
 
@@ -73,7 +73,7 @@ def main():
         var_names = [var_names[i] for i, mask in enumerate(var_mask)
                      if mask == "1"]
 
-    calcium_ode = getattr(stan_helpers, "calcium_ode_" + ode_variant)
+    calcium_ode = getattr(calcium_models, "calcium_ode_" + ode_variant)
     control = {"adapt_delta": adapt_delta, "max_treedepth": max_treedepth}
 
     max_num_tries = 3  # maximum number of tries of stan sampling
@@ -141,8 +141,8 @@ def main():
             stan_session = StanSession(
                 stan_model, cell_dir, data=calcium_data,
                 num_chains=num_chains, num_iters=num_iters, warmup=warmup,
-                thin=thin, rhat_upper_bound=rhat_upper_bound)
-            stan_session.run_sampling(control=control)
+                thin=thin, control=control, rhat_upper_bound=rhat_upper_bound)
+            stan_session.run_sampling()
             stan_session.gather_fit_result()
 
             # find chain combo with good R_hat value
@@ -156,7 +156,8 @@ def main():
                 print("Running analysis on sampled result...")
 
                 analyzer = StanSessionAnalyzer(
-                    cell_dir, use_fit_export=True, param_names=param_names)
+                    cell_dir, sample_source="arviz_inf_data",
+                    param_names=param_names)
                 analyzer.simulate_chains(calcium_ode, 0, ts, y0, y_ref=y_ref,
                                          var_names=var_names)
                 analyzer.plot_parameters()
