@@ -9,5 +9,6 @@ calcium_model_bdf
 
 .DS_Store
 __pycache__/
+.ipynb_checkpoints/
 .vscode/
 result/
