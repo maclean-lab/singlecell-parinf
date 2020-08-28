@@ -6,6 +6,8 @@ slurm-*
 run_*.sh
 core.*
 calcium_model_bdf
+scratch.ipynb
+genes_vs_params.py
 
 .DS_Store
 __pycache__/

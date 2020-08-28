@@ -5,12 +5,12 @@ import numpy as np
 # from scipy.stats import ks_2samp
 import pandas as pd
 import matplotlib.pyplot as plt
-from stan_helpers import StanSessionAnalyzer, moving_average, \
-    calcium_ode_vanilla, pdf_multi_plot
+from stan_helpers import StanSessionAnalyzer, moving_average,  pdf_multi_plot
 
 def main():
     args = get_args()
-    result_dir = args.result_dir
+    output_dir = args.output_dir
+
     session_list_path = args.session_list
     param_mask = args.param_mask
 
@@ -32,7 +32,7 @@ def main():
     for idx in range(num_sessions):
         # create a session analyzer for current session
         analyzer = StanSessionAnalyzer(session_list.loc[idx, "dir"],
-                                       use_fit_export=True,
+                                       sample_source="arviz_inf_data",
                                        param_names=param_names)
         session_analyzers.append(analyzer)
 
@@ -41,10 +41,10 @@ def main():
         session_chains.append([int(c) for c in chains.split(",")])
 
     compare_params(session_analyzers, session_list["id"],
-                   session_chains, result_dir, param_names)
+                   session_chains, output_dir, param_names)
 
-def compare_params(analyzers, session_ids, chain_list, result_dir,
-                   param_names):
+def compare_params(analyzers, session_ids, chain_list, output_dir,
+                   param_names, output_name="param_violin.pdf"):
     """make violin plots for parameters sampled from different Stan
     sessions
     """
@@ -63,7 +63,7 @@ def compare_params(analyzers, session_ids, chain_list, result_dir,
         all_samples.append(param_samples)
 
     # make violin plots for all parameters
-    figure_path = os.path.join(result_dir, "param_violin.pdf")
+    figure_path = os.path.join(output_dir, output_name)
     xticks = [f"{session_ids[idx]}:{chain}" for idx in range(num_sessions)
               for chain in chain_list[idx]]
     pdf_multi_plot(plt.violinplot, all_samples, figure_path, num_rows=4,
@@ -73,6 +73,7 @@ def compare_params(analyzers, session_ids, chain_list, result_dir,
 def plot_alt_trajectories(ref_analyzer, test_analyzer, alt_params, alt_dir):
     # update test analyzer
     result_dir_copy = test_analyzer.result_dir
+
     test_analyzer.result_dir = alt_dir
     test_samples_copy = [sample.copy() for sample in test_analyzer.samples]
     ref_sample = ref_analyzer.samples[0].copy()
@@ -101,7 +102,7 @@ def get_args():
     arg_parser = ArgumentParser(
         description="Compare results of different Stan sessions.")
     arg_parser.add_argument("--session_list", type=str, required=True)
-    arg_parser.add_argument("--result_dir", type=str, required=True)
+    arg_parser.add_argument("--output_dir", type=str, required=True)
     arg_parser.add_argument("--param_mask", type=str, default=None)
 
     return arg_parser.parse_args()

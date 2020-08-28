@@ -24,6 +24,8 @@ def main():
     prior_chains = args.prior_chains
     prior_spec_path = args.prior_spec
     prior_std_scale = args.prior_std_scale
+    prior_clip_min = args.prior_clip_min
+    prior_clip_max = args.prior_clip_max
     num_chains = args.num_chains
     num_iters = args.num_iters
     warmup = args.warmup
@@ -74,6 +76,9 @@ def main():
         print("Scaling standard deviation of prior distribution by "
               + "{}...".format(prior_std_scale))
         prior_std *= prior_std_scale
+
+        # restrict standard deviation of prior
+        prior_std = np.clip(prior_std, prior_clip_min, prior_clip_max)
 
     # gather prepared data
     var_names = ["PLC", "IP3", "h", "Ca"]
@@ -135,7 +140,7 @@ def get_args():
     arg_parser.add_argument("--stan_model", type=str, required=True)
     arg_parser.add_argument("--stan_backend",  type=str, default="pystan",
                             choices=["pystan", "cmdstanpy"])
-    arg_parser.add_argument("--ode_variant", type=str,required=True)
+    arg_parser.add_argument("--ode_variant", type=str, required=True)
     arg_parser.add_argument("--cell_id", type=int, default=0)
     arg_parser.add_argument("--filter_type", default=None,
                             choices=["moving_average"])
@@ -149,6 +154,8 @@ def get_args():
                             default=[0, 1, 2, 3])
     arg_parser.add_argument("--prior_spec", type=str, default=None)
     arg_parser.add_argument("--prior_std_scale", type=float, default=1.0)
+    arg_parser.add_argument("--prior_clip_min", type=float, default=0.001)
+    arg_parser.add_argument("--prior_clip_max", type=float, default=5)
     arg_parser.add_argument("--num_chains", type=int, default=4)
     arg_parser.add_argument("--num_iters", type=int, default=2000)
     arg_parser.add_argument("--warmup", type=int, default=1000)

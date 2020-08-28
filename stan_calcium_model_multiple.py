@@ -197,9 +197,9 @@ def get_args():
     arg_parser.add_argument("--prior_cell", type=int, required=True)
     arg_parser.add_argument("--prior_chains", type=int, nargs="+",
                             default=[0, 1, 2, 3])
-    arg_parser.add_argument("--prior_std_scale",  type=float, default=1.0)
-    arg_parser.add_argument("--prior_clip_min",  type=float, default=0.001)
-    arg_parser.add_argument("--prior_clip_max",  type=float, default=5)
+    arg_parser.add_argument("--prior_std_scale", type=float, default=1.0)
+    arg_parser.add_argument("--prior_clip_min", type=float, default=0.001)
+    arg_parser.add_argument("--prior_clip_max", type=float, default=5)
     arg_parser.add_argument("--num_chains", type=int, default=4)
     arg_parser.add_argument("--num_iters", type=int, default=2000)
     arg_parser.add_argument("--warmup", type=int, default=1000)
