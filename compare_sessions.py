@@ -15,8 +15,8 @@ def main():
     param_mask = args.param_mask
 
     param_names = ["sigma", "KonATP", "L", "Katp", "KoffPLC", "Vplc", "Kip3",
-                    "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
-                    "eta1", "eta2", "eta3", "c0", "k3"]
+                   "KoffIP3", "a", "dinh", "Ke", "Be", "d1", "d5", "epr",
+                   "eta1", "eta2", "eta3", "c0", "k3"]
 
     if param_mask:
         param_names = [param_names[i + 1] for i, mask in enumerate(param_mask)

@@ -464,6 +464,59 @@ class StanSessionAnalyzer:
                 float_format="%.8f"
             )
 
+    def get_good_chain_combo(self, rhat_upper_bound=4.0):
+        """Get a combination of chains with good R_hat value of log
+        posteriors
+        """
+        if self.num_chains <= 2 or \
+                not isinstance(self.raw_samples, az.InferenceData):
+            return None
+
+        sample_rhat = az.rhat(self.raw_samples.sample_stats, method='split')
+        lp_rhat = sample_rhat["lp"].item()
+        if 0.9 <= lp_rhat <= rhat_upper_bound:
+            return list(range(self.num_chains))
+
+        best_combo = None
+        best_rhat = np.inf
+        best_rhat_dist = np.inf
+
+        # try remove one bad chain
+        for chain_combo in itertools.combinations(range(self.num_chains),
+                                                  self.num_chains - 1):
+            chain_combo = list(chain_combo)
+            combo_data = self.raw_samples.sel(chain=chain_combo)
+            combo_stats_rhat = az.rhat(combo_data.sample_stats, method="split")
+            combo_lp_rhat = combo_stats_rhat["lp"].item()
+            combo_lp_rhat_dist = np.abs(combo_lp_rhat - 1.0)
+
+            if combo_lp_rhat_dist < best_rhat_dist:
+                best_combo = chain_combo
+                best_rhat = combo_lp_rhat
+                best_rhat_dist = combo_lp_rhat_dist
+
+        if 0.9 <= best_rhat <= rhat_upper_bound:
+            return best_combo
+        else:
+            return None
+
+    def get_sample_means(self, rhat_upper_bound=4.0):
+        """Get means of all sampled parameters in mixed chains"""
+        mixed_chains = self.get_good_chain_combo(
+            rhat_upper_bound=rhat_upper_bound)
+
+        if not mixed_chains:
+            return None
+
+        sample_means = {}
+        for param in self.param_names:
+            param_samples = np.concatenate(
+                [self.samples[c][param].to_numpy() for c in mixed_chains])
+
+            sample_means[param] = np.mean(param_samples)
+
+        return sample_means
+
 class StanMultiSessionAnalyzer:
     def __init__(self, session_list, result_root, session_output_dirs,
                  sample_source="arviz_inf_data", num_chains=4, warmup=1000,

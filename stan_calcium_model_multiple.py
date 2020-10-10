@@ -153,6 +153,7 @@ def main():
                 # analyze result of current cell
                 print("Good R_hat value of log posteriors for the "
                       + f"{num2ord(cell_order)} cell (ID: {cell_id})")
+                print(f"Mixed chains are {', '.join(map(str, prior_chains))}")
                 print("Running analysis on sampled result...")
 
                 analyzer = StanSessionAnalyzer(
