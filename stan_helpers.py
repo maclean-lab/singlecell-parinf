@@ -5,6 +5,7 @@ import pickle
 import re
 
 import math
+from arviz.stats.diagnostics import rhat
 import numpy as np
 import scipy.integrate
 import scipy.stats
@@ -500,7 +501,19 @@ class StanSessionAnalyzer:
         else:
             return None
 
-    def get_sample_means(self, rhat_upper_bound=4.0):
+    def get_mixed_samples(self, rhat_upper_bound=4.0):
+        """get sampled parameters of mixed chains"""
+        mixed_chains = self.get_good_chain_combo(
+            rhat_upper_bound=rhat_upper_bound)
+
+        if not mixed_chains:
+            return None
+
+        mixed_samples = pd.concat([self.samples[c] for c in mixed_chains])
+
+        return mixed_samples
+
+    def get_mixed_sample_means(self, rhat_upper_bound=4.0):
         """Get means of all sampled parameters in mixed chains"""
         mixed_chains = self.get_good_chain_combo(
             rhat_upper_bound=rhat_upper_bound)
@@ -508,12 +521,7 @@ class StanSessionAnalyzer:
         if not mixed_chains:
             return None
 
-        sample_means = {}
-        for param in self.param_names:
-            param_samples = np.concatenate(
-                [self.samples[c][param].to_numpy() for c in mixed_chains])
-
-            sample_means[param] = np.mean(param_samples)
+        sample_means = pd.concat([self.samples[c] for c in mixed_chains]).mean()
 
         return sample_means
 
@@ -541,7 +549,7 @@ class StanMultiSessionAnalyzer:
 
         # make a directory for result
         self.analyzer_result_dir = os.path.join(self.result_root,
-                                                "multi_sample_analysis")
+                                                "multi-sample-analysis")
         if not os.path.exists(self.analyzer_result_dir):
             os.mkdir(self.analyzer_result_dir)
 
