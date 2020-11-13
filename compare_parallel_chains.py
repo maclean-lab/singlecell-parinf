@@ -85,8 +85,8 @@ def get_chain_data(chain, first_cell, last_cell):
             cell_path, sample_source='arviz_inf_data', param_names=param_names)
 
         # compute sample means for cells with mixed chains (R_hat < 4.0)
-        cell_samples = analyzer.get_mixed_samples(rhat_upper_bound=4.0)
-        cell_sample_means = analyzer.get_mixed_sample_means(
+        cell_samples = analyzer.get_samples(rhat_upper_bound=4.0)
+        cell_sample_means = analyzer.get_sample_means(
             rhat_upper_bound=4.0)
         if cell_samples is not None:
             chain['cell_ids'].append(cell_id)

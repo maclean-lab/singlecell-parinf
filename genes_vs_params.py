@@ -5,9 +5,7 @@ import os
 import os.path
 import itertools
 import math
-from random import sample
 import numpy as np
-from pandas.core.arrays.sparse import dtype
 import scipy.stats
 import pandas as pd
 from sklearn.decomposition import PCA
@@ -20,10 +18,11 @@ from stan_helpers import StanSessionAnalyzer
 
 # %%
 # set up
-root_cell_id, first_cell, last_cell = 5106, 5121, 4369
-# root_cell_id, first_cell, last_cell = 5085, 4982, 4746
+# root_cell_id, first_cell, last_cell = 5106, 5121, 4267
+root_cell_id, first_cell, last_cell = 5085, 4982, 4553
 stan_run_suffix = '-1'
 use_highly_variable_genes = False
+save_results = True
 
 # %%
 # load sampled parameters
@@ -86,7 +85,7 @@ for cell_order in trange(first_cell_order, last_cell_order + 1):
                                    param_names=param_names)
 
     # compute sample means for cells with mixed chains (R_hat < 4.0)
-    cell_sample_means = analyzer.get_mixed_sample_means(rhat_upper_bound=4.0)
+    cell_sample_means = analyzer.get_sample_means(rhat_upper_bound=4.0)
     if cell_sample_means is not None:
         sampled_cell_ids.append(cell_id)
         sample_means = sample_means.append(cell_sample_means, ignore_index=True)
@@ -141,11 +140,12 @@ def scatter_multi_plot(X_data, output_path, c=None, num_rows=4, num_cols=2,
 sample_mean_z_scores = sample_means.apply(scipy.stats.zscore, ddof=1)
 
 # plot z-scores of sample means
-# for gene_idx, gene in enumerate(tqdm(gene_symbols)):
-#     gene_scatter_path = os.path.join(output_dir, 'genes-vs-params',
-#                                      f'{gene}_z_scores.pdf')
-#     scatter_multi_plot(log_data[gene_idx, sampled_cell_ids], gene_scatter_path,
-#                        c=sample_mean_z_scores)
+if save_results:
+    for gene_idx, gene in enumerate(tqdm(gene_symbols)):
+        gene_scatter_path = os.path.join(output_dir, 'genes-vs-params',
+                                        f'{gene}_z_scores.pdf')
+        scatter_multi_plot(log_data[gene_idx, sampled_cell_ids],
+                           gene_scatter_path, c=sample_mean_z_scores)
 
 sample_mean_z_score_max = 3.0
 is_cell_outlier = \
@@ -157,11 +157,12 @@ cell_order_list = list(range(num_sampled_cells)) # orders of cells in the chain
 
 # %%
 # plot sample mean of params vs expression of every gene
-for gene_idx, gene in enumerate(tqdm(gene_symbols)):
-    gene_scatter_path = os.path.join(output_dir, 'genes-vs-params',
-                                     f'{gene}.pdf')
-    scatter_multi_plot(log_data[gene_idx, sampled_cell_ids], gene_scatter_path,
-                       c=cell_order_list)
+if save_results:
+    for gene_idx, gene in enumerate(tqdm(gene_symbols)):
+        gene_scatter_path = os.path.join(output_dir, 'genes-vs-params',
+                                        f'{gene}.pdf')
+        scatter_multi_plot(log_data[gene_idx, sampled_cell_ids],
+                           gene_scatter_path, c=cell_order_list)
 
 # %%
 # run PCA on log expression
@@ -173,9 +174,10 @@ log_data_reduced_abs = np.abs(log_data_reduced)
 
 # %%
 # plot variance ratio explained by each component
-plt.plot(pca.explained_variance_ratio_, '.')
-plt.savefig(os.path.join(output_dir, 'pca_var_ratio.png'))
-plt.close()
+if save_results:
+    plt.plot(pca.explained_variance_ratio_, '.')
+    plt.savefig(os.path.join(output_dir, 'pca_var_ratio.png'))
+    plt.close()
 
 # %%
 # get Pearson correlations of top principal components vs params
@@ -191,18 +193,20 @@ for comp, param in itertools.product(range(num_top_comps), param_names):
     pc_vs_param_pearson_corr_p_vals.loc[comp, param] = p_val
 
 # save Pearson correlations to file
-# pc_vs_param_pearson_corrs.to_csv(
-#     os.path.join(output_dir, 'pcs-vs-params', 'pearson_corrs.csv'))
-# pc_vs_param_pearson_corr_p_vals.to_csv(
-#     os.path.join(output_dir, 'pcs-vs-params', 'pearson_corrs_p_vals.csv'))
+if save_results:
+    pc_vs_param_pearson_corrs.to_csv(
+        os.path.join(output_dir, 'pcs-vs-params', 'pearson_corrs.csv'))
+    pc_vs_param_pearson_corr_p_vals.to_csv(
+        os.path.join(output_dir, 'pcs-vs-params', 'pearson_corrs_p_vals.csv'))
 
 # %%
 # make scatter plots for components vs params
-for comp in trange(num_top_comps):
-    comp_data = log_data_reduced_abs[sampled_cell_ids, comp]
-    comp_param_plot_path = os.path.join(output_dir, 'pcs-vs-params',
-                                        f'comp_{comp}_vs_params.pdf')
-    scatter_multi_plot(comp_data, comp_param_plot_path, c=cell_order_list)
+if save_results:
+    for comp in trange(num_top_comps):
+        comp_data = log_data_reduced_abs[sampled_cell_ids, comp]
+        comp_param_plot_path = os.path.join(output_dir, 'pcs-vs-params',
+                                            f'comp_{comp}_vs_params.pdf')
+        scatter_multi_plot(comp_data, comp_param_plot_path, c=cell_order_list)
 
 # %%
 # regression analysis for principal components vs sampled means of params
@@ -212,7 +216,7 @@ from sklearn.linear_model import LinearRegression, ElasticNetCV, \
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.metrics import mean_squared_error
 
-def run_regression_pcs_vs_params(regressor_name, degree=1, save_result=True):
+def run_regression_pcs_vs_params(regressor_name, degree=1):
     '''Fit a regression model principal components vs sampled means of params,
     with features raised to a specified degree'''
     print(f'Running {regressor_name} with degree {degree}')
@@ -246,7 +250,7 @@ def run_regression_pcs_vs_params(regressor_name, degree=1, save_result=True):
             mean_sq_errors.loc[comp, param] = mean_squared_error(y, y_pred)
 
         # plot regression lines (curves)
-        if save_result:
+        if save_results:
             regression_scatter_path = os.path.join(
                 output_dir, output_sub_dir,
                 f'{r}_degree_{degree}_comp_{comp}.pdf')
@@ -254,7 +258,7 @@ def run_regression_pcs_vs_params(regressor_name, degree=1, save_result=True):
                             param_regressors=param_regressors, X_poly=X)
 
     # save metrics
-    if save_result:
+    if save_results:
         r2_scores_path = os.path.join(
             output_dir, output_sub_dir, f'{r}_degree_{degree}_scores.csv')
         r2_scores.to_csv(r2_scores_path, float_format='%.8f')
@@ -269,7 +273,7 @@ regressor_classes = {'linear': LinearRegression, 'elastic_net': ElasticNetCV,
                      'ransac': RANSACRegressor, 'theil': TheilSenRegressor}
 
 for r, d in itertools.product(regressor_classes, range(1, 5)):
-    run_regression_pcs_vs_params(r, degree=d, save_result=False)
+    run_regression_pcs_vs_params(r, degree=d)
 
 # %%
 # get PCA loadings
@@ -288,36 +292,38 @@ for comp in range(num_comps):
     top_neg_genes_comp = gene_symbols[ranked_gene_indices[:num_top_genes]]
     top_neg_genes.loc[:, comp] = top_neg_genes_comp
 
-    # if comp < num_top_comps:
-    #     # plot top positive genes vs sampled means
-    #     for i, gene in enumerate(top_pos_genes_comp):
-    #         gene_idx = ranked_gene_indices[-i]
-    #         gene_log_data = log_data[gene_idx, sampled_cell_ids]
-    #         gene_scatter_path = os.path.join(
-    #             output_dir, 'pca-top-genes',
-    #             f'comp_{comp}_top_pos_{i:02d}_{gene}_vs_params.pdf')
-    #         scatter_multi_plot(gene_log_data, gene_scatter_path)
+    if save_results and comp < num_top_comps:
+        # plot top positive genes vs sampled means
+        for i, gene in enumerate(top_pos_genes_comp):
+            gene_idx = ranked_gene_indices[-i]
+            gene_log_data = log_data[gene_idx, sampled_cell_ids]
+            gene_scatter_path = os.path.join(
+                output_dir, 'pca-top-genes',
+                f'comp_{comp}_top_pos_{i:02d}_{gene}_vs_params.pdf')
+            scatter_multi_plot(gene_log_data, gene_scatter_path)
 
-    #     # plot top negative genes vs sampled means
-    #     for i, gene in enumerate(top_neg_genes_comp):
-    #         gene_idx = ranked_gene_indices[i]
-    #         gene_log_data = log_data[gene_idx, sampled_cell_ids]
-    #         gene_scatter_path = os.path.join(
-    #             output_dir, 'pca-top-genes',
-    #             f'comp_{comp}_top_neg_{i:02d}_{gene}_vs_params.pdf')
-    #         scatter_multi_plot(gene_log_data, gene_scatter_path)
+        # plot top negative genes vs sampled means
+        for i, gene in enumerate(top_neg_genes_comp):
+            gene_idx = ranked_gene_indices[i]
+            gene_log_data = log_data[gene_idx, sampled_cell_ids]
+            gene_scatter_path = os.path.join(
+                output_dir, 'pca-top-genes',
+                f'comp_{comp}_top_neg_{i:02d}_{gene}_vs_params.pdf')
+            scatter_multi_plot(gene_log_data, gene_scatter_path)
 
 # save top genes
-# top_pos_genes.to_csv(os.path.join(output_dir, 'top_pos_genes.csv'))
-# top_neg_genes.to_csv(os.path.join(output_dir, 'top_neg_genes.csv'))
+if save_results:
+    top_pos_genes.to_csv(os.path.join(output_dir, 'top_pos_genes.csv'))
+    top_neg_genes.to_csv(os.path.join(output_dir, 'top_neg_genes.csv'))
 
 # %%
 # make heatmap of PCA loadings
-plt.figure(figsize=(8, 8))
-plt.imshow(V[:, :5], cmap='seismic', aspect='auto')
-plt.colorbar()
-plt.savefig(os.path.join(output_dir, 'pca_transform_matrix.png'))
-plt.close()
+if save_results:
+    plt.figure(figsize=(8, 8))
+    plt.imshow(V[:, :5], cmap='seismic', aspect='auto')
+    plt.colorbar()
+    plt.savefig(os.path.join(output_dir, 'pca_transform_matrix.png'))
+    plt.close()
 
 # %%
 # get Pearson correlations for top genes in top components vs param means
@@ -339,39 +345,41 @@ for gene, param in itertools.product(top_pc_gene_list, param_names):
     gene_vs_param_pearson_corr_p_vals.loc[gene, param] = p_val
 
 # save Pearson correlations to file
-# gene_vs_param_pearson_corrs.to_csv(
-#     os.path.join(output_dir, 'genes-vs-params', 'pearson_corrs.csv'))
-# gene_vs_param_pearson_corr_p_vals.to_csv(
-#     os.path.join(output_dir, 'genes-vs-params', 'pearson_corrs_p_vals.csv'))
+if save_results:
+    gene_vs_param_pearson_corrs.to_csv(
+        os.path.join(output_dir, 'genes-vs-params', 'pearson_corrs.csv'))
+    gene_vs_param_pearson_corr_p_vals.to_csv(
+        os.path.join(output_dir, 'genes-vs-params', 'pearson_corrs_p_vals.csv'))
 
 # %%
 # plot Pearson correlations as histogram for each param
-for param in param_names:
-    plt.hist(gene_vs_param_pearson_corrs[param], bins=15)
-    plt.savefig(os.path.join(output_dir, 'genes-vs-params',
-                             f'gene_vs_{param}_corr_hist.png'))
-    plt.close()
+if save_results:
+    for param in param_names:
+        plt.hist(gene_vs_param_pearson_corrs[param], bins=15)
+        plt.savefig(os.path.join(output_dir, 'genes-vs-params',
+                                f'gene_vs_{param}_corr_hist.png'))
+        plt.close()
 
 #%%
 # sort gene vs param correlations
-sorted_corr_idx = np.unravel_index(
-    np.argsort(np.absolute(gene_vs_param_pearson_corrs.to_numpy()), axis=None),
-    gene_vs_param_pearson_corrs.shape)
-
 num_gene_param_pairs = len(top_pc_gene_list) * num_params
 sorted_gene_vs_param_pairs = pd.DataFrame(
     columns=['Gene', 'Parameter', 'Correlation', 'p-value'],
     index=range(num_gene_param_pairs))
-for i in range(num_gene_param_pairs):
-    row, col = sorted_corr_idx[0][-i - 1], sorted_corr_idx[1][-i - 1]
-    gene = top_pc_gene_list[row]
-    param = param_names[col]
-    corr = gene_vs_param_pearson_corrs.iloc[row, col]
-    p_val = gene_vs_param_pearson_corr_p_vals.iloc[row, col]
+
+for i, (gene, param) in enumerate(
+        itertools.product(top_pc_gene_list, param_names)):
+    corr = gene_vs_param_pearson_corrs.loc[gene, param]
+    p_val = gene_vs_param_pearson_corr_p_vals.loc[gene, param]
     sorted_gene_vs_param_pairs.iloc[i, :] = [gene, param, corr, p_val]
 
-# sorted_gene_vs_param_pairs.to_csv(
-#     os.path.join(output_dir, 'genes-vs-params', 'pearson_corrs_sorted.csv'))
+sorted_gene_vs_param_pairs.sort_values(
+    'Correlation', ascending=False, inplace=True, ignore_index=True,
+    key=lambda x: np.abs(x))
+
+if save_results:
+    sorted_gene_vs_param_pairs.to_csv(
+        os.path.join(output_dir, 'genes-vs-params', 'pearson_corrs_sorted.csv'))
 
 # %%
 # define pairs of genes and parameters with high correlations
@@ -385,8 +393,7 @@ high_corr_pairs.sort()
 
 # %%
 # run regression analysis for genes vs sampled means of params
-def run_regression_genes_vs_params(regressor_name, regression_genes, degree=1,
-                                   save_result=True):
+def run_regression_genes_vs_params(regressor_name, regression_genes, degree=1):
     '''Fit a regression model for gene expression vs sampled means of prams,
     with features raised to a specified degree'''
     print(f'Running {regressor_name} with degree {degree}')
@@ -427,14 +434,14 @@ def run_regression_genes_vs_params(regressor_name, regression_genes, degree=1,
                     (regressor_name, degree, gene, param)] = regressor
 
         # plot regression lines (curves)
-        if save_result:
+        if save_results:
             regression_scatter_path = os.path.join(
                 output_dir, output_sub_dir, f'{r}_degree_{degree}_{gene}.pdf')
             scatter_multi_plot(X_gene, regression_scatter_path,
                             param_regressors=param_regressors, X_poly=X)
 
     # save metrics
-    if save_result:
+    if save_results:
         r2_scores_path = os.path.join(
             output_dir, output_sub_dir, f'{r}_degree_{degree}_scores.csv')
         r2_scores.to_csv(r2_scores_path, float_format='%.8f')
@@ -448,8 +455,7 @@ regressor_classes = {'linear': LinearRegression, 'huber': HuberRegressor,
 
 regressor_trained = {}
 for r, d in itertools.product(regressor_classes, range(1, 5)):
-    run_regression_genes_vs_params(r, top_pc_gene_list, degree=d,
-                                   save_result=False)
+    run_regression_genes_vs_params(r, top_pc_gene_list, degree=d)
 
 # %%
 def plot_high_corr_pairs(output_path, regressor_name, num_rows=4, num_cols=2,
@@ -503,5 +509,18 @@ def plot_high_corr_pairs(output_path, regressor_name, num_rows=4, num_cols=2,
 high_corr_pairs_scatter_path = os.path.join(
     output_dir, 'high_corr_pairs_scatter.pdf')
 plot_high_corr_pairs(high_corr_pairs_scatter_path, 'huber')
+
+# %%
+num_param_param_pairs = num_params * (num_params - 1) // 2
+sorted_param_param_corrs = pd.DataFrame(
+    columns=['Param1', 'Param2', 'Correlation', 'p-value'],
+    index=range(num_param_param_pairs))
+for i, (p1, p2) in enumerate(itertools.combinations(param_names, 2)):
+    corr, p_value = scipy.stats.pearsonr(sample_means[p1], sample_means[p2])
+    sorted_param_param_corrs.iloc[i, :] = [p1, p2, corr, p_value]
+
+sorted_param_param_corrs.sort_values(
+    'Correlation', ascending=False, inplace=True, ignore_index=True,
+    key=lambda x: np.abs(x))
 
 # %%

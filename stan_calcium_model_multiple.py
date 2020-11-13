@@ -146,7 +146,7 @@ def main():
             stan_session.gather_fit_result()
 
             # find chain combo with good R_hat value
-            prior_chains = stan_session.get_good_chain_combo()
+            prior_chains = stan_session.get_mixed_chains()
 
             if prior_chains:
                 # good R_hat value of one chain combo

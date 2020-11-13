@@ -1,3 +1,4 @@
+from random import sample
 import sys
 import os.path
 import itertools
@@ -184,7 +185,7 @@ class StanSession:
 
         sys.stdout.flush()
 
-    def get_good_chain_combo(self):
+    def get_mixed_chains(self):
         """Get a combination of chains with good R_hat value of log
         posteriors
         """
@@ -302,6 +303,19 @@ class StanSessionAnalyzer:
 
         for samples in self.samples:
             samples.columns = self.param_names
+
+    def get_sampling_time(self):
+        '''get runtime for all chains'''
+        sampling_time = np.zeros(self.num_chains)
+
+        for chain_idx in self.num_chains:
+            sample_file_path = os.path.join(self.output_dir,
+                                            f'chain_{chain_idx}.csv')
+            with open(sample_file_path, 'r') as sf:
+                time_text =sf.readlines()[-2]
+                sampling_time[chain_idx] = float(time_text)
+
+        return sampling_time
 
     def simulate_chains(self, ode, t0, ts, y0, y_ref=None, show_progress=False,
                         var_names=None, integrator="dopri5",
@@ -465,7 +479,7 @@ class StanSessionAnalyzer:
                 float_format="%.8f"
             )
 
-    def get_good_chain_combo(self, rhat_upper_bound=4.0):
+    def get_mixed_chains(self, rhat_upper_bound=4.0):
         """Get a combination of chains with good R_hat value of log
         posteriors
         """
@@ -501,10 +515,9 @@ class StanSessionAnalyzer:
         else:
             return None
 
-    def get_mixed_samples(self, rhat_upper_bound=4.0):
+    def get_samples(self, rhat_upper_bound=4.0):
         """get sampled parameters of mixed chains"""
-        mixed_chains = self.get_good_chain_combo(
-            rhat_upper_bound=rhat_upper_bound)
+        mixed_chains = self.get_mixed_chains(rhat_upper_bound=rhat_upper_bound)
 
         if not mixed_chains:
             return None
@@ -513,10 +526,9 @@ class StanSessionAnalyzer:
 
         return mixed_samples
 
-    def get_mixed_sample_means(self, rhat_upper_bound=4.0):
+    def get_sample_means(self, rhat_upper_bound=4.0):
         """Get means of all sampled parameters in mixed chains"""
-        mixed_chains = self.get_good_chain_combo(
-            rhat_upper_bound=rhat_upper_bound)
+        mixed_chains = self.get_mixed_chains(rhat_upper_bound=rhat_upper_bound)
 
         if not mixed_chains:
             return None
@@ -528,24 +540,42 @@ class StanSessionAnalyzer:
 class StanMultiSessionAnalyzer:
     def __init__(self, session_list, result_root, session_output_dirs,
                  sample_source="arviz_inf_data", num_chains=4, warmup=1000,
-                 param_names=None):
-        self.session_list = session_list
+                 param_names=None, rhat_upper_bound=4.0):
         self.result_root = result_root
         self.session_output_dirs = session_output_dirs
         self.sample_source = sample_source
         self.num_chains = num_chains
         self.warmup = warmup
         self.param_names = param_names
-
-        self.num_sessions = len(self.session_list)
+        self.rhat_upper_bound = rhat_upper_bound
 
         # initialize sample anaylzers for all cells
-        self.sample_analyzers = [None] * self.num_sessions
-        for i, output_dir in enumerate(self.session_output_dirs):
-            self.sample_analyzers[i] = StanSessionAnalyzer(
+        self.session_list = []
+        self.session_analyzers = []
+        for session_name, output_dir in zip(session_list,
+                                            self.session_output_dirs):
+            analyzer = StanSessionAnalyzer(
                 os.path.join(self.result_root, output_dir),
                 sample_source=self.sample_source, num_chains=self.num_chains,
                 warmup=self.warmup, param_names=self.param_names)
+
+            mixed_chains = analyzer.get_mixed_chains(
+                rhat_upper_bound=rhat_upper_bound)
+
+            if mixed_chains is not None:
+                self.session_list.append(session_name)
+                self.session_analyzers.append(analyzer)
+
+        self.num_sessions = len(self.session_list)
+        self.session_list = np.array(self.session_list)
+
+        # set default parameter names if not given
+        if self.param_names is None:
+            self.num_params = self.session_analyzers[0].samples[0].shape[1]
+            self.param_names = ['sigma'] + \
+                [f'theta_{i}' for i in range(self.num_params - 1)]
+        else:
+            self.num_params = len(param_names)
 
         # make a directory for result
         self.analyzer_result_dir = os.path.join(self.result_root,
@@ -553,31 +583,184 @@ class StanMultiSessionAnalyzer:
         if not os.path.exists(self.analyzer_result_dir):
             os.mkdir(self.analyzer_result_dir)
 
-    def plot_parameter_violin(self, show_progress=False):
+    def get_sample_means(self):
+        '''Get sample means for all sessions'''
+        self.sample_means = pd.DataFrame(columns=self.param_names)
+
+        for analyzer in self.session_analyzers:
+            session_means = analyzer.get_sample_means(
+                rhat_upper_bound=self.rhat_upper_bound)
+            self.sample_means = self.sample_means.append(session_means,
+                                                         ignore_index=True)
+
+    def filter_sessions(self, z_score_max=3.0):
+        '''Filter sessions by z-scores of sample means
+
+        Sample means will be calculated and assigned as a field of the analyzer
+        if not already
+        '''
+        if not hasattr(self, 'sample_means'):
+            self.get_sample_means()
+
+        sample_mean_z_scores = self.sample_means.apply(scipy.stats.zscore,
+                                                       ddof=1)
+        is_z_score_low = \
+            (sample_mean_z_scores.abs() < z_score_max).all(axis=1)
+        self.session_list = self.session_list[is_z_score_low]
+        self.session_analyzers = itertools.compress(self.session_analyzers,
+                                                    is_z_score_low)
+        self.sample_means = self.sample_means.loc[is_z_score_low, :]
+        self.num_sessions = len(self.session_list)
+
+    def get_parameter_correlations(self, sort=True, plot=False, num_pairs=20,
+                                   num_rows=4, num_cols=2):
+        '''Compute correlation between pairs of parameters using sample means'''
+        if not hasattr(self, 'sample_means'):
+            print('No operation performed since sample means has not been'
+                  + 'calculated')
+            return
+
+        num_param_param_pairs = self.num_params * (self.num_params - 1) // 2
+        self.param_param_corrs = pd.DataFrame(
+            columns=['Param1', 'Param2', 'Correlation', 'p-value'],
+            index=range(num_param_param_pairs))
+        for i, (p1, p2) in enumerate(
+            itertools.combinations(self.param_names, 2)):
+            corr, p_value = scipy.stats.pearsonr(self.sample_means[p1],
+                                                 self.sample_means[p2])
+            self.param_param_corrs.iloc[i, :] = [p1, p2, corr, p_value]
+
+        if sort:
+            self.param_param_corrs.sort_values(
+                'Correlation', ascending=False, inplace=True,
+                ignore_index=True, key=lambda x: np.abs(x))
+
+        if plot:
+            figure_path = os.path.join(self.analyzer_result_dir,
+                                       'param_param_scatter.pdf')
+            self._plot_param_param_scatter(figure_path, num_pairs, num_rows,
+                                           num_cols)
+
+    def _plot_param_param_scatter(self, output_path, num_pairs, num_rows,
+                                  num_cols):
+        '''Make param-param scatter plot'''
+        num_subplots_per_page = num_rows * num_cols
+        num_plots = num_pairs
+        num_pages = math.ceil(num_plots / num_subplots_per_page)
+        session_orders = list(range(self.num_sessions))
+
+        with PdfPages(output_path) as pdf:
+            for page in range(num_pages):
+                plt.figure(figsize=(8.5, 11))
+
+                if page == num_pages - 1:
+                    num_subplots = (num_plots - 1) % num_subplots_per_page + 1
+                else:
+                    num_subplots = num_subplots_per_page
+
+                for plot_idx in range(num_subplots):
+                    plt.subplot(num_rows, num_cols, plot_idx + 1)
+                    pair_rank = page * num_subplots_per_page + plot_idx
+
+                    param_1 = self.param_param_corrs.loc[pair_rank, 'Param1']
+                    param_2 = self.param_param_corrs.loc[pair_rank, 'Param2']
+                    corr = self.param_param_corrs.loc[pair_rank, 'Correlation']
+                    plt.scatter(self.sample_means[param_1],
+                                self.sample_means[param_2], c=session_orders)
+                    plt.title(f'{param_1} vs {param_2}: {corr:.6f}')
+                    plt.colorbar()
+
+                plt.tight_layout()
+                pdf.savefig()
+                plt.close()
+
+    def plot_parameter_violin(self):
         """make violin plots of all parameters"""
         # gather all samples
         all_samples = [np.vstack(analyzer.samples)
-                       for analyzer in self.sample_analyzers]
+                       for analyzer in self.session_analyzers]
         all_samples = np.array(all_samples)
         all_samples = all_samples.T
-        output_path = os.path.join(self.analyzer_result_dir, "param_violin.pdf")
 
-        xtick_pos = np.arange(1, self.num_sessions + 1)
-        pdf_multi_plot(plt.violinplot, all_samples, output_path, num_rows=4,
-                       num_cols=1, titles=self.param_names,
-                       xticks=self.session_list, xtick_pos=xtick_pos,
-                       xtick_rotation=90, show_progress=show_progress)
+        # set up plots
+        output_path = os.path.join(self.analyzer_result_dir, "param_violin.pdf")
+        num_rows, num_cols = 4, 1
+        num_subplots_per_page = num_rows * num_cols
+        num_plots = self.num_params
+        num_pages = math.ceil(num_plots / num_subplots_per_page)
+
+        with PdfPages(output_path) as pdf:
+            for page in range(num_pages):
+                plt.figure(figsize=(8.5, 11), dpi=300)
+
+                if page == num_pages - 1:
+                    num_subplots = (num_plots - 1) % num_subplots_per_page + 1
+                else:
+                    num_subplots = num_subplots_per_page
+
+                for plot_idx in range(num_subplots):
+                    plt.subplot(num_rows, num_cols, plot_idx + 1)
+                    param_idx = page * num_subplots_per_page + plot_idx
+                    plt.violinplot(all_samples[param_idx])
+                    plt.title(self.param_names[param_idx])
+
+                plt.tight_layout()
+                pdf.savefig()
+                plt.close()
+
+    def plot_parameter_ribbon(self, dpi=300):
+        '''Make ribbon plot for parameters'''
+        # make 'long' form for sampled parameters / concat all samples
+        all_samples = pd.DataFrame(columns=['Order'] + self.param_names)
+        for i, analyzer in enumerate(self.session_analyzers):
+            mixed_chains = analyzer.get_mixed_chains()
+            if mixed_chains is not None:
+                for chain in mixed_chains:
+                    chain_sample = analyzer.samples[chain].copy()
+                    # add a cell order column
+                    chain_sample.insert(0, 'Order', i)
+                    all_samples = all_samples.append(chain_sample,
+                                                     ignore_index=True)
+
+        output_path = os.path.join(self.analyzer_result_dir, 'param_ribbon.pdf')
+
+        num_rows, num_cols = 4, 1
+        num_subplots_per_page = num_rows * num_cols
+        num_plots = self.num_params
+        num_pages = math.ceil(num_plots / num_subplots_per_page)
+
+        with PdfPages(output_path) as pdf:
+            for page in range(num_pages):
+                plt.figure(figsize=(8.5, 11), dpi=dpi)
+
+                if page == num_pages - 1:
+                    num_subplots = (num_plots - 1) % num_subplots_per_page + 1
+                else:
+                    num_subplots = num_subplots_per_page
+
+                for plot_idx in range(num_subplots):
+                    plt.subplot(num_rows, num_cols, plot_idx + 1)
+                    param = self.param_names[page * num_subplots_per_page \
+                                             + plot_idx]
+                    sns.lineplot(data=all_samples, x='Order', y=param, ci='sd')
+                    plt.xlabel('')
+                    plt.ylabel('')
+                    plt.title(param)
+
+                plt.tight_layout()
+                pdf.savefig()
+                plt.close()
 
     def plot_rhat(self):
         """make plots for R^hat for all parameters and log posterior"""
-        if not isinstance(self.sample_analyzers[0].raw_samples,
+        if not isinstance(self.session_analyzers[0].raw_samples,
                           az.InferenceData):
             raise TypeError("Cannot plot R^hat if samples are not loaded "
                             + "from Arviz's InferenceData")
 
         rhats = np.zeros((len(self.param_names) + 1, self.num_sessions))
 
-        for i, analyzer in enumerate(self.sample_analyzers):
+        for i, analyzer in enumerate(self.session_analyzers):
             inf_data = analyzer.raw_samples
 
             # get R^hat for parameters
@@ -594,6 +777,14 @@ class StanMultiSessionAnalyzer:
         pdf_multi_plot(plt.plot, rhats, output_path, ".", num_rows=4,
                        num_cols=1, titles=self.param_names + ["lp"],
                        xticks=self.session_list, xtick_rotation=90)
+
+    def plot_runtime(self):
+        '''Plot runtime of all chains in every Stan sesssion'''
+        # TODO: implement plot_runtime()
+
+        # load stan sample file
+
+        return
 
 # utility functions
 def load_trajectories(t0, filter_type=None, moving_average_window=20,
@@ -739,7 +930,7 @@ def get_prior_from_samples(prior_dir, prior_chains,
     return prior_mean, prior_std
 
 def pdf_multi_plot(plot_func, plot_data, output_path, *args, num_rows=4,
-                   num_cols=2, titles=None, xticks=None, xtick_pos=None,
+                   num_cols=2, dpi=300, titles=None, xticks=None, xtick_pos=None,
                    xtick_rotation=0, show_progress=False):
     """make multiple plots in a PDF"""
     num_subplots_per_page = num_rows * num_cols
@@ -752,7 +943,7 @@ def pdf_multi_plot(plot_func, plot_data, output_path, *args, num_rows=4,
         # generate each page
         for page in tqdm(range(num_pages), disable=not show_progress):
             # set page size as US letter
-            plt.figure(figsize=(8.5, 11))
+            plt.figure(figsize=(8.5, 11), dpi=dpi)
 
             # set number of subplots in current page
             if page == num_pages - 1:

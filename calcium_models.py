@@ -100,6 +100,26 @@ def calcium_ode_equiv_2_const_eta1(t, y, theta):
 
     return dydt
 
+def calcium_ode_equiv_2_const_Be_eta1(t, y, theta):
+    """Calcium model with equivalent ODEs"""
+    dydt = np.zeros(4)
+
+    dydt[0] = theta[0] * np.exp(-theta[1] * t) - theta[2] * y[0]
+    dydt[1] = (theta[3] * y[0] * y[0]) \
+        / (theta[4] + y[0] * y[0]) - theta[5] * y[1]
+    dydt[2] = theta[6] * (theta[7] - (y[3] + theta[7]) * y[2])
+    beta = np.power(theta[8] + y[3], 2) \
+        / (np.power(theta[8] + y[3], 2) + theta[8] * 150)
+    m_inf = y[1] * y[3] / ((theta[9] + y[1]) * (theta[10] + y[3]))
+    dydt[3] = beta * (
+        theta[11]
+            * (575 * np.power(m_inf, 3) * np.power(y[2], 3) + theta[12])
+            * (theta[14] - (1 + theta[11]) * y[3])
+        - theta[13] * y[3] * y[3] / (theta[15] + y[3] * y[3])
+    )
+
+    return dydt
+
 def calcium_ode_const_1(t, y, theta):
     """Calcium model with d_1 set to constants"""
     dydt = np.zeros(4)
