@@ -126,8 +126,8 @@ def main():
                               "get_r_squared"]
         if "simulate_chains" in analysis_tasks:
             calcium_ode = getattr(calcium_models, "calcium_ode_" + ode_variant)
-            analyzer.simulate_chains(calcium_ode, 0, ts, y0, y_ref=y_ref,
-                                     var_names=var_names)
+            _ = analyzer.simulate_chains(calcium_ode, 0, ts, y0, y_ref=y_ref,
+                                         var_names=var_names)
         if "plot_parameters" in analysis_tasks:
             analyzer.plot_parameters()
         if "get_r_squared" in analysis_tasks:

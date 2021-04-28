@@ -159,8 +159,8 @@ def main():
                 analyzer = StanSessionAnalyzer(
                     cell_dir, sample_source="arviz_inf_data",
                     param_names=param_names)
-                analyzer.simulate_chains(calcium_ode, 0, ts, y0, y_ref=y_ref,
-                                         var_names=var_names)
+                _ = analyzer.simulate_chains(calcium_ode, 0, ts, y0,
+                                             y_ref=y_ref, var_names=var_names)
                 analyzer.plot_parameters()
                 analyzer.get_r_squared()
             else:

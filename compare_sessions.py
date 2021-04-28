@@ -91,7 +91,7 @@ def plot_alt_trajectories(ref_analyzer, test_analyzer, alt_params, alt_dir):
         test_analyzer.samples[chain][alt_params] = ref_sample[alt_params]
 
     # simulate all chains in test analyzer
-    test_analyzer.simulate_chains(show_progress=True)
+    _ = test_analyzer.simulate_chains(show_progress=True)
 
     # restore test analyzer
     test_analyzer.result_dir = result_dir_copy

@@ -58,8 +58,8 @@ def main():
     calcium_ode = getattr(calcium_models, "calcium_ode_" + ode_variant)
 
     analyzer = StanSessionAnalyzer(result_dir, stan_operation=stan_operation,
-                                  sample_source=sample_source,
-                                  param_names=param_names)
+                                   sample_source=sample_source,
+                                   param_names=param_names)
 
     # run tasks
     if "all" in tasks:
@@ -69,7 +69,7 @@ def main():
         if integrator == "vode":
             integrator_params["method"] = integrator_method
 
-        analyzer.simulate_chains(
+        _ = analyzer.simulate_chains(
             calcium_ode, 0, ts, y0, y_ref=y_ref, show_progress=show_progress,
             var_names=var_names, integrator=integrator, **integrator_params)
     if "plot_parameters" in tasks:

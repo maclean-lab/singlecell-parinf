@@ -4,7 +4,7 @@ import numpy as np
 import scipy.integrate
 import pandas as pd
 import matplotlib.pyplot as plt
-from stan_helpers import calcium_ode_equiv
+from calcium_models import calcium_ode_equiv_1
 
 def main():
     # unpack command line arguments
@@ -28,7 +28,7 @@ def main():
 
 def simulate_calcium_ode(theta, t0, ts, y0, output_path):
     # initialize ODE solver
-    solver = scipy.integrate.ode(calcium_ode_equiv)
+    solver = scipy.integrate.ode(calcium_ode_equiv_1)
     solver.set_integrator("vode", method="bdf")
     solver.set_f_params(theta)
     solver.set_initial_value(y0, t0)

@@ -88,7 +88,8 @@ def main():
         analyzer = StanSessionAnalyzer(cell_dir, stan_operation="vb",
                                        use_fit_export=False, num_chains=1,
                                        warmup=0, param_names=param_names)
-        analyzer.simulate_chains(calcium_ode_vanilla, t0, ts, y0, y_ref=y_ref)
+        _ = analyzer.simulate_chains(calcium_ode_vanilla, t0, ts, y0,
+                                     y_ref=y_ref)
 
 def get_args():
     """parse command line arguments"""

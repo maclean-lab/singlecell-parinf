@@ -357,7 +357,7 @@ if save_results:
     for param in param_names:
         plt.hist(gene_vs_param_pearson_corrs[param], bins=15)
         plt.savefig(os.path.join(output_dir, 'genes-vs-params',
-                                f'gene_vs_{param}_corr_hist.png'))
+                                 f'gene_vs_{param}_corr_hist.png'))
         plt.close()
 
 #%%

@@ -40,7 +40,7 @@ def main():
         analyzer.plot_parameter_violin(show_progress=show_progress)
     if "plot_rhat" in tasks:
         print("Making R^hat plots for parameters and log postereior...")
-        analyzer.plot_rhat()
+        analyzer.plot_rhats()
 
 def get_args():
     """Parse command line arguments"""

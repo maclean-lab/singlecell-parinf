@@ -69,14 +69,12 @@ output_dir = os.path.join('../../result/',
 # %%
 def get_chain_data(chain, first_cell, last_cell):
     cell_list = pd.read_csv(chain['cell_list_path'], sep='\t')
-    first_cell_order = np.where(cell_list['Cell'] == first_cell)[0][0]
-    last_cell_order = np.where(cell_list['Cell'] == last_cell)[0][0]
 
     chain['cell_ids'] = []
     chain['analyzers'] = []
     chain['samples'] = []
     chain['sample_means'] = pd.DataFrame(columns=param_names)
-    for cell_order in trange(first_cell_order, last_cell_order + 1):
+    for cell_order in trange(first_cell, last_cell + 1):
         # load samples
         cell_id = cell_list.loc[cell_order, 'Cell']
         cell_path = os.path.join(chain['stan_output_root'],
@@ -95,9 +93,9 @@ def get_chain_data(chain, first_cell, last_cell):
             chain['sample_means'] = chain['sample_means'].append(
                 cell_sample_means, ignore_index=True)
 
-get_chain_data(chain_1, 141, 464)
-get_chain_data(chain_2, 141, 464)
-get_chain_data(chain_3, 141, 464)
+get_chain_data(chain_1, 1, 100)
+get_chain_data(chain_2, 1, 100)
+get_chain_data(chain_3, 1, 100)
 full_chains = (chain_1, chain_2, chain_3)
 
 # %%
@@ -292,7 +290,8 @@ violin_multi_plot(filtered_chain_3,
 
 # %%
 # plot fold changes in means for each parameter
-def fold_change_multi_plot(chains, output_path, num_rows=4, num_cols=1):
+def fold_change_multi_plot(chains, output_path, canvas_size=(8.5, 11),
+                           num_rows=4, num_cols=1):
     """Make multiple scatter plots in a PDF"""
     num_subplots_per_page = num_rows * num_cols
     num_plots = num_params
@@ -304,7 +303,7 @@ def fold_change_multi_plot(chains, output_path, num_rows=4, num_cols=1):
         # generate each page
         for page in range(num_pages):
             # set page size as US letter
-            plt.figure(figsize=(8.5, 11))
+            plt.figure(figsize=canvas_size)
 
             # set number of subplots in current page
             if page == num_pages - 1:
