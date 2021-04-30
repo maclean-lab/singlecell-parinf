@@ -11,7 +11,6 @@ def main():
     # get command-line arguments
     args = get_args()
     stan_model = args.stan_model
-    stan_backend = args.stan_backend
     cell_id = args.cell_id
     filter_type = args.filter_type
     moving_average_window = args.moving_average_window
@@ -110,8 +109,7 @@ def main():
     print("The following NUTS parameters will be used:")
     print(control)
     sys.stdout.flush()
-    stan_session = StanSession(stan_model, result_dir,
-                               stan_backend=stan_backend, data=calcium_data,
+    stan_session = StanSession(stan_model, result_dir, data=calcium_data,
                                num_chains=num_chains, num_iters=num_iters,
                                warmup=warmup, thin=thin, control=control)
     stan_session.run_sampling()
@@ -138,8 +136,6 @@ def get_args():
     arg_parser = argparse.ArgumentParser(
         description="Infer parameters of calcium mode using stan.")
     arg_parser.add_argument("--stan_model", type=str, required=True)
-    arg_parser.add_argument("--stan_backend",  type=str, default="pystan",
-                            choices=["pystan", "cmdstanpy"])
     arg_parser.add_argument("--ode_variant", type=str, required=True)
     arg_parser.add_argument("--cell_id", type=int, default=0)
     arg_parser.add_argument("--filter_type", default=None,

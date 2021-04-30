@@ -1,6 +1,7 @@
 # %%
 import os
 import os.path
+import sys
 import itertools
 import math
 import numpy as np
@@ -401,24 +402,27 @@ plt.close()
 
 # %%
 # predict unsampled cells using similar cells
-bit_generator = np.random.MT19937(0)
+rng_seed = 0
+bit_generator = np.random.MT19937(rng_seed)
 rng = np.random.default_rng(bit_generator)
 soptsc_vars = scipy.io.loadmat(
         "../../result/SoptSC/SoptSC_feature_100/workspace.mat")
 similarity_matrix = soptsc_vars["W"]
-num_unsampled = 500
+num_unsampled = 50
 unsampled_cells = full_cell_list.loc[last_cell_order + 1:, 'Cell']
 unsampled_cells = unsampled_cells.sample(n=num_unsampled,
                                          random_state=bit_generator)
-unsampled_pred_dir = os.path.join(output_root, 'prediction-unsampled')
+unsampled_pred_dir = os.path.join(
+    output_root, f'prediction-unsampled-{num_unsampled}-{rng_seed}')
 if not os.path.exists(unsampled_pred_dir):
     os.mkdir(unsampled_pred_dir)
 
 def predict_unsampled(num_sampled, use_similar_cell=True):
     traj_dist_table = pd.DataFrame(index=range(num_unsampled),
-                                   columns=['Cell', 'SimilarCell', 'Distance'])
+                                   columns=['Cell', 'SampledCell', 'Distance'])
 
     sampled_cell_list = cell_list.loc[:num_sampled, 'Cell'].to_numpy()
+    num_zero_sim = 0
     for i, cell in enumerate(tqdm(unsampled_cells)):
         # find the most similar cell among sampled ones
         if use_similar_cell:
@@ -428,15 +432,18 @@ def predict_unsampled(num_sampled, use_similar_cell=True):
         else:
             sampled_cell = rng.choice(sampled_cell_list)
 
+        if similarity_matrix[cell, sampled_cell] == 0:
+            num_zero_sim += 1
+
         # predict using the most similar cell
-        similar_cell_order = cell_list['Cell'].to_list().index(sampled_cell)
-        similar_cell_analyzer = analyzer.session_analyzers[similar_cell_order]
+        sampled_cell_order = cell_list['Cell'].to_list().index(sampled_cell)
+        sampled_cell_analyzer = analyzer.session_analyzers[sampled_cell_order]
 
         # plot predicted trajectories
-        traj_pred = similar_cell_analyzer.simulate_chains(
+        traj_pred = sampled_cell_analyzer.simulate_chains(
             calcium_ode, 0, ts, np.array([0, 0, 0.7, y0[cell]]),
             subsample_step_size=50, plot=False, verbose=False)
-        mixed_chains = similar_cell_analyzer.get_mixed_chains()
+        mixed_chains = sampled_cell_analyzer.get_mixed_chains()
         traj_pred_mixed = np.concatenate(
             [traj_pred[c][:, : ,3] for c in mixed_chains])
 
@@ -450,24 +457,51 @@ def predict_unsampled(num_sampled, use_similar_cell=True):
         plt.close()
 
         # get trajectory distances
-        traj_dist = similar_cell_analyzer.get_trajectory_distance(
+        traj_dist = sampled_cell_analyzer.get_trajectory_distance(
             calcium_ode, 0, ts, np.array([0, 0, 0.7, y0[cell]]), y[cell, :], 3)
         traj_dist_table.loc[i, 'Cell'] = cell
         traj_dist_table.loc[i, 'SampledCell'] = sampled_cell
         traj_dist_table.loc[i, 'Distance'] = traj_dist
 
+    print(num_zero_sim)
+    sys.stdout.flush()
+
     return traj_dist_table
 
 unsampled_traj_dists_similar = {}
 unsampled_traj_dists_random = {}
-for n in [500, 400, 300, 200, 100]:
+num_sampled_for_prediction = [500, 400, 300, 200, 100]
+for n in num_sampled_for_prediction:
     unsampled_traj_dists_similar[n] = predict_unsampled(n)
+    unsampled_traj_dists_similar_path = os.path.join(
+        unsampled_pred_dir,
+        f'mean_trajectory_distances_prediction_unsampled_similar_{n}.csv')
+    unsampled_traj_dists_similar[n].to_csv(unsampled_traj_dists_similar_path)
+
     unsampled_traj_dists_random[n] = predict_unsampled(
         n, use_similar_cell=False)
+    unsampled_traj_dists_random_path = os.path.join(
+        unsampled_pred_dir,
+        f'mean_trajectory_distances_prediction_unsampled_random_{n}.csv')
+    unsampled_traj_dists_similar[n].to_csv(unsampled_traj_dists_random_path)
 
 # %%
-# make histogram of trajectory distances from prediction of unsampled cells
-for n in [500, 400, 300, 200, 100]:
+from scipy.stats import ks_2samp
+unsampled_traj_dists_ks_stats = pd.DataFrame(columns=['Stat', 'p-value'],
+                                             index=num_sampled_for_prediction)
+for n in num_sampled_for_prediction:
+    ks, p = ks_2samp(unsampled_traj_dists_similar[n]['Distance'],
+                     unsampled_traj_dists_random[n]['Distance'])
+    unsampled_traj_dists_ks_stats.loc[n, 'Stat'] = ks
+    unsampled_traj_dists_ks_stats.loc[n, 'p-value'] = p
+
+unsampled_traj_dists_ks_stats_path = os.path.join(
+    unsampled_pred_dir, 'mean_trajectory_distances_similar_vs_random_ks.csv')
+unsampled_traj_dists_ks_stats.to_csv(unsampled_traj_dists_ks_stats_path)
+
+# %%
+for n in num_sampled_for_prediction:
+    # make histogram of trajectory distances from prediction of unsampled cells
     figure_path = os.path.join(
         unsampled_pred_dir,
         f'mean_trajectory_distances_prediction_unsampled_from_similar_{n}.pdf')
@@ -496,7 +530,24 @@ for n in [500, 400, 300, 200, 100]:
     plt.savefig(figure_path)
     plt.close()
 
+    # make histogram of similarity
+    figure_path = os.path.join(unsampled_pred_dir,
+                               f'unsampled_similar_similarity_{n}.pdf')
+    plt.figure(figsize=(11, 8.5), dpi=300)
+    similarity = [similarity_matrix[row['Cell'], row['SampledCell']]
+                  for _, row in unsampled_traj_dists_similar[n].iterrows()]
+    plt.hist(similarity)
+    plt.savefig(figure_path)
+    plt.close()
 
+    figure_path = os.path.join(unsampled_pred_dir,
+                               f'unsampled_random_similarity_{n}.pdf')
+    plt.figure(figsize=(11, 8.5), dpi=300)
+    similarity = [similarity_matrix[row['Cell'], row['SampledCell']]
+                  for _, row in unsampled_traj_dists_random[n].iterrows()]
+    plt.hist(similarity)
+    plt.savefig(figure_path)
+    plt.close()
 
 # %%
 # make plots for basic stats
