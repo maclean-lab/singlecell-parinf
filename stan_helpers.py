@@ -1,4 +1,3 @@
-from random import sample
 import sys
 import os
 import os.path
@@ -39,26 +38,26 @@ class StanSession:
         stan_model_filename = os.path.basename(stan_model_path)
         self.model_name, model_ext = os.path.splitext(stan_model_filename)
         self.output_dir = output_dir
-        if model_ext == ".stan":
+        if model_ext == '.stan':
             # load model from Stan code
             self.model = StanModel(file=stan_model_path,
                                     model_name=self.model_name)
 
             compiled_model_path = os.path.join(self.output_dir,
-                                                "stan_model.pkl")
-            with open(compiled_model_path, "wb") as f:
+                                                'stan_model.pkl')
+            with open(compiled_model_path, 'wb') as f:
                 pickle.dump(self.model, f)
 
-            print("Compiled stan model saved")
-        elif model_ext == ".pkl":
+            print('Compiled stan model saved')
+        elif model_ext == '.pkl':
             # load saved model
-            with open(stan_model_path, "rb") as f:
+            with open(stan_model_path, 'rb') as f:
                 self.model = pickle.load(f)
 
-            print("Compiled stan model loaded")
+            print('Compiled stan model loaded')
         else:
             # cannot load given file, exit
-            print("Unsupported input file")
+            print('Unsupported input file')
             sys.exit(1)
 
         self.data = data
@@ -73,92 +72,92 @@ class StanSession:
 
     def run_sampling(self):
         """Run Stan sampling"""
-        if "max_treedepth" not in self.control:
-            self.control["max_treedepth"] = 10
-        if "adapt_delta" not in self.control:
-            self.control["adapt_delta"] = 0.8
+        if 'max_treedepth' not in self.control:
+            self.control['max_treedepth'] = 10
+        if 'adapt_delta' not in self.control:
+            self.control['adapt_delta'] = 0.8
 
         # run sampling
         self.fit = self.model.sampling(
             data=self.data, chains=self.num_chains, iter=self.num_iters,
             warmup=self.warmup, thin=self.thin,
-            sample_file=os.path.join(self.output_dir, "chain"),
+            sample_file=os.path.join(self.output_dir, 'chain'),
             control=self.control)
-        print("Stan sampling finished")
+        print('Stan sampling finished')
 
         # save fit object
-        stan_fit_path = os.path.join(self.output_dir, "stan_fit.pkl")
-        with open(stan_fit_path, "wb") as f:
+        stan_fit_path = os.path.join(self.output_dir, 'stan_fit.pkl')
+        with open(stan_fit_path, 'wb') as f:
             pickle.dump(self.fit, f)
-        print("Stan fit object saved")
+        print('Stan fit object saved')
 
         # convert fit object to arviz's inference data
-        print("Converting Stan fit object to Arviz inference data")
+        print('Converting Stan fit object to Arviz inference data')
         self.inference_data = az.from_pystan(self.fit)
-        inference_data_path = os.path.join(self.output_dir, "arviz_inf_data.nc")
+        inference_data_path = os.path.join(self.output_dir, 'arviz_inf_data.nc')
         az.to_netcdf(self.inference_data, inference_data_path)
-        print("Arviz inference data saved")
+        print('Arviz inference data saved')
 
         sys.stdout.flush()
 
     def gather_fit_result(self, verbose=True):
         """Run analysis after sampling"""
         if verbose:
-            print("Gathering result from stan fit object...")
+            print('Gathering result from stan fit object...')
             sys.stdout.flush()
 
         # get summary of fit
-        summary_path = os.path.join(self.output_dir, "stan_fit_summary.txt")
-        with open(summary_path, "w") as sf:
+        summary_path = os.path.join(self.output_dir, 'stan_fit_summary.txt')
+        with open(summary_path, 'w') as sf:
             sf.write(self.fit.stansummary())
 
         fit_summary = self.fit.summary()
         self.fit_summary = pd.DataFrame(
-            data=fit_summary["summary"],
-            index=fit_summary["summary_rownames"],
-            columns=fit_summary["summary_colnames"])
-        fit_summary_path = os.path.join(self.output_dir, "stan_fit_summary.csv")
+            data=fit_summary['summary'],
+            index=fit_summary['summary_rownames'],
+            columns=fit_summary['summary_colnames'])
+        fit_summary_path = os.path.join(self.output_dir, 'stan_fit_summary.csv')
         self.fit_summary.to_csv(fit_summary_path)
         if verbose:
-            print("Stan summary saved")
+            print('Stan summary saved')
 
         # save samples
         fit_samples = self.fit.to_dataframe()
         fit_samples_path = os.path.join(self.output_dir,
-                                        "stan_fit_samples.csv")
+                                        'stan_fit_samples.csv')
         fit_samples.to_csv(fit_samples_path)
 
         if verbose:
-            print("Stan samples saved")
+            print('Stan samples saved')
 
         # make plots using arviz
         # make trace plot
         plt.clf()
         az.plot_trace(self.inference_data)
-        trace_figure_path = os.path.join(self.output_dir, "stan_fit_trace.png")
+        trace_figure_path = os.path.join(self.output_dir, 'stan_fit_trace.png')
         plt.savefig(trace_figure_path)
         plt.close()
         if verbose:
-            print("Trace plot saved")
+            print('Trace plot saved')
 
         # make plot for posterior
         plt.clf()
         az.plot_posterior(self.inference_data)
         posterior_figure_path = os.path.join(self.output_dir,
-                                             "stan_fit_posterior.png")
+                                             'stan_fit_posterior.png')
         plt.savefig(posterior_figure_path)
         plt.close()
         if verbose:
-            print("Posterior plot saved")
+            print('Posterior plot saved')
 
         # make pair plots
         plt.clf()
         az.plot_pair(self.inference_data)
-        pair_figure_path = os.path.join(self.output_dir, "stan_fit_pair.png")
+        pair_figure_path = os.path.join(self.output_dir, 'stan_fit_pair.png')
         plt.savefig(pair_figure_path)
         plt.close()
         if verbose:
-            print("Pair plot saved")
+            print('Pair plot saved')
 
         sys.stdout.flush()
 
@@ -166,7 +165,7 @@ class StanSession:
         """Get a combination of chains with good R_hat value of log
         posteriors
         """
-        if 0.9 <= self.fit_summary.loc["lp__", "Rhat"] <= self.rhat_upper_bound:
+        if 0.9 <= self.fit_summary.loc['lp__', 'Rhat'] <= self.rhat_upper_bound:
             return list(range(self.num_chains))
 
         if self.num_chains <= 2:
@@ -202,8 +201,8 @@ class StanSession:
         return optimized_params
 
     def run_variational_bayes(self):
-        sample_path = os.path.join(self.output_dir, "chain_0.csv")
-        diagnostic_path = os.path.join(self.output_dir, "vb_diagnostic.txt")
+        sample_path = os.path.join(self.output_dir, 'chain_0.csv')
+        diagnostic_path = os.path.join(self.output_dir, 'vb_diagnostic.txt')
         vb_results = self.model.vb(data=self.data, sample_file=sample_path,
                                    diagnostic_file=diagnostic_path)
 
@@ -211,8 +210,8 @@ class StanSession:
 
 class StanSessionAnalyzer:
     """Analyze samples from a Stan sampling/varitional Bayes session"""
-    def __init__(self, output_dir, stan_operation="sampling",
-                 sample_source="arviz_inf_data", num_chains=4, warmup=1000,
+    def __init__(self, output_dir, stan_operation='sampling',
+                 sample_source='arviz_inf_data', num_chains=4, warmup=1000,
                  param_names=None, verbose=False):
         self.output_dir = output_dir
         self.stan_operation = stan_operation
@@ -223,27 +222,27 @@ class StanSessionAnalyzer:
 
         # load sample files
         if verbose:
-            print("Loading stan sample files...")
+            print('Loading stan sample files...')
             sys.stdout.flush()
 
         self.samples = []
         self.log_posterior = []
-        if self.sample_source == "sample_files":
+        if self.sample_source == 'sample_files':
             # use sample files generatd by stan's sampling function
             self.raw_samples = []
 
             for chain_idx in range(self.num_chains):
                 # get raw samples
                 sample_path = os.path.join(
-                    self.output_dir, "chain_{}.csv".format(chain_idx))
+                    self.output_dir, 'chain_{}.csv'.format(chain_idx))
                 raw_samples = pd.read_csv(sample_path, index_col=False,
-                                          comment="#")
+                                          comment='#')
                 raw_samples.set_index(pd.RangeIndex(raw_samples.shape[0]),
                                       inplace=True)
                 self.raw_samples.append(raw_samples)
 
                 # extract sampled parameters
-                if self.stan_operation == "sampling":
+                if self.stan_operation == 'sampling':
                     first_col_idx = 7
                 else:
                     first_col_idx = 3
@@ -252,19 +251,19 @@ class StanSessionAnalyzer:
 
                 # get log posterior
                 self.log_posterior.append(raw_samples.iloc[self.warmup:, 0])
-        elif self.sample_source == "fit_export":
+        elif self.sample_source == 'fit_export':
             # get number of chains and number of warmup iterations from
             # stan_fit_summary.txt
-            summary_path = os.path.join(self.output_dir, "stan_fit_summary.txt")
-            with open(summary_path, "r") as summary_file:
+            summary_path = os.path.join(self.output_dir, 'stan_fit_summary.txt')
+            with open(summary_path, 'r') as summary_file:
                 lines = summary_file.readlines()
 
-            sampling_params = re.findall(r"\d+", lines[1])
+            sampling_params = re.findall(r'\d+', lines[1])
             self.num_chains = int(sampling_params[0])
             self.warmup = int(sampling_params[2])
 
             # get samples
-            sample_path = os.path.join(self.output_dir, "stan_fit_samples.csv")
+            sample_path = os.path.join(self.output_dir, 'stan_fit_samples.csv')
             self.raw_samples = pd.read_csv(sample_path, index_col=0)
             self.samples = load_stan_fit_samples(sample_path)
 
@@ -274,10 +273,10 @@ class StanSessionAnalyzer:
                     self.raw_samples.loc[
                         self.raw_samples['warmup'] == 0 &
                         self.raw_samples['chain'] == chain_idx, :])
-        else:  # sample_source == "arviz_inf_data":
-            sample_path = os.path.join(self.output_dir, "arviz_inf_data.nc")
+        else:  # sample_source == 'arviz_inf_data':
+            sample_path = os.path.join(self.output_dir, 'arviz_inf_data.nc')
             self.raw_samples = az.from_netcdf(sample_path)
-            self.num_chains = self.raw_samples.sample_stats.dims["chain"]
+            self.num_chains = self.raw_samples.sample_stats.dims['chain']
             self.samples = load_arviz_inference_data(sample_path)
             for chain_idx in range(self.num_chains):
                 self.log_posterior.append(
@@ -288,8 +287,8 @@ class StanSessionAnalyzer:
 
         # set parameters names
         if not param_names or len(param_names) != self.num_params:
-            self.param_names = ["sigma"] \
-                + ["theta[{}]".format(i) for i in range(self.num_params - 1)]
+            self.param_names = ['sigma'] \
+                + [f'theta[{i}]' for i in range(self.num_params - 1)]
 
         for samples in self.samples:
             samples.columns = self.param_names
@@ -321,7 +320,7 @@ class StanSessionAnalyzer:
         return inf_data.sample_stats['treedepth'].data
 
     def simulate_chains(self, ode, t0, ts, y0, y_ref=None, show_progress=False,
-                        var_names=None, integrator="dopri5",
+                        var_names=None, integrator='dopri5',
                         subsample_step_size=None, plot=True, verbose=True,
                         **integrator_params):
         """Simulate trajectories for all chains"""
@@ -371,14 +370,14 @@ class StanSessionAnalyzer:
             plt.plot(ts, y[:, :, var_idx].T)
 
             if y_ref[var_idx] is not None:
-                plt.plot(ts, y_ref[var_idx], "ko", fillstyle="none")
+                plt.plot(ts, y_ref[var_idx], 'ko', fillstyle='none')
 
             if var_names[var_idx]:
                 plt.title(var_names[var_idx])
 
         plt.tight_layout()
         figure_name = os.path.join(
-            self.output_dir, "chain_{}_trajectories.png".format(chain_idx))
+            self.output_dir, 'chain_{}_trajectories.png'.format(chain_idx))
         plt.savefig(figure_name)
         plt.close()
 
@@ -412,13 +411,13 @@ class StanSessionAnalyzer:
     def plot_parameters(self):
         """Make plots for sampled parameters"""
         for chain_idx in range(self.num_chains):
-            print("Making trace plot for chain {}...".format(chain_idx))
+            print(f'Making trace plot for chain {chain_idx}...')
             self._make_trace_plot(chain_idx)
 
-            print("Making violin plot for chain {}...".format(chain_idx))
+            print(f"Making violin plot for chain {chain_idx}...")
             self._make_violin_plot(chain_idx)
 
-            print("Making pairs plot for chain {}...".format(chain_idx))
+            print(f"Making pairs plot for chain {chain_idx}...")
             self._make_pair_plot(chain_idx)
 
             sys.stdout.flush()
@@ -441,7 +440,7 @@ class StanSessionAnalyzer:
 
         # save trace plot
         figure_name = os.path.join(
-            self.output_dir, "chain_{}_parameter_trace.png".format(chain_idx))
+            self.output_dir, f'chain_{chain_idx}_parameter_trace.png')
         plt.savefig(figure_name)
         plt.close()
 
@@ -450,7 +449,7 @@ class StanSessionAnalyzer:
         plt.clf()
         plt.figure(figsize=(self.num_params, 4))
         if use_log_scale:
-            plt.yscale("log")
+            plt.yscale('log')
         plt.violinplot(self.samples[chain_idx].to_numpy())
 
         # add paramter names to ticks on x-axis
@@ -461,23 +460,19 @@ class StanSessionAnalyzer:
 
         # save violin plot
         figure_name = os.path.join(
-            self.output_dir,
-            "chain_{}_parameter_violin_plot.png".format(chain_idx)
-        )
+            self.output_dir, f'chain_{chain_idx}_parameter_violin_plot.png')
         plt.savefig(figure_name)
         plt.close()
 
     def _make_pair_plot(self, chain_idx):
         """Make pair plot for parameters"""
         plt.clf()
-        sns.pairplot(self.samples[chain_idx], diag_kind="kde",
-                     plot_kws=dict(alpha=0.4, s=30, color="#191970",
-                                   edgecolor="#ffffff", linewidth=0.2),
-                     diag_kws=dict(color="#191970", shade=True))
+        sns.pairplot(self.samples[chain_idx], diag_kind='kde',
+                     plot_kws=dict(alpha=0.4, s=30, color='#191970',
+                                   edgecolor='#ffffff', linewidth=0.2),
+                     diag_kws=dict(color='#191970', shade=True))
         figure_name = os.path.join(
-            self.output_dir,
-            "chain_{}_parameter_pair_plot.png".format(chain_idx)
-        )
+            self.output_dir, f'chain_{chain_idx}_parameter_pair_plot.png')
         plt.savefig(figure_name)
         plt.close()
 
@@ -496,8 +491,8 @@ class StanSessionAnalyzer:
                                         columns=self.param_names)
             r_squared_df.to_csv(
                 os.path.join(self.output_dir,
-                             "chain_{}_r_squared.csv".format(chain_idx)),
-                float_format="%.8f"
+                             f'chain_{chain_idx}_r_squared.csv'),
+                float_format='%.8f'
             )
 
     def get_mixed_chains(self, rhat_upper_bound=4.0, return_rhat=False):
@@ -566,9 +561,25 @@ class StanSessionAnalyzer:
         if not mixed_chains:
             return None
 
-        sample_means = pd.concat([self.samples[c] for c in mixed_chains]).mean()
+        mixed_samples = pd.concat([self.samples[c] for c in mixed_chains])
+        sample_means = mixed_samples.mean()
 
         return sample_means
+
+    def get_sample_modes(self, method='kde', bins=100, rhat_upper_bound=4.0):
+        """Get means of all sampled parameters in mixed chains"""
+        mixed_chains = self.get_mixed_chains(rhat_upper_bound=rhat_upper_bound)
+
+        if not mixed_chains:
+            return None
+
+        mixed_samples = pd.concat([self.samples[c] for c in mixed_chains])
+        sample_modes = pd.Series(index=self.param_names)
+        for param in self.param_names:
+            sample_modes[param] = get_mode_continuous_rv(
+                mixed_samples[param], method=method, bins=bins)
+
+        return sample_modes
 
     def get_mean_log_posteriors(self):
         """Get mean of log posterior density"""
@@ -576,7 +587,7 @@ class StanSessionAnalyzer:
 
 class StanMultiSessionAnalyzer:
     def __init__(self, session_list, output_dir, session_output_dirs,
-                 sample_source="arviz_inf_data", num_chains=4, warmup=1000,
+                 sample_source='arviz_inf_data', num_chains=4, warmup=1000,
                  param_names=None, rhat_upper_bound=4.0):
         self.output_dir = output_dir
         self.full_session_output_dirs = session_output_dirs
@@ -662,6 +673,15 @@ class StanMultiSessionAnalyzer:
         self.sample_means = self.sample_means.loc[is_z_score_low, :]
         self.num_sessions = len(self.session_list)
 
+    def get_sample_modes(self, method='kde', bins=100, rhat_upper_bound=4.0):
+        '''Get modes of all sessions'''
+        self.sample_modes = pd.DataFrame(index=self.session_list,
+                                 columns=self.param_names)
+
+        for session, analyzer in zip(self.session_list, self.session_analyzers):
+            self.sample_modes.loc[session, :] = analyzer.get_sample_modes(
+                method=method, bins=bins, rhat_upper_bound=rhat_upper_bound)
+
     def get_parameter_correlations(self, sort=True, plot=False, num_pairs=20,
                                    num_rows=4, num_cols=2):
         '''Compute correlation between pairs of parameters using sample means'''
@@ -743,7 +763,7 @@ class StanMultiSessionAnalyzer:
         violin_pos = [self.full_session_list.index(s) + 1
                       for s in self.session_list]
 
-        output_path = os.path.join(self.output_dir, "param_violin.pdf")
+        output_path = os.path.join(self.output_dir, 'param_violin.pdf')
         with PdfPages(output_path) as pdf:
             for page in range(num_pages):
                 plt.figure(figsize=page_size, dpi=dpi)
@@ -989,8 +1009,8 @@ class StanMultiSessionAnalyzer:
         """
         if not isinstance(self.session_analyzers[0].raw_samples,
                           az.InferenceData):
-            raise TypeError("Cannot plot R^hat if samples are not loaded "
-                            + "from Arviz's InferenceData")
+            raise TypeError('Cannot plot R^hat if samples are not loaded '
+                            + 'from Arviz\'s InferenceData')
 
         rhats = np.zeros((len(self.param_names) + 1, self.num_sessions))
 
@@ -998,18 +1018,18 @@ class StanMultiSessionAnalyzer:
             inf_data = analyzer.raw_samples
 
             # get R^hat for parameters
-            param_rhats = az.rhat(inf_data, method="split")
-            rhats[0, i] = param_rhats["sigma"].item()
-            rhats[1:-1, i] = param_rhats["theta"].to_masked_array()
+            param_rhats = az.rhat(inf_data, method='split')
+            rhats[0, i] = param_rhats['sigma'].item()
+            rhats[1:-1, i] = param_rhats['theta'].to_masked_array()
 
             # get R^hat for log posterior
-            stat_rhats = az.rhat(inf_data.sample_stats, method="split")
-            rhats[-1, i] = stat_rhats["lp"].item()
+            stat_rhats = az.rhat(inf_data.sample_stats, method='split')
+            rhats[-1, i] = stat_rhats['lp'].item()
 
         # plot all R^hat's
-        output_path = os.path.join(self.output_dir, "rhats.pdf")
-        pdf_multi_plot(plt.plot, rhats, output_path, ".", num_rows=4,
-                       num_cols=1, titles=self.param_names + ["lp"],
+        output_path = os.path.join(self.output_dir, 'rhats.pdf')
+        pdf_multi_plot(plt.plot, rhats, output_path, '.', num_rows=4,
+                       num_cols=1, titles=self.param_names + ['lp'],
                        xticks=self.session_list, xtick_rotation=90)
 
     def plot_posterior_rhats(self, dpi=300, xticks=None):
@@ -1292,10 +1312,16 @@ class StanMultiSessionAnalyzer:
                     plt.close(fig)
 
     def run_sensitivity_test(self, ode, t0, ts, y0, y_ref, target_var_idx,
-                             test_params, figure_size=(3, 2), dpi=300,
+                             test_params, method='default', method_kwargs=None,
+                             figure_size=(3, 2), dpi=300,
                              output_path_prefixes=None):
+        '''Test sensitivity of parameters'''
+        if method_kwargs is None:
+            method_kwargs = {}
+
         test_percentiles = np.arange(0.1, 1, 0.1)  # percentiles for test
-        colors = plt.cm.jet(test_percentiles)
+        jet_cmap = plt.get_cmap('jet')
+        colors = jet_cmap(test_percentiles)
         traj_dist_cols = [f'{p}_{q:.2f}' for p, q in itertools.product(
             test_params, [0.01, 0.99])]
         traj_dists = pd.DataFrame(columns=traj_dist_cols,
@@ -1320,7 +1346,10 @@ class StanMultiSessionAnalyzer:
                 row_cond = param_samples == \
                     param_samples.quantile(pct, interpolation='nearest')
                 row_idx = param_samples[row_cond].index[0]
-                theta = session_samples.iloc[row_idx, 1:]
+                if method == 'mode':
+                    theta = sample_modes.copy()
+                else:
+                    theta = session_samples.iloc[row_idx, 1:].copy()
                 theta[param] = test_value
                 y_sim = simulate_trajectory(ode, theta, t0, ts, y0[idx, :])
                 ax.plot(ts, y_sim[:, target_var_idx], color=colors[i],
@@ -1335,6 +1364,8 @@ class StanMultiSessionAnalyzer:
 
         for idx, analyzer in enumerate(self.session_analyzers):
             session_samples = analyzer.get_samples()
+            if method == 'mode':
+                sample_modes = analyzer.get_sample_modes(**method_kwargs)
 
             for param in test_params:
                 param_samples = session_samples[param]
@@ -1667,15 +1698,15 @@ def load_trajectories(t0, filter_type=None, moving_average_window=20,
                       verbose=False):
     """Preprocess raw trajectories with filter and downsampling"""
     if verbose:
-        print("Loading calcium trajectories...")
-    y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
+        print('Loading calcium trajectories...')
+    y = np.loadtxt('canorm_tracjectories.csv', delimiter=',')
 
     # filter the trajectories
-    if filter_type == "moving_average":
+    if filter_type == 'moving_average':
         y = moving_average(y, window=moving_average_window, verbose=verbose)
     elif filter_type is not None and verbose:
-        print(f"Unsupported filter {filter_type}. The trajectories will not "
-              + "be filtered.")
+        print(f'Unsupported filter {filter_type}. The trajectories will not '
+              + 'be filtered.')
 
     # downsample the trajectories
     t_end = y.shape[1] - 1
@@ -1696,8 +1727,7 @@ def load_trajectories(t0, filter_type=None, moving_average_window=20,
 def moving_average(x: np.ndarray, window: int = 20, verbose=True):
     """Compute moving average of trajectories"""
     if verbose:
-        print("Performing moving average with window size of "
-              + "{}...".format(window))
+        print(f'Performing moving average with window size of {window}...')
         sys.stdout.flush()
 
     # make x 2D if it is 1D
@@ -1719,19 +1749,19 @@ def load_stan_sample_files(sample_dir, num_chains, include_warmup_iters=False):
     stan_samples = []
 
     for chain_idx in range(num_chains):
-        sample_path = os.path.join(sample_dir, f"chain_{chain_idx}.csv")
+        sample_path = os.path.join(sample_dir, f'chain_{chain_idx}.csv')
 
         # get number of warm-up iterations
         num_warmup_iters = 0
         if not include_warmup_iters:
-            with open(sample_path, "r") as sf:
+            with open(sample_path, 'r') as sf:
                 for line in sf:
-                    if "warmup=" in line:
-                        num_warmup_iters = int(line.strip().split("=")[-1])
+                    if 'warmup=' in line:
+                        num_warmup_iters = int(line.strip().split('=')[-1])
                         break
 
         # get samples
-        chain_samples = pd.read_csv(sample_path, index_col=False, comment="#")
+        chain_samples = pd.read_csv(sample_path, index_col=False, comment='#')
         stan_samples.append(chain_samples.iloc[num_warmup_iters:, 7:])
 
     return stan_samples
@@ -1740,14 +1770,14 @@ def load_stan_fit_samples(sample_file, include_warmup_iters=False):
     """Load samples output by StanFit4Model"""
     stan_samples = []
     raw_samples = pd.read_csv(sample_file, index_col=0)
-    chains = np.unique(raw_samples["chain"])
+    chains = np.unique(raw_samples['chain'])
 
     # add samples for each chain
     for chain_idx in chains:
-        samples = raw_samples.loc[raw_samples["chain"] == chain_idx, :]
+        samples = raw_samples.loc[raw_samples['chain'] == chain_idx, :]
         # remove rows for warmup iterations
         if not include_warmup_iters:
-            samples = samples.loc[samples["warmup"] == 0, :]
+            samples = samples.loc[samples['warmup'] == 0, :]
         # keep columns for parameters only
         samples = samples.iloc[3:-7]
         # reset row indices
@@ -1762,9 +1792,9 @@ def load_arviz_inference_data(data_file):
 
     # get samples from saved InferenceData
     inf_data = az.from_netcdf(data_file)
-    num_chains = inf_data.sample_stats.dims["chain"]
-    sigma_array = inf_data.posterior["sigma"].values
-    theta_array = inf_data.posterior["theta"].values
+    num_chains = inf_data.sample_stats.dims['chain']
+    sigma_array = inf_data.posterior['sigma'].values
+    theta_array = inf_data.posterior['theta'].values
 
     # gather samples for each chain
     for chain_idx in range(num_chains):
@@ -1775,21 +1805,21 @@ def load_arviz_inference_data(data_file):
     return stan_samples
 
 def get_prior_from_samples(prior_dir, prior_chains,
-                           sample_source="arviz_inf_data", verbose=True):
+                           sample_source='arviz_inf_data', verbose=True):
     """Get prior distribution from sampled parameters"""
     if verbose:
-        chain_str = ", ".join(map(str, prior_chains))
-        print(f"Getting prior distribution from chain(s) {chain_str}...")
+        chain_str = ', '.join(map(str, prior_chains))
+        print(f'Getting prior distribution from chain(s) {chain_str}...')
         sys.stdout.flush()
 
     # load sampled parameters
-    if sample_source == "sample_files":
+    if sample_source == 'sample_files':
         stan_samples = load_stan_sample_files(prior_dir, max(prior_chains) + 1)
-    elif sample_source == "fit_export":
-        fit_sample_file = os.path.join(prior_dir, "stan_fit_samples.csv")
+    elif sample_source == 'fit_export':
+        fit_sample_file = os.path.join(prior_dir, 'stan_fit_samples.csv')
         stan_samples = load_stan_fit_samples(fit_sample_file)
     else:  # sample_source == Arviz InferenceData
-        inf_data_file = os.path.join(prior_dir, "arviz_inf_data.nc")
+        inf_data_file = os.path.join(prior_dir, 'arviz_inf_data.nc')
         stan_samples = load_arviz_inference_data(inf_data_file)
 
     # retrieve samples from specified chains
@@ -1804,7 +1834,7 @@ def get_prior_from_samples(prior_dir, prior_chains,
 
     return prior_mean, prior_std
 
-def simulate_trajectory(ode, theta, t0, ts, y0, integrator="dopri5",
+def simulate_trajectory(ode, theta, t0, ts, y0, integrator='dopri5',
                         **integrator_params):
     """Simulate a trajectory with sampled parameters"""
     # initialize ODE solver

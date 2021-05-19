@@ -1,0 +1,127 @@
+{
+    "1": {
+        "param_mask": "0111111111111111111",
+        "ode_variant": "equiv_2",
+        "pub_name": "Full-1",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-1",
+        "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
+        "color": "C1"
+    },
+    "2": {
+        "param_mask": "0111111111111111111",
+        "ode_variant": "equiv_2",
+        "pub_name": "Full-2",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-2",
+        "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
+        "color": "C2"
+    },
+    "3": {
+        "param_mask": "0111111111111111111",
+        "ode_variant": "equiv_2",
+        "pub_name": "Full-3",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-3",
+        "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
+        "color": "C0"
+    },
+    "3-1.0": {
+        "param_mask": "0111111111111111111",
+        "ode_variant": "equiv_2",
+        "pub_name": "Scale-1.0",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-3-1.0",
+        "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
+        "color": "C1"
+    },
+    "3-2.0": {
+        "param_mask": "0111111111111111111",
+        "ode_variant": "equiv_2",
+        "pub_name": "Scale-2.0",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-3-2.0",
+        "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
+        "color": "C2"
+    },
+    "simple-prior": {
+        "param_mask": "0111111111111111111",
+        "ode_variant": "equiv_2",
+        "pub_name": "",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
+        "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
+        "output_dir": "stan-calcium-model-100-root-5106-simple-prior"
+    },
+    "const-eta1": {
+        "param_mask": "0111111111111101111",
+        "ode_variant": "equiv_2_const_eta1",
+        "pub_name": "Red-eta1",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-const-eta1",
+        "root_cell_dir": "stan-calcium-model-const-eta1/cell-5106-local",
+        "color": "C3"
+    },
+    "const-Be": {
+        "param_mask": "0111111111011111111",
+        "ode_variant": "equiv_2_const_Be",
+        "pub_name": "Red-B_e",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be",
+        "root_cell_dir": "stan-calcium-model-const-Be/cell-5106-local",
+        "color": "C4"
+    },
+    "const-Be-eta1": {
+        "param_mask": "0111111111011101111",
+        "ode_variant": "equiv_2_const_Be_eta1",
+        "pub_name": "Red-B_e-eta1",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1",
+        "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
+        "color": "C8"
+    },
+    "const-Be-eta1-mixed-0": {
+        "param_mask": "0111111111011101111",
+        "ode_variant": "equiv_2_const_Be_eta1",
+        "pub_name": "Red-B_e-eta1-mixed_0",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8_mixed_0.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-mixed-0",
+        "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
+        "color": "C0"
+    },
+    "const-Be-eta1-mixed-1": {
+        "param_mask": "0111111111011101111",
+        "ode_variant": "equiv_2_const_Be_eta1",
+        "pub_name": "Red-B_e-eta1-mixed_1",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8_mixed_1.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-mixed-1",
+        "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
+        "color": "C1"
+    },
+    "const-Be-eta1-mixed-2": {
+        "param_mask": "0111111111011101111",
+        "ode_variant": "equiv_2_const_Be_eta1",
+        "pub_name": "Red-B_e-eta1-mixed_2",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8_mixed_2.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-mixed-2",
+        "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
+        "color": "C2"
+    },
+    "lemon-prior-1000": {
+        "param_mask": "0111111111111111111",
+        "ode_variant": "equiv_2",
+        "pub_name": "Idv-cells-1000",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
+        "output_dir": "stan-calcium-model-equiv_2-lemon-prior-500",
+        "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
+        "color": "C1"
+    },
+    "lemon-prior-500": {
+        "param_mask": "0111111111111111111",
+        "ode_variant": "equiv_2",
+        "pub_name": "Idv-cells-500",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
+        "output_dir": "stan-calcium-model-equiv_2-lemon-prior-1000",
+        "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
+        "color": "C2"
+    }
+}

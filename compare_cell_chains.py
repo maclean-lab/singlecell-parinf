@@ -1,6 +1,7 @@
 # %%
 import os
 import os.path
+import json
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -11,81 +12,70 @@ import seaborn as sns
 root_cell_id = 5106
 # first_cell, last_cell = 4940, 4828
 first_cell_order = 1
-last_cell_order = 10
+last_cell_order = 60
 
 # define directories for results produced by MultiSessionAnalyzers
+# run_group = 'full-models'
+# run_group = '3-vs-const'
+# run_group = 'scaling'
+# run_group = '3-vs-lemon'
+run_group = 'similar-vs-mixed'
+
+with open('stan_run_meta.json', 'r') as f:
+    stan_run_meta = json.load(f)
+with open('stan_run_comparison_meta.json', 'r') as f:
+    stan_run_comparison_meta = json.load(f)
+
+runs = stan_run_meta[run_group]['runs']
+num_runs = len(runs)
+
 output_root = '../../result'
-# runs = ['1', '2', '3']
-# output_suffix = 'full-models'
-# runs = ['3', 'const-eta1', 'const-Be', 'const-Be-eta1']
-# output_suffix = '3-vs-const'
-# runs = ['3', '3-1.0', '3-2.0']
-# output_suffix = 'scaling'
-# analyzer_dirs = [
-#     os.path.join(
-#         output_root, f'stan-calcium-model-100-root-5106-{r}',
-#         f'multi-sample-analysis-{first_cell_order:04d}-{last_cell_order:04d}')
-#     for r in runs]
-# 3 vs lemon prior ####
-runs = ['3', 'lemon-500', 'lemon-1000']
-analyzer_dirs = ['stan-calcium-model-100-root-5106-3',
-                 'stan-calcium-model-equiv_2-lemon-prior-500',
-                 'stan-calcium-model-equiv_2-lemon-prior-1000']
-output_suffix = '3-vs-lemon'
+run_dirs = [stan_run_meta[r]['output_dir'] for r in runs]
 analyzer_dirs = [
     os.path.join(
         output_root, d,
         f'multi-sample-analysis-{first_cell_order:04d}-{last_cell_order:04d}')
-    for d in analyzer_dirs
+    for d in run_dirs
 ]
-#####
+
+cell_plot_order_type = stan_run_comparison_meta[run_group]['order_by']
+
 output_dir = os.path.join(
     output_root,
-    f'stan-calcium-model-100-root-{root_cell_id}-comparison-{output_suffix}',
+    f'stan-calcium-model-100-root-{root_cell_id}-comparison-{run_group}',
     f'cell-{first_cell_order:04d}-{last_cell_order:04d}')
 if not os.path.exists(output_dir):
     os.mkdir(output_dir)
-num_runs = len(analyzer_dirs)
 
 # get cell list
-cell_list_path = f'cell_lists/dfs_feature_100_root_{root_cell_id}_0.000_1.8.txt'
-cell_list = pd.read_csv(cell_list_path, sep='\t')
-# first_cell_order = np.where(cell_list['Cell'] == first_cell)[0][0]
-# last_cell_order = np.where(cell_list['Cell'] == last_cell)[0][0]
-cell_list = cell_list.iloc[first_cell_order:last_cell_order + 1, :]
+if cell_plot_order_type == 'cell_id':
+    # assume same list for all runs
+    cell_list_path = os.path.join(
+        'cell_lists', stan_run_meta[runs[0]]['cell_list'])
+    cell_list = pd.read_csv(cell_list_path, sep='\t')
+    cell_plot_order = cell_list.iloc[first_cell_order:last_cell_order + 1, 0]
+else:
+    cell_plot_order = list(range(first_cell_order, last_cell_order + 1))
+
+    cell_lists = {}
+    for run in runs:
+        cell_list_path = os.path.join(
+            'cell_lists', stan_run_meta[run]['cell_list'])
+        cell_lists[run] = pd.read_csv(cell_list_path, sep='\t')
+        cell_lists[run] = cell_lists[run].iloc[
+            first_cell_order:last_cell_order + 1, 0]
+        cell_lists[run] = cell_lists[run].to_list()
+
+pub_names = [stan_run_meta[r]['pub_name'] for r in runs]
 
 # define plot parameters
 dpi = 300
-figure_size = (8, 6)
-run_color_map = {}
-run_color_map['3'] = 'C0'
-run_color_map['1'] = 'C1'
-run_color_map['2'] = 'C2'
-run_color_map['const-eta1'] = 'C3'
-run_color_map['const-Be'] = 'C4'
-run_color_map['const-Be-eta1'] = 'C8'
-run_color_map['lemon-1000'] = 'C1'
-run_color_map['lemon-500'] = 'C2'
-run_color_map['3-1.0'] = 'C1'
-run_color_map['3-2.0'] = 'C2'
-run_colors = [run_color_map[c] for c in runs]
-
-pub_name_map = {}
-pub_name_map['3'] = 'Full-3'
-pub_name_map['1'] = 'Full-1'
-pub_name_map['2'] = 'Full-2'
-pub_name_map['const-eta1'] = 'Red-eta1'
-pub_name_map['const-Be'] = 'Red-B_e'
-pub_name_map['const-Be-eta1'] = 'Red-B_e-eta1'
-pub_name_map['lemon-1000'] = 'Idv-cells-1000'
-pub_name_map['lemon-500'] = 'Idv-cells-500'
-pub_name_map['3-1.0'] = 'Scale-1.0'
-pub_name_map['3-2.0'] = 'Scale-2.0'
-pub_names = [pub_name_map[c] for c in runs]
+figure_size = (11, 8.5)
+run_colors = [stan_run_meta[r]['color'] for r in runs]
 
 # change font settings
 matplotlib.rcParams['font.sans-serif'] = ['Arial']
-matplotlib.rcParams['font.size'] = 16
+matplotlib.rcParams['font.size'] = 12
 
 marker_size = 8
 
@@ -124,7 +114,7 @@ for d in analyzer_dirs:
 
     # load sampling time
     data_path = os.path.join(d, 'sampling_time.csv')
-    run_data = pd.read_csv(data_path, index_col=0, header=None, squeeze=True)
+    run_data = pd.read_csv(data_path, index_col=0)
     sampling_time.append(run_data)
 
     # load tree depths
@@ -176,8 +166,12 @@ num_rows = 0
 for run, run_lp in zip(runs, log_posteriors):
     for cell_id, row in run_lp.iterrows():
         for chain, lp in row.items():
-            long_row = {'Run': run, 'Cell': cell_id, 'Chain': chain,
-                        'LP': lp}
+            if cell_plot_order == 'cell_id':
+                cell = cell_id
+            else:
+                cell = cell_lists[run].index(cell_id)
+
+            long_row = {'Run': run, 'Cell': cell, 'Chain': chain, 'LP': lp}
             mean_log_posteriors_long.loc[num_rows] = long_row
             num_rows += 1
 
@@ -187,8 +181,12 @@ num_rows = 0
 for run, run_st in zip(runs, sampling_time):
     for cell_id, row in run_st.iterrows():
         for chain, t in row.items():
-            long_row = {'Run': run, 'Cell': cell_id, 'Chain': chain,
-                        'Time': t}
+            if cell_plot_order == 'cell_id':
+                cell = cell_id
+            else:
+                cell = cell_lists[run].index(cell_id)
+
+            long_row = {'Run': run, 'Cell': cell, 'Chain': chain, 'Time': t}
             sampling_time_long.loc[num_rows] = long_row
             num_rows += 1
 
@@ -206,7 +204,7 @@ dist_violins['cmaxes'].set_color('k')
 dist_violins['cbars'].set_color('k')
 plt.xticks(ticks=violin_xticks, labels=violin_xticklabels)
 plt.ylabel('Mean trajectory distances')
-plt.ylim((0, 50))
+plt.ylim((0, 10))
 plt.savefig(figure_path, transparent=True)
 plt.close()
 
@@ -221,13 +219,13 @@ lp_high = 600
 mean_log_posteriors_long['LP'].clip(lower=lp_low, upper=lp_high, inplace=True)
 
 g = sns.stripplot(data=mean_log_posteriors_long, x='Cell', y='LP', hue='Run',
-                  order=cell_list['Cell'], alpha=0.5, palette=run_colors,
+                  order=cell_plot_order, alpha=0.5, palette=run_colors,
                   size=marker_size)
 
 # draw lines for means of chains
-# for i in range(num_runs):
-#     run_mean = np.full(num_cells, np.mean(log_posteriors[i].values))
-#     g.plot(run_mean, color=run_colors[i])
+for i in range(num_runs):
+    run_mean = np.full(num_cells, np.mean(log_posteriors[i].values))
+    g.plot(run_mean, color=run_colors[i])
 
 # set labels on axes
 g.set_xticks(run_xtick_locs)
@@ -240,9 +238,9 @@ g.set_ylim(bottom=lp_low, top=lp_high)
 
 # update legend
 legend = g.legend()
-legend.remove()
-# for text, label in zip(legend.texts, legend_labels):
-#     text.set_text(label)
+# legend.remove()
+for text, label in zip(legend.texts, pub_names):
+    text.set_text(label)
 
 # export
 plt.savefig(figure_path, transparent=True)
@@ -258,13 +256,13 @@ sampling_time_low = 0
 sampling_time_high = 1000
 sampling_time_long['Time'].clip(upper=sampling_time_high, inplace=True)
 g = sns.stripplot(data=sampling_time_long, x='Cell', y='Time', hue='Run',
-                  order=cell_list['Cell'], alpha=0.8, palette=run_colors,
+                  order=cell_plot_order, alpha=0.8, palette=run_colors,
                   size=marker_size)
 
 # draw lines for means of chains
-# for i in range(num_runs):
-#     run_mean = np.full(num_cells, np.mean(sampling_time[i].values))
-#     g.plot(run_mean, color=run_colors[i])
+for i in range(num_runs):
+    run_mean = np.full(num_cells, np.mean(sampling_time[i].values))
+    g.plot(run_mean, color=run_colors[i])
 
 # set labels on axes
 g.set_xticks(run_xtick_locs)
@@ -277,9 +275,9 @@ g.set_ylim(bottom=sampling_time_low, top=sampling_time_high)
 
 # update legend
 legend = g.legend()
-legend.remove()
-# for text, label in zip(legend.texts, legend_labels):
-#     text.set_text(label)
+# legend.remove()
+for text, label in zip(legend.texts, pub_names):
+    text.set_text(label)
 
 # export
 plt.savefig(figure_path, transparent=True)
@@ -289,14 +287,14 @@ plt.close()
 # make violin plot for sampling time
 plt.figure(figsize=figure_size, dpi=dpi)
 figure_path = os.path.join(output_dir, 'sampling_time_violin.pdf')
-dist_violins = plt.violinplot([t.values.flatten() for t in sampling_time],
+time_violins = plt.violinplot([t.values.flatten() for t in sampling_time],
                               showmeans=True)
-for violin, color in zip(dist_violins['bodies'], run_colors):
+for violin, color in zip(time_violins['bodies'], run_colors):
     violin.set_facecolor(color)
-dist_violins['cmeans'].set_color('k')
-dist_violins['cmins'].set_color('k')
-dist_violins['cmaxes'].set_color('k')
-dist_violins['cbars'].set_color('k')
+time_violins['cmeans'].set_color('k')
+time_violins['cmins'].set_color('k')
+time_violins['cmaxes'].set_color('k')
+time_violins['cbars'].set_color('k')
 plt.xticks(ticks=violin_xticks, labels=violin_xticklabels)
 plt.ylim((0, 1000))
 plt.ylabel('Time (minutes)')
@@ -307,3 +305,5 @@ plt.close()
 # make legends
 dummy_fig = plt.figure()
 fig_legend = plt.figure(figsize=(3, num_runs * 2), dpi=dpi)
+
+# %%

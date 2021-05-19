@@ -6,19 +6,19 @@ import matplotlib.pyplot as plt
 from matplotlib_venn import venn2
 
 # %%
-# load MI data
-mi_matrix = pd.read_csv('../../result/gene_gene_MI.csv', index_col=0)
-mi_long = pd.DataFrame(columns=['gene_1', 'gene_2', 'MI'])
-for g1, g2 in itertools.combinations(mi_matrix.index, 2):
-    row = {'gene_1': g1, 'gene_2': g2, 'MI': mi_matrix.loc[g1, g2]}
-    mi_long = mi_long.append(row, ignore_index=True)
-mi_long.sort_values('MI', axis=0, ascending=False, inplace=True,
-                    ignore_index=True)
+# load gene-gene MI data
+gene_gene_mi_matrix = pd.read_csv('../../result/gene_gene_MI.csv', index_col=0)
+gene_gene_mi_long = pd.DataFrame(columns=['gene_1', 'gene_2', 'MI'])
+for g1, g2 in itertools.combinations(gene_gene_mi_matrix.index, 2):
+    row = {'gene_1': g1, 'gene_2': g2, 'MI': gene_gene_mi_matrix.loc[g1, g2]}
+    gene_gene_mi_long = gene_gene_mi_long.append(row, ignore_index=True)
+gene_gene_mi_long.sort_values('MI', axis=0, ascending=False, inplace=True,
+                              ignore_index=True)
 
 # get genes with highest MI
 num_top_genes = 30
-high_mi_genes = set(mi_long.loc[:num_top_genes, 'gene_1'])
-high_mi_genes |= set(mi_long.loc[:num_top_genes, 'gene_2'])
+high_mi_genes = set(gene_gene_mi_long.loc[:num_top_genes, 'gene_1'])
+high_mi_genes |= set(gene_gene_mi_long.loc[:num_top_genes, 'gene_2'])
 
 # %%
 # load gene-param pairs
