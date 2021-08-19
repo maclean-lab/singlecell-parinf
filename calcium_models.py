@@ -1,5 +1,19 @@
 import numpy as np
 
+param_names = ['sigma', 'KonATP', 'L', 'Katp', 'KoffPLC', 'Vplc', 'Kip3',
+               'KoffIP3', 'a', 'dinh', 'Ke', 'Be', 'd1', 'd5', 'epr',
+               'eta1', 'eta2', 'eta3', 'c0', 'k3']
+
+params_on_plot = {
+    'sigma': r'$\sigma$', 'KonATP': r'$K_{\mathrm{on, ATP}}$', 'L': r'ATP',
+    'Katp': r'$K_{\mathrm{ATP}}$', 'KoffPLC': r'$K_{\mathrm{off, ATP}}$',
+    'Vplc': r'$V_{\mathrm{PLC}}$', 'Kip3': r'$K_{\mathrm{IP3}}$',
+    'KoffIP3': r'$K_{\mathrm{off, IP3}}$', 'a': r'$a$',
+    'dinh': r'$d_{\mathrm{inh}}$','Ke': r'$K_e$', 'Be': r'$B_e$',
+    'd1': r'$d_1$', 'd5': r'$d_5$', 'epr': r'$\epsilon$', 'eta1': r'$\eta_1$',
+    'eta2': r'$\eta_2$', 'eta3': r'$\eta_3$','c0': r'$c_0$', 'k3': r'$k_3$'
+}
+
 def calcium_ode_vanilla(t, y, theta):
     """Original calcium model from Yao 2016"""
     dydt = np.zeros(4)

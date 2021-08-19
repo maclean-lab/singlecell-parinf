@@ -585,6 +585,41 @@ class StanSessionAnalyzer:
         """Get mean of log posterior density"""
         return np.array([np.mean(lp) for lp in self.log_posterior])
 
+    def get_log_posteriors(self, include_warmup=True):
+        """Get log posterior"""
+        # load sample files
+        if self.sample_source == 'sample_files':
+            samples = self.raw_samples
+        else:
+            samples = []
+            for chain_idx in range(self.num_chains):
+                # get raw samples
+                sample_path = os.path.join(
+                    self.output_dir, 'chain_{}.csv'.format(chain_idx))
+                sample = pd.read_csv(sample_path, index_col=False, comment='#')
+                sample.set_index(pd.RangeIndex(sample.shape[0]), inplace=True)
+                samples.append(sample)
+
+        # remove warmup iterations if specified
+        if not include_warmup:
+            for i in range(len(samples)):
+                samples[i] = samples[i].loc[self.warmup:, :]
+
+        lps = np.array([s['lp__'].to_numpy() for s in samples])
+
+        return lps
+
+    def plot_log_posteriors(self, include_warmup=True):
+        """Plot log posterior, including warmup"""
+        lps = self.get_log_posteriors(include_warmup=include_warmup)
+
+        plt.figure(figsize=(6, 4), dpi=300)
+        plt.plot(lps.T)
+        plt.ylim((0, np.amax(lps)))
+        figure_path = os.path.join(self.output_dir, 'log_posterior_trace.png')
+        plt.savefig(figure_path)
+        plt.close()
+
 class StanMultiSessionAnalyzer:
     def __init__(self, session_list, output_dir, session_output_dirs,
                  sample_source='arviz_inf_data', num_chains=4, warmup=1000,
@@ -641,7 +676,7 @@ class StanMultiSessionAnalyzer:
             self.sample_means = self.sample_means.append(session_means,
                                                          ignore_index=True)
 
-    def filter_sessions(self, z_score_max=3.0):
+    def filter_sessions(self, z_score_max=3.0, plot=False):
         '''Filter sessions by z-scores of sample means
 
         Sample means will be calculated and assigned as a field of the analyzer
@@ -653,7 +688,7 @@ class StanMultiSessionAnalyzer:
         sample_mean_z_scores = self.sample_means.apply(scipy.stats.zscore,
                                                        ddof=1)
         # plot z-scores on sample means vs gene expression
-        if hasattr(self, 'log_data'):
+        if plot and hasattr(self, 'log_data'):
             gvp_dir = os.path.join(self.output_dir, 'genes-vs-params')
             if not os.path.exists(gvp_dir):
                 os.mkdir(gvp_dir)
@@ -840,7 +875,8 @@ class StanMultiSessionAnalyzer:
                 plt.close()
 
     def plot_parameter_box(self, page_size=(8.5, 11), dpi=300, num_rows=4,
-                           num_cols=1, titles=None, xticks=None):
+                           num_cols=1, titles=None, xticks=None,
+                           y_labels=None):
         '''Make ribbon plot for parameters'''
         # make 'long' form for sampled parameters / concat all samples
         all_samples = pd.DataFrame(columns=['Order'] + self.param_names)
@@ -880,7 +916,8 @@ class StanMultiSessionAnalyzer:
                     if xticks is not None:
                         plt.xticks(**xticks)
                     plt.xlabel('')
-                    plt.ylabel('')
+                    if y_labels is not None:
+                        plt.ylabel(y_labels[param_idx])
                     plt.title(titles[param_idx])
 
                 plt.tight_layout()
@@ -888,7 +925,8 @@ class StanMultiSessionAnalyzer:
                 plt.close()
 
     def plot_param_pairs_all_sessions(self, param_pairs,
-                                      output_path_prefixes=None, dpi=300):
+                                      output_path_prefixes=None, dpi=300,
+                                      param_names_on_plot=None):
         '''Make scatter plot for select pairs of parameters of all sessions,
         with histogram on the sides'''
 
@@ -927,8 +965,16 @@ class StanMultiSessionAnalyzer:
 
                 # draw scatter of the parameter pair
                 ax.scatter(p1_samples, p2_samples)
-                ax.set_xlabel(p1)
-                ax.set_ylabel(p2)
+                if param_names_on_plot:
+                    ax.set_xlabel(param_names_on_plot[p1])
+                    print(param_names_on_plot[p1])
+                else:
+                    ax.set_xlabel(p1)
+                if param_names_on_plot:
+                    ax.set_xlabel(param_names_on_plot[p2])
+                    print(param_names_on_plot[p2])
+                else:
+                    ax.set_ylabel(p2)
 
                 # draw histogram for each parameter on the side
                 ax_histx.tick_params(axis='x', labelbottom=False)
@@ -941,7 +987,8 @@ class StanMultiSessionAnalyzer:
                 plt.close(fig)
 
     def plot_param_pairs(self, param_pairs, sessions=[], num_rows=4,
-                         num_cols=2):
+                         num_cols=2, page_size=(8.5, 11),
+                         param_names_on_plot=None, titles=None):
         '''Make scatter plot of sample means for a pair of parameters, plus
         scatter plot of all samples of select sessions'''
         if not hasattr(self, 'sample_means'):
@@ -955,13 +1002,19 @@ class StanMultiSessionAnalyzer:
             sessions = [s for s in sessions if s in self.session_list]
             num_plots += len(sessions)
         num_pages = math.ceil(num_plots / num_subplots_per_page)
+        if param_names_on_plot:
+            param_0_label = param_names_on_plot[param_pairs[0]]
+            param_1_label = param_names_on_plot[param_pairs[1]]
+        else:
+            param_0_label = param_pairs[0]
+            param_1_label = param_pairs[1]
 
         output_path = os.path.join(
             self.output_dir,
             f'param_pair_scatters_{param_pairs[0]}_{param_pairs[1]}.pdf')
         with PdfPages(output_path) as pdf:
             for page in range(num_pages):
-                plt.figure(figsize=(8.5, 11))
+                plt.figure(figsize=page_size, dpi=300)
 
                 if page == num_pages - 1:
                     num_subplots = (num_plots - 1) % num_subplots_per_page + 1
@@ -978,13 +1031,17 @@ class StanMultiSessionAnalyzer:
                         ax.scatter(self.sample_means[param_pairs[0]],
                                    self.sample_means[param_pairs[1]],
                                    c=session_orders)
-                        ax.set_xlabel(param_pairs[0])
-                        ax.set_ylabel(param_pairs[1])
-                        ax.set_title('Sample means')
+                        ax.set_xlabel(param_0_label)
+                        ax.set_ylabel(param_1_label)
+                        if titles:
+                            ax.set_title(titles[0])
+                        else:
+                            ax.set_title('Sample means')
+                        # plt.colorbar(sc, ax=ax, label='Cell positions')
                     else:
                         # plot sample vs sample in a session
-                        session = sessions[
-                            page * num_subplots_per_page + plot_idx - 1]
+                        plot_idx_all = page * num_subplots_per_page + plot_idx
+                        session = sessions[plot_idx_all - 1]
                         session_idx = np.argwhere(
                             self.session_list == session)
                         if session_idx.size == 0:
@@ -993,9 +1050,12 @@ class StanMultiSessionAnalyzer:
                         samples = analyzer.get_samples()
                         ax.scatter(samples[param_pairs[0]],
                                    samples[param_pairs[1]], s=3, alpha=0.3)
-                        ax.set_xlabel(param_pairs[0])
-                        ax.set_ylabel(param_pairs[1])
-                        ax.set_title(session)
+                        ax.set_xlabel(param_0_label)
+                        ax.set_ylabel(param_1_label)
+                        if titles:
+                            ax.set_title(titles[plot_idx_all])
+                        else:
+                            ax.set_title(session)
 
                 plt.tight_layout()
                 pdf.savefig()
@@ -1165,7 +1225,8 @@ class StanMultiSessionAnalyzer:
 
         return stats
 
-    def plot_sampling_time(self, time_unit='s', dpi=300, xticks=None):
+    def plot_sampling_time(self, time_unit='s', dpi=300, xticks=None,
+                           hist_range=None):
         '''Plot runtime of all chains in every Stan sesssion'''
         time_unit_text = {'s': 'seconds', 'm': 'minutes', 'h': 'hours'}
         # load stan sample file
@@ -1191,7 +1252,7 @@ class StanMultiSessionAnalyzer:
         # plot histogram of sampling time
         output_path = os.path.join(self.output_dir, 'sampling_time_hist.pdf')
         plt.figure(figsize=(11, 8.5), dpi=dpi)
-        plt.hist(sampling_time.flatten(), bins=20)
+        plt.hist(sampling_time.flatten(), bins=20, range=hist_range)
         plt.savefig(output_path)
         plt.close()
 
@@ -1313,34 +1374,40 @@ class StanMultiSessionAnalyzer:
 
     def run_sensitivity_test(self, ode, t0, ts, y0, y_ref, target_var_idx,
                              test_params, method='default', method_kwargs=None,
-                             figure_size=(3, 2), dpi=300,
-                             output_path_prefixes=None):
+                             plot_traj=False, figure_size=(3, 2), dpi=300,
+                             figure_path_prefixes=None,
+                             param_names_on_plot=None):
         '''Test sensitivity of parameters'''
         if method_kwargs is None:
             method_kwargs = {}
 
         test_percentiles = np.arange(0.1, 1, 0.1)  # percentiles for test
+        num_test_percentiles = len(test_percentiles)
+        test_quantiles = [0.01, 0.99]  # quantile to be test at
+        num_steady_pts = ts.size // 5
         jet_cmap = plt.get_cmap('jet')
         colors = jet_cmap(test_percentiles)
-        traj_dist_cols = [f'{p}_{q:.2f}' for p, q in itertools.product(
-            test_params, [0.01, 0.99])]
-        traj_dists = pd.DataFrame(columns=traj_dist_cols,
-                                  index=self.session_list)
+
+        # initialize tables for stats
+        stats = {}
+        stats_types = ['MeanTrajDist', 'MeanPeakDiff', 'MeanPeakFoldChange',
+                       'MeanSteadyDiff', 'MeanSteadyFoldChange']
+        for param, qt in itertools.product(test_params, test_quantiles):
+            stats[(param, qt)] = pd.DataFrame(columns=stats_types,
+                                              index=self.session_list)
 
         def _test_quantile(q):
             test_value = session_samples[param].quantile(q)
-            if output_path_prefixes:
-                output_path = f'{output_path_prefixes[idx]}_{param}_{q:.2f}.pdf'
-            else:
-                output_path = os.path.join(
-                    self.output_dir,
-                    f'{idx:04d}_{self.session_list[idx]}_{param}_{q:.2f}.pdf')
-            fig = Figure(figsize=figure_size, dpi=dpi)
-            ax = fig.gca()
 
-            td_col = f'{param}_{q:.2f}'
-            td_row = self.session_list[idx]
-            traj_dists.loc[td_row, td_col] = 0
+            # initialize
+            y_sim_all = np.empty((num_test_percentiles, ts.size))
+            traj_dist = 0
+            peak_diff = 0
+            steady_diff = 0
+            peak_fold_change = 0
+            steady_fold_change = 0
+            peak_ref = np.max(y_ref[idx, :])
+            steady_ref = np.mean(y_ref[idx, -num_steady_pts:])
 
             for i, pct in enumerate(test_percentiles):
                 row_cond = param_samples == \
@@ -1351,28 +1418,84 @@ class StanMultiSessionAnalyzer:
                 else:
                     theta = session_samples.iloc[row_idx, 1:].copy()
                 theta[param] = test_value
-                y_sim = simulate_trajectory(ode, theta, t0, ts, y0[idx, :])
-                ax.plot(ts, y_sim[:, target_var_idx], color=colors[i],
-                        label=f'{pct:.1f}')
-                traj_dists.loc[td_row, td_col] += \
-                    np.linalg.norm(y_sim[:, target_var_idx] - y_ref[idx, :])
 
-            ax.plot(ts, y_ref[idx, :], 'ko', fillstyle='none')
-            ax.legend()
-            fig.savefig(output_path)
-            plt.close(fig)
+                y_sim = simulate_trajectory(ode, theta, t0, ts, y0[idx, :])
+                y_sim = y_sim[:, target_var_idx]
+
+                # get trajectory distance
+                traj_dist += np.linalg.norm(y_sim - y_ref[idx, :])
+
+                # get stats for change in peak
+                peak_sim = np.max(y_sim)
+                peak_diff += peak_sim - peak_ref
+                if peak_ref > peak_sim:  # negative fold change
+                    peak_fold_change -= peak_ref / peak_sim
+                else:  # positive fold change
+                    peak_fold_change += peak_sim / peak_ref
+
+                # get stats for change in steady state
+                steady_sim = np.mean(y_sim[-num_steady_pts:])
+                steady_diff += steady_sim - steady_ref
+                if steady_ref > steady_sim:  # negative fold change
+                    steady_fold_change -= steady_ref / steady_sim
+                else:  # positive fold change
+                    steady_fold_change += steady_sim / steady_ref
+
+                if plot_traj:
+                    y_sim_all[i, :] = y_sim
+
+            if plot_traj:
+                if figure_path_prefixes:
+                    figure_path = f'{figure_path_prefixes[idx]}_{param}_' \
+                        + f'{q:.2f}.pdf'
+                else:
+                    figure_path = f'{idx:04d}_{session}_{param}_{q:.2f}.pdf'
+                figure_path = os.path.join(self.output_dir, figure_path)
+                fig = Figure(figsize=figure_size, dpi=dpi)
+                ax = fig.gca()
+
+                for i, pct in enumerate(test_percentiles):
+                    ax.plot(ts, y_sim_all[i, :], color=colors[i],
+                            label=f'{pct:.1f}')
+
+                ax.plot(ts, y_ref[idx, :], 'ko', fillstyle='none')
+                if param_names_on_plot:
+                    param_name = param_names_on_plot[param]
+                else:
+                    param_name = param
+                ax.set_title(f'{param_name}, {q}')
+                ax.legend()
+                fig.savefig(figure_path)
+                plt.close(fig)
+
+            # record all stats
+            stats[(param, q)].loc[session, 'MeanTrajDist'] = \
+                traj_dist / num_test_percentiles
+            stats[(param, q)].loc[session, 'MeanPeakDiff'] = \
+                peak_diff / num_test_percentiles
+            stats[(param, q)].loc[session, 'MeanPeakFoldChange'] = \
+                peak_fold_change / num_test_percentiles
+            stats[(param, q)].loc[session, 'MeanSteadyDiff'] = \
+                steady_diff / num_test_percentiles
+            stats[(param, q)].loc[session, 'MeanSteadyFoldChange'] = \
+                steady_fold_change / num_test_percentiles
 
         for idx, analyzer in enumerate(self.session_analyzers):
+            session = self.session_list[idx]
             session_samples = analyzer.get_samples()
             if method == 'mode':
                 sample_modes = analyzer.get_sample_modes(**method_kwargs)
 
             for param in test_params:
                 param_samples = session_samples[param]
-                _test_quantile(0.01)
-                _test_quantile(0.99)
+                for qt in test_quantiles:
+                    _test_quantile(qt)
 
-        return traj_dists
+        # save tables for stats
+        for param, qt in itertools.product(test_params, test_quantiles):
+            stats_path = os.path.join(self.output_dir,
+                                      f'{param}_{qt}_stats.csv')
+            stats[(param, qt)].to_csv(stats_path)
 
     def load_expression_data(self, data_path, use_highly_variable_genes=False):
         """Load and preprocess expression data"""
@@ -1407,7 +1530,8 @@ class StanMultiSessionAnalyzer:
                     self.log_data[gene_idx, self.session_list],
                     gvp_scatter_path, c=session_orders)
 
-    def run_pca(self, num_pcs=50, num_top_pcs=10, sampled_only=False):
+    def run_pca(self, num_pcs=50, num_top_pcs=10, sampled_only=False,
+                plot=False):
         """Perform PCA"""
         self.num_pcs = num_pcs
         self.num_top_pcs = num_top_pcs
@@ -1420,12 +1544,13 @@ class StanMultiSessionAnalyzer:
         self.log_pca_data_abs = np.abs(self.log_pca_data)
 
         # plot PCA explained variance ratio
-        plt.figure(figsize=(11, 8.5))
-        plt.plot(self.pca.explained_variance_ratio_, '.')
-        plt.savefig(os.path.join(self.output_dir, 'pca_var_ratio.pdf'))
-        plt.close()
+        if plot:
+            plt.figure(figsize=(11, 8.5))
+            plt.plot(self.pca.explained_variance_ratio_, '.')
+            plt.savefig(os.path.join(self.output_dir, 'pca_var_ratio.pdf'))
+            plt.close()
 
-    def get_top_genes_from_pca(self, num_top_genes=10):
+    def get_top_genes_from_pca(self, num_top_genes=10, plot=False):
         pca_loadings = self.pca.components_.T
         top_pos_genes = pd.DataFrame(index=range(num_top_genes),
                                      columns=range(self.num_pcs))
@@ -1445,7 +1570,7 @@ class StanMultiSessionAnalyzer:
                 ranked_gene_indices[:num_top_genes]]
             top_neg_genes.loc[:, comp] = top_neg_genes_comp
 
-            if comp < self.num_top_pcs:
+            if plot and comp < self.num_top_pcs:
                 # plot top positive genes vs sampled means
                 for i, gene in enumerate(top_pos_genes_comp):
                     gene_idx = ranked_gene_indices[-(i+1)]
@@ -1479,7 +1604,7 @@ class StanMultiSessionAnalyzer:
         self.top_neg_gene_list = top_neg_gene_list
         self.top_pc_gene_list = top_pc_gene_list
 
-    def compute_gene_param_correlations(self, genes):
+    def compute_gene_param_correlations(self, genes, plot=False):
         '''Compute correlations between parameters and top genes from PCA'''
         gvp_corr_dir = os.path.join(self.output_dir, 'genes-vs-params')
         if not os.path.exists(gvp_corr_dir):
@@ -1506,11 +1631,13 @@ class StanMultiSessionAnalyzer:
         self.gene_vs_param_corrs = gene_vs_param_corrs
         self.gene_vs_param_corr_pvals = gene_vs_param_corr_pvals
 
-        for param in self.param_names:
-            plt.hist(gene_vs_param_corrs[param], bins=15)
-            plt.savefig(
-                os.path.join(gvp_corr_dir, f'gene_vs_{param}_corr_hist.png'))
-            plt.close()
+        if plot:
+            for param in self.param_names:
+                plt.hist(gene_vs_param_corrs[param], bins=15)
+                figure_path = os.path.join(gvp_corr_dir,
+                                           f'gene_vs_{param}_corr_hist.png')
+                plt.savefig(figure_path)
+                plt.close()
 
         # sort gene-parameter pairs in descending order of Pearson correlations
         num_gene_param_pairs = len(genes) * self.num_params
@@ -1534,7 +1661,7 @@ class StanMultiSessionAnalyzer:
         self.sorted_gene_vs_param_pairs = sorted_gene_vs_param_pairs
 
     def run_genes_vs_params_regression(self, regressor_name, genes, degree=1,
-                                       select_pairs=[]):
+                                       select_pairs=[], plot=False):
         '''Fit a regression model for gene expression vs sampled means of
         params, with features raised to a specified degree'''
         regression_dir = os.path.join(self.output_dir,
@@ -1579,10 +1706,12 @@ class StanMultiSessionAnalyzer:
                         (degree, gene, param)] = regressor
 
             # plot regression lines (curves)
-            regression_scatter_path = os.path.join(
-                regression_dir, f'{regressor_name}_degree_{degree}_{gene}.pdf')
-            self._scatter_multi_plot(X_gene, regression_scatter_path,
-                                     regressors=param_regressors, X_poly=X)
+            if plot:
+                regression_scatter_path = os.path.join(
+                    regression_dir,
+                    f'{regressor_name}_degree_{degree}_{gene}.pdf')
+                self._scatter_multi_plot(X_gene, regression_scatter_path,
+                                         regressors=param_regressors, X_poly=X)
 
         # save metrics
         r2_scores_path = os.path.join(
@@ -1640,11 +1769,13 @@ class StanMultiSessionAnalyzer:
     def plot_select_genes_vs_params(self, select_pairs, regressors_trained,
                                     figure_name, figure_size=(8.5, 11),
                                     num_rows=4, num_cols=2, degree=1,
-                                    show_corrs=True):
+                                    show_corrs=True, param_names_on_plot=None,
+                                    **scatter_kwargs):
         """Plot select gene-parameter pairs with regression line/curve"""
         num_subplots_per_page = num_rows * num_cols
         num_plots = len(select_pairs)
         num_pages = math.ceil(num_plots / num_subplots_per_page)
+        cell_orders = np.arange(self.session_list.size)
 
         figure_path = os.path.join(self.output_dir, figure_name)
         with PdfPages(figure_path) as pdf:
@@ -1671,12 +1802,17 @@ class StanMultiSessionAnalyzer:
                                            np.newaxis]
 
                     # make scatter plot
-                    plt.scatter(X_data, self.sample_means[param])
+                    plt.scatter(X_data, self.sample_means[param],
+                                c=cell_orders, **scatter_kwargs)
+                    if param_names_on_plot:
+                        param_name = param_names_on_plot[param]
+                    else:
+                        param_name = param
                     if show_corrs:
                         corr = self.gene_vs_param_corrs.loc[gene, param]
-                        plt.title(f'{gene} vs {param}: {corr:.6f}')
+                        plt.title(f'{gene} vs {param_name}: {corr:.6f}')
                     else:
-                        plt.title(f'{gene} vs {param}')
+                        plt.title(f'{gene} vs {param_name}')
 
                     # plot regression line/curve
                     if degree == 1:
@@ -1686,7 +1822,8 @@ class StanMultiSessionAnalyzer:
                         X = poly.fit_transform(X_data)
                     regressor = regressors_trained[(degree, gene, param)]
                     sample_mean_pred = regressor.predict(X)
-                    plt.scatter(X_data, sample_mean_pred)
+                    plt.scatter(X_data, sample_mean_pred, c='C1',
+                                **scatter_kwargs)
 
                 plt.tight_layout()
                 pdf.savefig()
@@ -1704,6 +1841,9 @@ def load_trajectories(t0, filter_type=None, moving_average_window=20,
     # filter the trajectories
     if filter_type == 'moving_average':
         y = moving_average(y, window=moving_average_window, verbose=verbose)
+    elif filter_type == 'savitzky_golay':
+        from scipy.signal import savgol_filter
+        y = savgol_filter(y, 51, 2)
     elif filter_type is not None and verbose:
         print(f'Unsupported filter {filter_type}. The trajectories will not '
               + 'be filtered.')
@@ -1723,6 +1863,37 @@ def load_trajectories(t0, filter_type=None, moving_average_window=20,
     ts -= t0
 
     return y, y0, ts
+
+def get_trajectory_derivatives(t0, downsample_offset=-1, downsample_factor=10,
+                               verbose=False):
+    '''Compute first derivatives of trajectories'''
+    from scipy.signal import savgol_filter
+
+    # load trajectories
+    if verbose:
+        print('Loading calcium trajectories...')
+    y = np.loadtxt('canorm_tracjectories.csv', delimiter=',')
+
+    # smooth trajectories
+    y = savgol_filter(y, 51, 2)
+
+    # get derivatives
+    dydt = np.gradient(y, axis=1)
+
+    # downsample the trajectories
+    t_end = y.shape[1] - 1
+    if downsample_offset >= 0 and downsample_factor > 1:
+        ts = np.concatenate((
+            np.arange(t0 + 1, downsample_offset),
+            np.arange(downsample_offset, t_end + 1, downsample_factor)
+        ))
+    else:
+        ts = np.arange(t0 + 1, t_end + 1)
+
+    dydt = dydt[:, ts]
+    ts -= t0
+
+    return dydt, ts
 
 def moving_average(x: np.ndarray, window: int = 20, verbose=True):
     """Compute moving average of trajectories"""
@@ -1907,3 +2078,81 @@ def get_mode_continuous_rv(x, method='kde', bins=100):
         mode = support[np.argmax(pdf)]
 
     return mode
+
+
+def get_kl_nn(posterior_samples, random_seed=0):
+    '''Compute KL divergence based nearest neighbors
+
+    samples: list of posterior samples, each has shape num_draws * num_params
+    See https://github.com/wollmanlab/ODEparamFitting_ABCSMC/blob/master/estimateKLdivergenceBasedOnNN.m
+    '''
+    from sklearn.neighbors import NearestNeighbors
+    bit_generator = np.random.MT19937(random_seed)
+    rng = np.random.default_rng(bit_generator)
+
+    k = 2
+    num_samples = len(posterior_samples)
+    D = np.ones((num_samples, num_samples))
+    nn = NearestNeighbors(n_neighbors=k, algorithm='kd_tree')
+
+    for i in range(num_samples):
+        D[i, i] = 0.5
+
+        for j in range(i + 1, num_samples):
+            n_i = posterior_samples[i].shape[0]
+            n_j = posterior_samples[j].shape[0]
+            n = min(n_i, n_j)
+            P_i = posterior_samples[i][rng.choice(n_i, size=n), :]
+            P_j = posterior_samples[j][rng.choice(n_j, size=n), :]
+            P_ij = np.vstack((P_i, P_j))
+
+            nn.fit(P_ij)
+            _, nn_indices = nn.kneighbors(P_ij)
+            nn_indices = nn_indices[:, k - 1]
+            D[i, j] = np.mean(np.concatenate(
+                ((nn_indices[:n] < n).astype(int),
+                 (nn_indices[n:] >= n).astype(int))
+            ))
+
+    D = 1 - D.T
+    KL = D * np.log(D * 2) + (1 - D) * np.log((1 - D) * 2)
+    for i, j in itertools.combinations(range(num_samples), 2):
+        if np.isnan(KL[j, i]):
+            KL[j, i] = 1.0
+
+        KL[i, j] = KL[j, i]
+
+    return KL
+
+def get_jensen_shannon(posterior_samples, subsample_size=1000, random_seed=0):
+    '''Compute Jensen-Shannon distance between pairs of samples'''
+    bit_generator = np.random.MT19937(random_seed)
+    rng = np.random.default_rng(bit_generator)
+
+    num_samples = len(posterior_samples)
+    num_params = posterior_samples[0].shape[1]
+    js_dists = np.empty((num_samples, num_samples))
+
+    for i, j in itertools.combinations_with_replacement(range(num_samples), 2):
+        sample_i = posterior_samples[i]
+        sample_j = posterior_samples[j]
+        sample_min = np.minimum(np.amin(sample_i, axis=0),
+                                np.amin(sample_j, axis=0))
+        sample_max = np.maximum(np.amax(sample_i, axis=0),
+                                np.amax(sample_j, axis=0))
+        estimation_points = \
+            rng.random(size=(subsample_size, num_params)) \
+                * (sample_max - sample_min) + sample_min
+
+        kernel_i = scipy.stats.gaussian_kde(sample_i.T)
+        density_i = kernel_i(estimation_points.T)
+        kernel_j = scipy.stats.gaussian_kde(sample_j.T)
+        density_j = kernel_j(estimation_points.T)
+
+        js_ij =  scipy.spatial.distance.jensenshannon(density_i, density_j)
+        if np.isnan(js_ij):
+            js_dists[i, j] = js_dists[j, i] = 1.0
+        else:
+            js_dists[i, j] = js_dists[j, i] = js_ij
+
+    return js_dists

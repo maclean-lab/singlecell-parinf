@@ -46,7 +46,7 @@ print(high_corr_only_genes)
 
 # %%
 # make Venn diagram
-plt.figure(figsize=(6, 4), dpi=300)
+plt.figure(figsize=(4, 2), dpi=300)
 v_handle = venn2([high_mi_genes, high_corr_genes],
                  set_labels=['MI gene-gene pairs','Gene-param pairs'])
 

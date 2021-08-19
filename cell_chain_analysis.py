@@ -6,13 +6,16 @@ import math
 import json
 import numpy as np
 import scipy.io
+import scipy.stats
 import pandas as pd
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from tqdm import tqdm
 
 from stan_helpers import StanSessionAnalyzer, StanMultiSessionAnalyzer, \
-    load_trajectories, simulate_trajectory, get_mode_continuous_rv
+    load_trajectories, get_trajectory_derivatives, simulate_trajectory, \
+    get_mode_continuous_rv
 import calcium_models
 
 working_dir = os.path.dirname(os.path.realpath(__file__))
@@ -38,8 +41,8 @@ stan_run = 'const-Be-eta1'
 # additional flags
 first_cell_order = 1
 last_cell_order = 500
-sensitive_params = ['L', 'Katp', 'KoffPLC', 'Vplc', 'Kip3', 'KoffIP3', 'eta2',
-                    'd1', 'a', 'epr', 'dinh']
+sensitive_params = ['L', 'Katp', 'KoffPLC', 'Vplc', 'Kip3', 'KoffIP3', 'a',
+                    'dinh', 'd1', 'epr', 'eta2']
 pca_sampled_only = False
 use_custom_xticks = True
 
@@ -48,12 +51,9 @@ with open('stan_run_meta.json', 'r') as f:
     stan_run_meta = json.load(f)
 
 # get parameter names
-all_param_names = ['sigma', 'KonATP', 'L', 'Katp', 'KoffPLC', 'Vplc', 'Kip3',
-                   'KoffIP3', 'a', 'dinh', 'Ke', 'Be', 'd1', 'd5', 'epr',
-                   'eta1', 'eta2', 'eta3', 'c0', 'k3']
 param_mask = stan_run_meta[stan_run]['param_mask']
-param_names = [all_param_names[i + 1] for i, mask in enumerate(param_mask)
-               if mask == "1"]
+param_names = [calcium_models.param_names[i + 1]
+               for i, mask in enumerate(param_mask) if mask == "1"]
 param_names = ['sigma'] + param_names
 num_params = len(param_names)
 # select_params = 'd5', 'eta2', 'KoffIP3', 'k3', 'epr', 'KoffPLC', 'Katp'
@@ -69,8 +69,8 @@ cell_list = full_cell_list.iloc[first_cell_order:last_cell_order + 1, :]
 # get directories for sampled cells, as well as output of analysis
 output_root = os.path.join(
     '../../result', stan_run_meta[stan_run]['output_dir'])
-output_dir = f'multi-sample-analysis-{first_cell_order:04d}' + \
-    f'-{last_cell_order:04d}'
+output_dir = \
+    f'multi-sample-analysis-{first_cell_order:04d}-{last_cell_order:04d}'
 if pca_sampled_only:
     output_dir += '-pca-sampled-only'
 output_dir = os.path.join(output_root, output_dir)
@@ -81,8 +81,11 @@ session_dirs = [os.path.join(output_root, sd) for sd in session_dirs]
 # load calcium trajectories
 ode_variant = stan_run_meta[stan_run]['ode_variant']
 calcium_ode = getattr(calcium_models, f'calcium_ode_{ode_variant}')
-y_all, y0_all, ts = load_trajectories(200, filter_type='moving_average',
-    moving_average_window=20, downsample_offset=300)
+t0 = 200
+t_downsample = 300
+y_all, y0_all, ts = load_trajectories(t0, filter_type='moving_average',
+    moving_average_window=20, downsample_offset=t_downsample)
+y_prime, _ = get_trajectory_derivatives(t0, downsample_offset=t_downsample)
 
 # get similarity matrix
 soptsc_vars = scipy.io.loadmat(
@@ -101,6 +104,10 @@ print('Initializing the analyzer for root cell...')
 root_output_dir = os.path.join(
     '../../result', stan_run_meta[stan_run]['root_cell_dir'])
 root_analyzer = StanSessionAnalyzer(root_output_dir, param_names=param_names)
+
+# change font settings
+matplotlib.rcParams['font.sans-serif'] = ['Arial']
+matplotlib.rcParams['font.size'] = 16
 
 # set ticks on x-axis for plots
 if use_custom_xticks:
@@ -213,19 +220,20 @@ plot_trajectories_pdf(y_mode, mode_traj_path, titles=mixed_cells)
 
 # %%
 # sensitivity test
-use_mode = True
+use_mode = False
 sensitivity_dir = 'sensitivity-test'
 if use_mode:
     sensitivity_dir += '-mode'
 sensitivity_dir = os.path.join(output_root, sensitivity_dir)
 if not os.path.exists(sensitivity_dir):
     os.mkdir(sensitivity_dir)
+# temporarily change output directory
+analyzer.output_dir = sensitivity_dir
 
 figure_paths = []
 for i, cell in enumerate(mixed_cells):
     cell_order = first_cell_order + i
-    chain_fp = os.path.join(sensitivity_dir, f'{cell_order:04d}_cell_{cell}')
-    figure_paths.append(chain_fp)
+    figure_paths.append(f'{cell_order:04d}_cell_{cell}')
 
 y0_run = np.zeros((num_mixed_cells, 4))
 y0_run[:, 2] = 0.7
@@ -233,59 +241,131 @@ y0_run[:, 3] = y0_all[mixed_cells]
 y_run = y_all[mixed_cells, :]
 
 if use_mode:
-    sensitivity_dists = analyzer.run_sensitivity_test(
+    analyzer.run_sensitivity_test(
         calcium_ode, 0, ts, y0_run, y_run, 3, sensitive_params, method='mode',
-        figure_size=(6, 4), output_path_prefixes=figure_paths,
+        figure_size=(4, 4), figure_path_prefixes=figure_paths,
+        param_names_on_plot=calcium_models.params_on_plot,
         method_kwargs={'method': 'histogram'})
 else:
-    sensitivity_dists = analyzer.run_sensitivity_test(
+    analyzer.run_sensitivity_test(
         calcium_ode, 0, ts, y0_run, y_run, 3, sensitive_params,
-        figure_size=(6, 4), output_path_prefixes=figure_paths)
-sensitivity_dists.to_csv(os.path.join(sensitivity_dir, 'sensitivity_dists.csv'))
+        figure_size=(4, 4), figure_path_prefixes=figure_paths,
+        param_names_on_plot=calcium_models.params_on_plot)
+
+# reset output directory
+analyzer.output_dir = output_dir
+
+# %%
+# visualize stats from sensitivity test
+sensitivity_dir = 'sensitivity-test'
+sensitivity_dir = os.path.join(output_root, sensitivity_dir)
+sensitivity_stats = {}
+test_quantiles = [0.01, 0.99]
+
+for param, qt in itertools.product(sensitive_params, test_quantiles):
+    stats_path = os.path.join(sensitivity_dir, f'{param}_{qt}_stats.csv')
+    sensitivity_stats[(param, qt)] = pd.read_csv(stats_path, index_col=0)
+
+    # trajectory distances
+    figure_path = os.path.join(sensitivity_dir, f'{param}_{qt}_traj_dists.pdf')
+    plt.figure(figsize=(11, 8.5), dpi=300)
+    plt.hist(sensitivity_stats[(param, qt)]['MeanTrajDist'])
+    plt.savefig(figure_path)
+    plt.close()
+
+    # differences in peak
+    figure_path = os.path.join(sensitivity_dir, f'{param}_{qt}_peak_diffs.pdf')
+    plt.figure(figsize=(11, 8.5), dpi=300)
+    plt.hist(sensitivity_stats[(param, qt)]['MeanPeakDiff'])
+    plt.savefig(figure_path)
+    plt.close()
+
+    # fold changes in peak
+    figure_path = os.path.join(sensitivity_dir,
+                               f'{param}_{qt}_peak_fold_changes.pdf')
+    plt.figure(figsize=(11, 8.5), dpi=300)
+    plt.hist(sensitivity_stats[(param, qt)]['MeanPeakFoldChange'])
+    plt.savefig(figure_path)
+    plt.close()
+
+    # differences in steady state
+    figure_path = os.path.join(sensitivity_dir,
+                               f'{param}_{qt}_steady_diffs.pdf')
+    plt.figure(figsize=(11, 8.5), dpi=300)
+    plt.hist(sensitivity_stats[(param, qt)]['MeanSteadyDiff'])
+    plt.savefig(figure_path)
+    plt.close()
+
+    # differences in steady state
+    figure_path = os.path.join(sensitivity_dir,
+                               f'{param}_{qt}_steady_fold_changes.pdf')
+    plt.figure(figsize=(11, 8.5), dpi=300)
+    plt.hist(sensitivity_stats[(param, qt)]['MeanSteadyFoldChange'])
+    plt.savefig(figure_path)
+    plt.close()
 
 # %%
 # gather stats for trajectory distances from sensitivity test
-sensitivity_dist_stats = pd.DataFrame(index=sensitivity_dists.columns,
-                                      columns=['Mean', 'Std', 'Mode'])
+test_quantiles = [0.01, 0.99]
+sensitivity_dist_stats = pd.DataFrame(
+    columns=['Mean', 'Std', 'Mode', 'Quantile_0.75'])
 
-for col_name, col in sensitivity_dists.items():
+for param, qt in itertools.product(sensitive_params, test_quantiles):
+    param_qt = f'{param}_{qt}'
+    stats_path = os.path.join(sensitivity_dir, f'{param_qt}_stats.csv')
+    stats = pd.read_csv(stats_path, index_col=0)
+    mean_traj_dist = stats['MeanTrajDist']
+
     # calculate stats for the param-percentile combo
-    sensitivity_dist_stats.loc[col_name, 'Mean'] = col.mean()
-    sensitivity_dist_stats.loc[col_name, 'Std'] = col.std()
-    sensitivity_dist_stats.loc[col_name, 'Mode'] = \
-        get_mode_continuous_rv(col, method='histogram')
+    sensitivity_dist_stats.loc[param_qt, 'Mean'] = mean_traj_dist.mean()
+    sensitivity_dist_stats.loc[param_qt, 'Std'] = mean_traj_dist.std()
+    sensitivity_dist_stats.loc[param_qt, 'Mode'] = \
+        get_mode_continuous_rv(mean_traj_dist, method='histogram')
+    sensitivity_dist_stats.loc[param_qt, 'Quantile_0.75'] = \
+        mean_traj_dist.quantile(0.75)
 
     # make a histogram for trajectory distances
-    figure_path = os.path.join(sensitivity_dir, f'{col_name}_hist.pdf')
+    figure_path = os.path.join(sensitivity_dir, f'{param_qt}_hist.pdf')
     plt.figure(figsize=(11, 8.5), dpi=300)
-    plt.hist(col, bins=20)
+    plt.hist(mean_traj_dist, bins=20)
     plt.savefig(figure_path)
     plt.close()
 
 sensitivity_dist_stats.to_csv(
     os.path.join(sensitivity_dir, 'sensitivity_dist_stats.csv'))
 
+# %%
 # make a heatmap for modes of trajectory distances
+sensitivity_dist_stats = pd.read_csv(
+    os.path.join(sensitivity_dir, 'sensitivity_dist_stats.csv'), index_col=0)
+test_quantiles = [0.01, 0.99]
 sensitivity_dist_modes = pd.DataFrame(index=sensitive_params,
-                                      columns=[0.01, 0.99], dtype=float)
-for param, pct in itertools.product(sensitive_params, [0.01, 0.99]):
-    sensitivity_dist_modes.loc[param, pct] = \
-        sensitivity_dist_stats.loc[f'{param}_{pct}', 'Mode']
+                                      columns=test_quantiles, dtype=float)
+sensitivity_dist_pct75 = pd.DataFrame(index=sensitive_params,
+                                      columns=test_quantiles, dtype=float)
+for param, qt in itertools.product(sensitive_params, test_quantiles):
+    sensitivity_dist_modes.loc[param, qt] = \
+        sensitivity_dist_stats.loc[f'{param}_{qt}', 'Mode']
+    sensitivity_dist_pct75.loc[param, qt] = \
+        sensitivity_dist_stats.loc[f'{param}_{qt}', 'Quantile_0.75']
 
 figure_path = os.path.join(sensitivity_dir,
                            'sensitivity_dist_modes_heatmap.pdf')
-plt.figure(figsize=(8.5, 11), dpi=300)
+plt.figure(figsize=(2.5, 7), dpi=300)
 ax = plt.gca()
 heatmap = ax.imshow(sensitivity_dist_modes, vmin=0)
 ax.set_xticks(np.arange(2))
-ax.set_xticklabels([0.01, 0.99])
+ax.set_xticklabels(test_quantiles)
 ax.set_yticks(np.arange(len(sensitive_params)))
-ax.set_yticklabels(sensitive_params)
+ax.set_yticklabels(
+    [calcium_models.params_on_plot[p] for p in sensitive_params])
 # draw text on each block
 for i, j in itertools.product(range(len(sensitive_params)), range(2)):
-    ax.text(j, i, f'{sensitivity_dist_modes.iloc[i, j]:.2f}', ha='center',
+    mode = sensitivity_dist_modes.iloc[i, j]
+    pct75 = sensitivity_dist_pct75.iloc[i, j]
+    ax.text(j, i, f'{mode:.2f}\n({pct75:.2f})', ha='center',
             va='center', color='w')
-plt.colorbar(heatmap, shrink=0.3)
+# plt.colorbar(heatmap, shrink=0.3)
 plt.tight_layout()
 plt.savefig(figure_path)
 plt.close()
@@ -376,7 +456,7 @@ for i, cell in enumerate(mixed_cells[1:]):
             y_all[cell, :], 3)
 
 traj_dist_path = os.path.join(output_dir, 'mean_trajectory_distances.csv')
-traj_dist_tables = pd.read_csv(traj_dist_path, index_col=0, header=None,
+traj_stat_tables = pd.read_csv(traj_dist_path, index_col=0, header=None,
                          squeeze=True)
 
 # %%
@@ -392,13 +472,13 @@ plt.close()
 figure_path = os.path.join(
     output_dir, 'mean_trajectory_distances_sampled_vs_prediction.pdf')
 plt.figure(figsize=(11, 8.5), dpi=300)
-plt.violinplot([traj_dist_tables, traj_pred_dists])
+plt.violinplot([traj_stat_tables, traj_pred_dists])
 plt.xticks(ticks=[1, 2], labels=['From posterior', 'From prior'])
 plt.savefig(figure_path)
 plt.close()
 
 # histogram of sampled vs predicted
-traj_dist_diffs = traj_pred_dists - traj_dist_tables
+traj_dist_diffs = traj_pred_dists - traj_stat_tables
 figure_path = os.path.join(
     output_dir, 'mean_trajectory_distances_sampled_vs_prediction_diff.pdf')
 plt.figure(figsize=(11, 8.5), dpi=300)
@@ -409,15 +489,18 @@ plt.close()
 # %%
 def predict_unsampled(num_unsampled, num_sampled, figure_dir,
                       use_similar_cell=True, sample_marginal=False,
-                      random_seed=0):
+                      random_seed=0, plot_traj=False):
     bit_generator = np.random.MT19937(random_seed)
     rng = np.random.default_rng(bit_generator)
     unsampled_cells = full_cell_list.loc[last_cell_order + 1:, 'Cell']
     unsampled_cells = unsampled_cells.sample(n=num_unsampled,
                                              random_state=bit_generator)
     sampled_cell_list = cell_list.loc[:num_sampled, 'Cell'].to_numpy()
-    traj_dist_table = pd.DataFrame(index=range(num_unsampled),
-                                   columns=['Cell', 'SampledCell', 'Distance'])
+    traj_stats_table = pd.DataFrame(
+        index=range(num_unsampled),
+        columns=['Cell', 'SampledCell', 'Distance', 'PeakDiff',
+                 'PeakFoldChange', 'PeakTimeDiff', 'SteadyDiff',
+                 'SteadyFoldChange', 'DerivativeDist'])
 
     for cell_idx, cell in enumerate(tqdm(unsampled_cells)):
         if use_similar_cell:
@@ -469,24 +552,59 @@ def predict_unsampled(num_unsampled, num_sampled, figure_dir,
                 [traj_pred[c][:, : ,3] for c in mixed_chains])
 
         # plot predicted trajectories
-        figure_name = f'{cell:04d}_{num_sampled}_{sampled_cell:04d}'
-        if sample_marginal:
-            figure_name += '_marginal'
-        figure_name += '.pdf'
-        figure_path = os.path.join(figure_dir, figure_name)
-        plt.figure()
-        plt.plot(ts, traj_pred.T, color='C0')
-        plt.plot(ts, y_cell, 'ko', fillstyle='none')
-        plt.savefig(figure_path)
-        plt.close()
+        if plot_traj:
+            figure_name = f'{cell:04d}_{num_sampled}_{sampled_cell:04d}'
+            if sample_marginal:
+                figure_name += '_marginal'
+            figure_name += '.pdf'
+            figure_path = os.path.join(figure_dir, figure_name)
+            plt.figure()
+            plt.plot(ts, traj_pred.T, color='C0')
+            plt.plot(ts, y_cell, 'ko', fillstyle='none')
+            plt.savefig(figure_path)
+            plt.close()
 
-        # get trajectory distances
+        # get stats of predicted trajectories
+        traj_stats_table.loc[cell_idx, 'Cell'] = cell
+        traj_stats_table.loc[cell_idx, 'SampledCell'] = sampled_cell
+
+        # trajectory distances
         traj_dist = np.mean(np.linalg.norm(traj_pred - y_cell, axis=1))
-        traj_dist_table.loc[cell_idx, 'Cell'] = cell
-        traj_dist_table.loc[cell_idx, 'SampledCell'] = sampled_cell
-        traj_dist_table.loc[cell_idx, 'Distance'] = traj_dist
+        traj_stats_table.loc[cell_idx, 'Distance'] = traj_dist
 
-    return traj_dist_table
+        # peaks
+        traj_ref_peak = np.amax(y_cell)
+        traj_pred_peaks = np.amax(traj_pred, axis=1)
+        traj_peak_diffs = traj_pred_peaks - traj_ref_peak
+        traj_stats_table.loc[cell_idx, 'PeakDiff'] = np.mean(traj_peak_diffs)
+        traj_peak_fold_changes = np.log2(traj_pred_peaks / traj_ref_peak)
+        traj_stats_table.loc[cell_idx, 'PeakFoldChange'] = \
+            np.mean(traj_peak_fold_changes)
+        traj_ref_peak_time = np.amax(y_cell[:100])
+        traj_pred_peak_times = np.amax(traj_pred[:, :100], axis=1)
+        traj_stats_table.loc[cell_idx, 'PeakTimeDiff'] = \
+            np.mean(traj_pred_peak_times - traj_ref_peak_time)
+
+        # steady states
+        num_steady_pts = ts.size // 5
+        traj_ref_steady_state = np.mean(y_cell[-num_steady_pts:])
+        traj_pred_steady_states = np.mean(traj_pred[:, -num_steady_pts:],
+                                          axis=1)
+        traj_steady_diffs = traj_pred_steady_states - traj_ref_steady_state
+        traj_stats_table.loc[cell_idx, 'SteadyDiff'] = \
+            np.mean(traj_steady_diffs)
+        traj_steady_fold_changes = \
+            np.log2(traj_pred_steady_states / traj_ref_steady_state)
+        traj_stats_table.loc[cell_idx, 'SteadyFoldChange'] = \
+            np.mean(traj_steady_fold_changes)
+
+        # L^2 distances between derivatives
+        traj_prime = np.gradient(traj_pred[:, :100], axis=1)
+        traj_prime_dist = np.mean(
+            np.linalg.norm(traj_prime - y_prime[cell, :100], axis=1))
+        traj_stats_table.loc[cell_idx, 'DerivativeDist'] = traj_prime_dist
+
+    return traj_stats_table
 
 # %%
 # predict unsampled cells using similar or random cells
@@ -497,36 +615,32 @@ unsampled_pred_dir = os.path.join(
 if not os.path.exists(unsampled_pred_dir):
     os.mkdir(unsampled_pred_dir)
 
-unsampled_traj_dists = {}
-unsampled_traj_dists['similar'] = {}
-unsampled_traj_dists['random'] = {}
-unsampled_traj_dists['marginal'] = {}
+unsampled_traj_stats = {}
+unsampled_traj_stats['similar'] = {}
+unsampled_traj_stats['random'] = {}
+unsampled_traj_stats['marginal'] = {}
 num_sampled_for_prediction = [500, 400, 300, 200, 100]
 
-# %%
 for n in num_sampled_for_prediction:
-    unsampled_traj_dists['similar'][n] = predict_unsampled(
+    unsampled_traj_stats['similar'][n] = predict_unsampled(
         num_unsampled, n, unsampled_pred_dir, random_seed=rng_seed)
-    table_path = os.path.join(
-        unsampled_pred_dir,
-        f'mean_trajectory_distances_prediction_unsampled_similar_{n}.csv')
-    unsampled_traj_dists['similar'][n].to_csv(table_path)
+    table_path = os.path.join(unsampled_pred_dir,
+                              f'trajectory_stats_similar_{n}.csv')
+    unsampled_traj_stats['similar'][n].to_csv(table_path)
 
-    unsampled_traj_dists['random'][n] = predict_unsampled(
+    unsampled_traj_stats['random'][n] = predict_unsampled(
         num_unsampled, n, unsampled_pred_dir, use_similar_cell=False,
         random_seed=rng_seed)
-    table_path = os.path.join(
-        unsampled_pred_dir,
-        f'mean_trajectory_distances_prediction_unsampled_random_{n}.csv')
-    unsampled_traj_dists['random'][n].to_csv(table_path)
+    table_path = os.path.join(unsampled_pred_dir,
+                              f'trajectory_stats_random_{n}.csv')
+    unsampled_traj_stats['random'][n].to_csv(table_path)
 
-    unsampled_traj_dists['marginal'][n] = predict_unsampled(
+    unsampled_traj_stats['marginal'][n] = predict_unsampled(
         num_unsampled, n, unsampled_pred_dir, use_similar_cell=False,
         sample_marginal=True, random_seed=rng_seed)
-    table_path = os.path.join(
-        unsampled_pred_dir,
-        f'mean_trajectory_distances_prediction_unsampled_marginal_{n}.csv')
-    unsampled_traj_dists['marginal'][n].to_csv(table_path)
+    table_path = os.path.join(unsampled_pred_dir,
+                              f'trajectory_stats_marginal_{n}.csv')
+    unsampled_traj_stats['marginal'][n].to_csv(table_path)
 
 # %%
 # predict using lemon prior
@@ -535,11 +649,14 @@ def predict_unsampled_lemon(num_unsampled, random_seed=0):
     unsampled_cells = full_cell_list.loc[last_cell_order + 1:, 'Cell']
     unsampled_cells = unsampled_cells.sample(n=num_unsampled,
                                              random_state=bit_generator)
-    traj_dist_table = pd.DataFrame(index=range(num_unsampled),
-                                   columns=['Cell', 'SampledCell', 'Distance'])
+    traj_stats_table = pd.DataFrame(
+        index=range(num_unsampled),
+        columns=['Cell', 'SampledCell', 'Distance', 'PeakDiff',
+                 'PeakFoldChange', 'SteadyDiff', 'SteadyFoldChange',
+                 'DerivativeDist'])
 
     lemon_prior_spec_path = os.path.join('stan_models', ode_variant,
-                                        'calcium_model_alt_prior.txt')
+                                         'calcium_model_alt_prior.txt')
     lemon_prior_spec = pd.read_csv(lemon_prior_spec_path, delimiter='\t',
                                 index_col=0)
     lemon_prior = lemon_prior_spec['mu'].to_numpy()
@@ -547,129 +664,287 @@ def predict_unsampled_lemon(num_unsampled, random_seed=0):
     for cell_idx, cell in enumerate(tqdm(unsampled_cells)):
         traj_pred = simulate_trajectory(calcium_ode, lemon_prior, 0, ts,
                                         np.array([0, 0, 0.7, y0_all[cell]]))
-        traj_dist = np.linalg.norm(traj_pred[:, 3] - y_all[cell, :])
+        traj_pred = traj_pred[:, 3]
+        y_cell = y_all[cell, :]
 
-        traj_dist_table.loc[cell_idx, 'Cell'] = cell
-        traj_dist_table.loc[cell_idx, 'SampledCell'] = 'Lemon'
-        traj_dist_table.loc[cell_idx, 'Distance'] = traj_dist
+        # get stats of predicted trajectories
+        traj_stats_table.loc[cell_idx, 'Cell'] = cell
+        traj_stats_table.loc[cell_idx, 'SampledCell'] = 'Lemon'
+        traj_dist = np.linalg.norm(traj_pred - y_cell)
+        traj_stats_table.loc[cell_idx, 'Distance'] = traj_dist
+        # peaks
+        traj_ref_peak = np.amax(y_cell)
+        traj_pred_peaks = np.amax(traj_pred)
+        traj_peak_diffs = traj_pred_peaks - traj_ref_peak
+        traj_stats_table.loc[cell_idx, 'PeakDiff'] = traj_peak_diffs
+        traj_peak_fold_changes = traj_pred_peaks / traj_ref_peak
+        if traj_peak_fold_changes < 1:
+            traj_peak_fold_changes = -1 / traj_peak_fold_changes
+        traj_stats_table.loc[cell_idx, 'PeakFoldChange'] = \
+            traj_peak_fold_changes
+        # steady states
+        num_steady_pts = ts.size // 5
+        traj_ref_steady_state = np.mean(y_cell[-num_steady_pts:])
+        traj_pred_steady_states = np.mean(traj_pred[-num_steady_pts:])
+        traj_steady_diffs = traj_pred_steady_states - traj_ref_steady_state
+        traj_stats_table.loc[cell_idx, 'SteadyDiff'] = traj_steady_diffs
+        traj_steady_fold_changes = \
+            traj_pred_steady_states / traj_ref_steady_state
+        if traj_steady_fold_changes < 1:
+            traj_steady_fold_changes = -1 / traj_steady_fold_changes
+        traj_stats_table.loc[cell_idx, 'SteadyFoldChange'] = \
+            traj_steady_fold_changes
 
-    return traj_dist_table
+    return traj_stats_table
 
 # %%
-unsampled_traj_dists['lemon'] = predict_unsampled_lemon(
+unsampled_traj_stats['lemon'] = predict_unsampled_lemon(
     num_unsampled, random_seed=rng_seed)
-table_path = os.path.join(
-    unsampled_pred_dir,
-    f'mean_trajectory_distances_prediction_unsampled_lemon.csv')
-unsampled_traj_dists['lemon'].to_csv(table_path)
+table_path = os.path.join(unsampled_pred_dir, f'trajectory_stats_lemon.csv')
+unsampled_traj_stats['lemon'].to_csv(table_path)
 
 # %%
-# load existing trajectory distance tables if necessary
+# load saved statistics if necessary
 rng_seed = 0
 num_unsampled = 500
 unsampled_pred_dir = os.path.join(
     output_root, f'prediction-unsampled-{num_unsampled}-{rng_seed}')
-unsampled_traj_dists = {}
-unsampled_traj_dists['similar'] = {}
-unsampled_traj_dists['random'] = {}
-unsampled_traj_dists['marginal'] = {}
+unsampled_traj_stats = {}
+unsampled_traj_stats['similar'] = {}
+unsampled_traj_stats['random'] = {}
+unsampled_traj_stats['marginal'] = {}
 num_sampled_for_prediction = [500, 400, 300, 200, 100]
 
 # load distances from 'similar', 'random', 'marginal'
 for n in num_sampled_for_prediction:
-    for method in unsampled_traj_dists:
-        table_path = os.path.join(
-            unsampled_pred_dir,
-            f'mean_trajectory_distances_prediction_unsampled_{method}_{n}.csv')
-        unsampled_traj_dists[method][n] = pd.read_csv(table_path, index_col=0)
+    for method in unsampled_traj_stats:
+        table_path = os.path.join(unsampled_pred_dir,
+                                  f'trajectory_stats_{method}_{n}.csv')
+        unsampled_traj_stats[method][n] = pd.read_csv(table_path, index_col=0)
 
 # load distances from 'lemon'
-table_path = os.path.join(
-    unsampled_pred_dir,
-    f'mean_trajectory_distances_prediction_unsampled_lemon.csv')
-unsampled_traj_dists['lemon'] = pd.read_csv(table_path)
+table_path = os.path.join(unsampled_pred_dir, f'trajectory_stats_lemon.csv')
+unsampled_traj_stats['lemon'] = pd.read_csv(table_path)
 
 # %%
-for method, traj_dist_tables in unsampled_traj_dists.items():
+# plot stats for predictions
+prediction_methods = ['similar', 'random', 'marginal', 'lemon']
+stats_names = ['Distance', 'PeakDiff', 'PeakFoldChange', 'PeakTimeDiff',
+               'SteadyDiff', 'SteadyFoldChange', 'DerivativeDist']
+stats_fig_names = ['mean_trajectory_distances', 'mean_peak_diffs',
+                   'mean_peak_fold_changes', 'peak_time_diff',
+                   'mean_steady_diffs', 'mean_steady_fold_changes',
+                   'mean_derivative_distances']
+stats_xlabels = ['Mean trajectory distance', 'Mean peak difference',
+                 'Mean peak fold change', 'Man peak time difference',
+                 'Mean steady state difference',
+                 'Mean steady state fold change',
+                 'Mean first derivative distance']
+
+prediction_stats_summary = {}
+for method in prediction_methods[:-1]:
+    prediction_stats_summary[method] = {}
+    for n in num_sampled_for_prediction:
+        prediction_stats_summary[method][n] = pd.DataFrame(
+            columns=['Mean', 'StdDev', 'Median'], index=stats_names)
+
+for method, traj_stat_tables in unsampled_traj_stats.items():
     if method == 'lemon':
-        # make histogram of trajectory distances from prediction of unsampled
-        # cells
-        figure_path = os.path.join(
-            unsampled_pred_dir,
-            'mean_trajectory_distances_prediction_unsampled_lemon.pdf')
-        plt.figure(figsize=(11, 8.5), dpi=300)
-        plt.hist(traj_dist_tables['Distance'], bins=20)
-        plt.savefig(figure_path)
-        plt.close()
+        # make histogram for prediction stats
+        for i in range(len(stats_names)):
+            if stats_names[i] not in ['PeakTimeDiff', 'DerivativeDist']:
+                figure_path = os.path.join(
+                    unsampled_pred_dir,
+                    f'{stats_fig_names[i]}_prediction_unsampled_lemon.pdf')
+                plt.figure(figsize=(6, 4), dpi=300)
+                plt.hist(traj_stat_tables[stats_names[i]], bins=20)
+                plt.xlabel(stats_xlabels[i])
+                plt.ylabel('Number of cells')
+                plt.tight_layout()
+                plt.savefig(figure_path)
+                plt.close()
     else:
         for n in num_sampled_for_prediction:
-            # make histogram of trajectory distances from prediction of
-            # unsampled cells
-            figure_path = os.path.join(
-                unsampled_pred_dir,
-                'mean_trajectory_distances_prediction_unsampled_'
-                    + f'{method}_{n}.pdf')
-            plt.figure(figsize=(11, 8.5), dpi=300)
-            plt.hist(traj_dist_tables[n]['Distance'], bins=20)
-            plt.savefig(figure_path)
-            plt.close()
+            for i, stat in enumerate(stats_names):
+                # get summary for prediction stats
+                prediction_stats_summary[method][n].loc[stat, 'Mean'] = \
+                    traj_stat_tables[n][stat].mean()
+                prediction_stats_summary[method][n].loc[stat, 'StdDev'] = \
+                    traj_stat_tables[n][stat].std()
+                prediction_stats_summary[method][n].loc[stat, 'Median'] = \
+                    traj_stat_tables[n][stat].std()
+
+                # make histogram for prediction stats
+                figure_path = os.path.join(
+                    unsampled_pred_dir,
+                    f'{stats_fig_names[i]}_prediction_unsampled_{method}'
+                        + f'_{n}.pdf')
+                plt.figure(figsize=(6, 4), dpi=300)
+                plt.hist(traj_stat_tables[n][stat], bins=20)
+                plt.xlabel(stats_xlabels[i])
+                plt.ylabel('Number of cells')
+                plt.tight_layout()
+                plt.savefig(figure_path)
+                plt.close()
+
+            # export summary for prediction stats
+            summary_path = os.path.join(
+                unsampled_pred_dir, f'stats_summary_{method}_{n}.csv')
+            prediction_stats_summary[method][n].to_csv(summary_path)
 
             # make histogram of similarity
             figure_path = os.path.join(
                 unsampled_pred_dir, f'unsampled_{method}_similarity_{n}.pdf')
-            plt.figure(figsize=(11, 8.5), dpi=300)
+            plt.figure(figsize=(6, 4), dpi=300)
             similarity = [similarity_matrix[row.Cell, row.SampledCell]
-                        for row in traj_dist_tables[n].itertuples()]
+                          for row in traj_stat_tables[n].itertuples()]
             plt.hist(similarity)
+            plt.tight_layout()
             plt.savefig(figure_path)
             plt.close()
 
+# make histogram for multiple stats in the same figure
 for n in num_sampled_for_prediction:
-    figure_path = os.path.join(
-        unsampled_pred_dir,
-        f'mean_trajectory_distances_prediction_unsampled_{n}.pdf')
-    plt.figure(figsize=(11, 8.5), dpi=300)
-    for method, traj_dist_tables in unsampled_traj_dists.items():
-        if method == 'lemon':
-            plt.hist(traj_dist_tables['Distance'], bins=20, range=(0, 40),
-                     alpha=0.5, label=method)
-        else:
-            plt.hist(traj_dist_tables[n]['Distance'], bins=20, range=(0, 40),
-                     alpha=0.5, label=method)
-    plt.legend()
-    plt.savefig(figure_path)
-    plt.close()
+    for i in range(len(stats_names)):
+        # plot all methods together
+        if stats_names[i] not in ['PeakTimeDiff', 'DerivativeDist']:
+            figure_path = os.path.join(
+                unsampled_pred_dir,
+                f'{stats_fig_names[i]}_prediction_unsampled_{n}.pdf')
+            plt.figure(figsize=(6, 4), dpi=300)
+            # gather data
+            traj_plot_stats = [unsampled_traj_stats[method][n][stats_names[i]]
+                            for method in prediction_methods[:-1]]
+            traj_plot_stats = np.vstack(traj_plot_stats)
+            traj_plot_stats = np.vstack([
+                traj_plot_stats, unsampled_traj_stats['lemon'][stats_names[i]]])
+            traj_plot_stats = traj_plot_stats.T
+            plt.hist(traj_plot_stats, label=prediction_methods, bins=20)
+            # for method, traj_stat_tables in unsampled_traj_stats.items():
+            #     if method == 'similar':
+            #         zorder = 3
+            #     elif method == 'random':
+            #         zorder = 2
+            #     else:
+            #         zorder = 1
+
+            #     if method == 'lemon':
+            #         plt.hist(traj_stat_tables[stats_names[i]], bins=20, alpha=0.5,
+            #                  label=method.capitalize())
+            #     else:
+            #         plt.hist(traj_stat_tables[n][stats_names[i]],bins=20,
+            #                  alpha=0.5, label=method.capitalize(),
+            #                  zorder=zorder)
+            plt.legend()
+            plt.xlabel(stats_xlabels[i])
+            plt.ylabel('Number of cells')
+            plt.tight_layout()
+            plt.savefig(figure_path)
+            plt.close()
+
+        # plot similar vs random
+        figure_path = os.path.join(
+            unsampled_pred_dir,
+            f'{stats_fig_names[i]}_prediction_unsampled_similar_vs_' +
+            f'random_{n}.pdf')
+        plt.figure(figsize=(6, 4), dpi=300)
+        traj_plot_stats = [unsampled_traj_stats[method][n][stats_names[i]]
+                           for method in prediction_methods[:2]]
+        traj_plot_stats = np.vstack(traj_plot_stats)
+        traj_plot_stats = traj_plot_stats.T
+        plt.hist(traj_plot_stats, label=prediction_methods[:2], bins=20)
+        # for method in ['similar', 'random']:
+        #     traj_stat_tables = unsampled_traj_stats[method]
+        #     if method == 'similar':
+        #         zorder = 3
+        #     else:
+        #         zorder = 2
+
+        #     plt.hist(traj_stat_tables[n][stats_names[i]], bins=20, alpha=0.5,
+        #              label=method.capitalize(), zorder=zorder)
+        plt.legend()
+        plt.xlabel(stats_xlabels[i])
+        plt.ylabel('Number of cells')
+        plt.tight_layout()
+        plt.savefig(figure_path)
+        plt.close()
+
+        # plot similar vs marginal and lemon
+        if stats_names[i] not in ['PeakTimeDiff', 'DerivativeDist']:
+            figure_path = os.path.join(
+                unsampled_pred_dir,
+                f'{stats_fig_names[i]}_prediction_unsampled_similar_vs_' +
+                f'others_{n}.pdf')
+            plt.figure(figsize=(6, 4), dpi=300)
+            traj_plot_stats = [unsampled_traj_stats[method][n][stats_names[i]]
+                               for method in ['similar', 'marginal']]
+            traj_plot_stats = np.vstack(traj_plot_stats)
+            traj_plot_stats = np.vstack([
+                traj_plot_stats, unsampled_traj_stats['lemon'][stats_names[i]]])
+            traj_plot_stats = traj_plot_stats.T
+            plt.hist(traj_plot_stats, label=['similar', 'marginal', 'lemon'],
+                    bins=20)
+            # for method in ['similar', 'marginal', 'lemon']:
+            #     traj_stat_tables = unsampled_traj_stats[method]
+
+            #     if method == 'similar':
+            #         zorder = 3
+            #     else:
+            #         zorder = 2
+
+            #     if method == 'lemon':
+            #         plt.hist(traj_stat_tables[stats_names[i]], bins=20, alpha=0.5,
+            #                  label=method.capitalize())
+            #     else:
+            #         plt.hist(traj_stat_tables[n][stats_names[i]], bins=20,
+            #                  alpha=0.5, label=method.capitalize(),
+            #                  zorder=zorder)
+            plt.legend()
+            plt.xlabel(stats_xlabels[i])
+            plt.ylabel('Number of cells')
+            plt.tight_layout()
+            plt.savefig(figure_path)
+            plt.close()
 
     # make scatter plots for similarity vs trajectory distances
-    figure_path = os.path.join(unsampled_pred_dir,
-                            f'similarity_vs_traj_dists_{n}.pdf')
-    plt.figure(figsize=(11, 8.5))
-    for method, traj_dist_tables in unsampled_traj_dists.items():
-        if method == 'lemon':
-            continue
+    # figure_path = os.path.join(unsampled_pred_dir,
+    #                         f'similarity_vs_traj_dists_{n}.pdf')
+    # plt.figure(figsize=(6, 4))
+    # for method, traj_dist_tables in unsampled_traj_dists.items():
+    #     if method == 'lemon':
+    #         continue
 
-        similarity = [similarity_matrix[row.Cell, row.SampledCell]
-                    for row in traj_dist_tables[n].itertuples()]
-        plt.scatter(similarity, traj_dist_tables[n]['Distance'],
-                    alpha=0.5, label=method)
-    plt.legend()
-    plt.savefig(figure_path)
-    plt.close()
+    #     similarity = [similarity_matrix[row.Cell, row.SampledCell]
+    #                 for row in traj_dist_tables[n].itertuples()]
+    #     plt.scatter(similarity, traj_dist_tables[n]['Distance'],
+    #                 alpha=0.5, label=method.capitalize())
+    # plt.legend()
+    # plt.tight_layout()
+    # plt.savefig(figure_path)
+    # plt.close()
 
 # %%
 # get K-S stats
 from scipy.stats import ks_2samp
-unsampled_traj_dists_ks_stats = pd.DataFrame(columns=['Stat', 'p-value'],
-                                             index=num_sampled_for_prediction)
-for n in num_sampled_for_prediction:
-    ks, p = ks_2samp(unsampled_traj_dists['similar'][n]['Distance'],
-                     unsampled_traj_dists['random'][n]['Distance'])
-    unsampled_traj_dists_ks_stats.loc[n, 'Stat'] = ks
-    unsampled_traj_dists_ks_stats.loc[n, 'p-value'] = p
+stats_names = ['Distance', 'PeakDiff', 'PeakFoldChange', 'PeakTimeDiff',
+               'SteadyDiff', 'SteadyFoldChange', 'DerivativeDist']
+unsampled_stats_ks_stats = {}
+ks_alt_hypothesis = 'greater'
 
-unsampled_traj_dists_ks_stats_path = os.path.join(
-    unsampled_pred_dir, 'mean_trajectory_distances_similar_vs_random_ks.csv')
-unsampled_traj_dists_ks_stats.to_csv(unsampled_traj_dists_ks_stats_path)
+for n in num_sampled_for_prediction:
+    unsampled_stats_ks_stats[n] = pd.DataFrame(columns=['K-S', 'p-value'],
+                                                    index=stats_names)
+    for stat in stats_names:
+        ks, p = ks_2samp(unsampled_traj_stats['similar'][n][stat],
+                         unsampled_traj_stats['random'][n][stat],
+                         alternative=ks_alt_hypothesis)
+        unsampled_stats_ks_stats[n].loc[stat, 'K-S'] = ks
+        unsampled_stats_ks_stats[n].loc[stat, 'p-value'] = p
+
+    unsampled_stats_ks_stats_path = os.path.join(
+        unsampled_pred_dir,
+        f'trajectory_stats_similar_vs_random_{n}_ks_{ks_alt_hypothesis}.csv')
+    unsampled_stats_ks_stats[n].to_csv(unsampled_stats_ks_stats_path)
 
 # %%
 # use multiple cells to predict one cell
@@ -730,20 +1005,20 @@ traj_dist_unsampled_batch = predict_unsampled_batch(last_cell_order, 100)
 # %%
 # make histogram of trajectory distances for predicted cells
 for cell in traj_dist_unsampled_batch['Cell'].unique():
-    traj_dist_tables = traj_dist_unsampled_batch.loc[
+    traj_stat_tables = traj_dist_unsampled_batch.loc[
         traj_dist_unsampled_batch['Cell'] == cell, 'Distance']
 
     figure_path = os.path.join(unsampled_pred_dir,
                                f'{cell:04d}_trajectory_distances.pdf')
     plt.figure(figsize=(11, 8.5), dpi=300)
-    plt.hist(traj_dist_tables, range=(0, 30))
+    plt.hist(traj_stat_tables, range=(0, 30))
     plt.savefig(figure_path)
     plt.close()
 
 # %%
 # make plots for basic stats
 print('Plotting sampling time...')
-analyzer.plot_sampling_time(time_unit='m', xticks=xticks)
+analyzer.plot_sampling_time(time_unit='m', xticks=xticks, hist_range=(0, 300))
 print('Plotting mean tree depths...')
 analyzer.plot_mean_tree_depths(tree_depth_min=0, tree_depth_max=15,
                                xticks=xticks)
@@ -765,16 +1040,19 @@ mean_lps_vs_traj_dists_stats = analyzer.plot_mean_lps_vs_trajectory_distances(
 print('Plotting mean log posteriors vs R^hats...')
 mean_lps_vs_lp_rhats = analyzer.plot_mean_lps_vs_lp_rhats()
 
+# %%
 param_plot_titles = [stan_run_meta[stan_run]['pub_name']] * num_params
-print('Making violin plot of sampled parameters...')
-analyzer.plot_parameter_violin(page_size=(6, 2), num_rows=1, num_cols=1,
-                               xticks=xticks, titles=param_plot_titles,
-                               y_labels=param_names)
-print('Making ribbon plot of sampled parameters...')
-analyzer.plot_parameter_ribbon(page_size=(6, 2), num_rows=1, num_cols=1)
+# print('Making violin plot of sampled parameters...')
+# analyzer.plot_parameter_violin(page_size=(6, 2), num_rows=1, num_cols=1,
+#                                xticks=xticks, titles=param_plot_titles,
+#                                y_labels=param_names)
+# print('Making ribbon plot of sampled parameters...')
+# analyzer.plot_parameter_ribbon(page_size=(6, 2), num_rows=1, num_cols=1)
 print('Making box plot of sampled parameters...')
-analyzer.plot_parameter_box(page_size=(6, 2), num_rows=1, num_cols=1,
-                            xticks=xticks)
+analyzer.plot_parameter_box(
+    page_size=(6, 2), num_rows=1, num_cols=1, xticks=xticks,
+    titles=param_plot_titles,
+    y_labels=[calcium_models.params_on_plot[p] for p in param_names])
 
 # %%
 print('Plotting select pairs of parameters...')
@@ -786,7 +1064,8 @@ output_path_prefixes = [
     os.path.join(session_param_pairs_dir, f'{idx:04d}_cell_{session}')
     for idx, session in enumerate(analyzer.session_list)]
 analyzer.plot_param_pairs_all_sessions(
-    select_param_pairs, output_path_prefixes=output_path_prefixes)
+    select_param_pairs, output_path_prefixes=output_path_prefixes,
+    param_names_on_plot=calcium_models.params_on_plot)
 
 # %%
 analyzer.get_sample_means()
@@ -796,8 +1075,29 @@ print('Plotting select pairs of parameters...')
 # param_pair_sessions = analyzer.session_list[::50].tolist()
 param_pair_sessions =['5121', '5104', '4996', '4962', '4918', '4824', '4800',
                       '4881', '4531', '4571']
+param_plot_titles = ['Sample means'] \
+    + [f'Cell {c}' for c in param_pair_sessions]
 for pairs in select_param_pairs:
-    analyzer.plot_param_pairs(pairs, sessions=param_pair_sessions)
+    analyzer.plot_param_pairs(
+        pairs, sessions=param_pair_sessions, num_rows=1, num_cols=1,
+        page_size=(4, 4), param_names_on_plot=calcium_models.params_on_plot,
+        titles=param_plot_titles)
+
+# %%
+# make legend gene-param plot with Huber regression
+plt.figure(figsize=(2, 0.5), dpi=300)
+gradient = np.linspace(0, 1, 100)
+gradient = gradient[np.newaxis, :]
+plt.imshow(gradient, aspect=3.0, cmap=plt.get_cmap('viridis'))
+plt.axis('off')
+plt.title('Cell positions', fontdict={'fontsize': 'medium'})
+figure_path = os.path.join(
+    output_dir, 'param_pair_scatters_legend.pdf')
+plt.tight_layout()
+plt.savefig(figure_path)
+plt.close()
+
+# %%
 
 # %%
 print('Loading gene expression data and preprocessing...')
@@ -805,7 +1105,7 @@ analyzer.load_expression_data('../../data/vol_adjusted_genes_transpose.txt')
 print('Filtering sessions with extreme samples...')
 analyzer.filter_sessions(z_score_max=3.0)
 print('Plotting correlation between sampled parameters...')
-analyzer.get_parameter_correlations(plot=True)
+analyzer.get_parameter_correlations()
 
 print('Getting top genes from PCA...')
 analyzer.run_pca(sampled_only=pca_sampled_only)
@@ -832,10 +1132,171 @@ for i in range(num_top_pairs):
 regressors_trained = analyzer.run_genes_vs_params_regression(
     'huber', analyzer.top_pc_gene_list, select_pairs=high_corr_pairs)
 print('Plotting select pairs of genes and parameters...')
+scatter_kwargs = {'s': 3.0}
 analyzer.plot_select_genes_vs_params(
     high_corr_pairs, regressors_trained, 'high_corr_pairs_scatter_huber.pdf',
-    figure_size=(8, 6), num_rows=1, num_cols=1)
+    figure_size=(2.5, 2.5), num_rows=1, num_cols=1, show_corrs=False,
+    param_names_on_plot=calcium_models.params_on_plot, **scatter_kwargs)
 
 print('All done!')
 
 # %%
+# make legend gene-param plot with Huber regression
+import matplotlib.patches as mpatches
+
+plt.figure(figsize=(2.5, 1), dpi=300)
+gradient = np.linspace(0, 1, 100)
+gradient = gradient[np.newaxis, :]
+plt.imshow(gradient, aspect=3.0, cmap=plt.get_cmap('viridis'))
+plt.axis('off')
+plt.title('Cell positions', fontdict={'fontsize': 'medium'})
+legend_patches = [mpatches.Patch(color='C1', label='Huber')]
+plt.legend(legend_patches, ['Huber Regression'], loc='upper left',
+           frameon=False, bbox_to_anchor=(0.0, 0.0))
+figure_path = os.path.join(
+    output_dir, 'high_corr_pairs_scatter_huber_legend.pdf')
+plt.tight_layout()
+plt.savefig(figure_path)
+plt.close()
+
+# %%
+# generate LaTeX code for table of top 20 gene-param pairs
+for i, row in analyzer.sorted_gene_vs_param_pairs.iterrows():
+    gene = row['Gene']
+    param = row['Parameter']
+    param = calcium_models.params_on_plot[param].replace('mathrm', 'text')
+    corr = row['Correlation']
+    p_val = row['p-value']
+    line = f"        {gene} & {param} & ${corr:.6f}$ & ${p_val:.6e}}}$ \\\\"
+    line = line.replace('e-', ' \\times 10^{-')
+    line = line.replace('{-0', '{-')
+    print(line)
+
+    if i == 19:
+        break
+
+# %%
+# analyze warmup
+warmup_time = pd.DataFrame(index=analyzer.session_list,
+                           columns=range(analyzer.num_chains))
+warmup_iters = 500
+
+for idx, a in zip(analyzer.session_list, analyzer.session_analyzers):
+    # compute mean and standard deviation of log posteriors
+    lps = a.get_log_posteriors(include_warmup=True)
+    mixed_chains = a.get_mixed_chains()
+
+    # find first iteration such that the log posterior is within 3 standard
+    # deviations from mean
+    for chain in range(analyzer.num_chains):
+        if chain in mixed_chains:
+            lp_mean = np.mean(lps[chain, warmup_iters:])
+            lp_std = np.std(lps[chain, warmup_iters:])
+            lp_z_scores = np.abs((lps[chain, :] - lp_mean) / lp_std)
+            warmup_time.loc[idx, chain] = np.argwhere(lp_z_scores < 3)[0][0]
+
+output_path = os.path.join(output_dir, 'warmup_time.csv')
+warmup_time.to_csv(output_path)
+
+# %%
+# plot warmup time
+plt.figure(figsize=(6, 4), dpi=300)
+if warmup_time.shape[0] > 100:
+    warmup_time_sample = warmup_time.sample(n=100)
+else:
+    warmup_time_sample = warmup_time
+plt.hist(warmup_time_sample.to_numpy().flatten(), bins=50,
+         range=(0, warmup_iters))
+plt.ylim((0, 200))
+plt.xlabel('Warmup time')
+plt.ylabel('Number of chains')
+plt.tight_layout()
+figure_path = os.path.join(analyzer.output_dir, 'warmup_time_hist.pdf')
+plt.savefig(figure_path)
+plt.close()
+
+# %%
+from stan_helpers import get_kl_nn
+from stan_helpers import get_jensen_shannon
+import seaborn as sns
+
+sample_dist_dir = os.path.join(output_root, 'sample-dists')
+if not os.path.exists(sample_dist_dir):
+    os.mkdir(sample_dist_dir)
+
+session_samples = [a.get_samples().iloc[:, 1:].to_numpy()
+                   for a in analyzer.session_analyzers]
+
+# %%
+kl_yao = get_kl_nn(session_samples)
+np.save(os.path.join(sample_dist_dir, 'kl.npy'), kl_yao)
+js_dists = get_jensen_shannon(session_samples)
+np.save(os.path.join(sample_dist_dir, 'js.npy'), js_dists)
+
+# %%
+# load saved distance matrix if necessary
+kl_yao = np.load(os.path.join(sample_dist_dir, 'kl.npy'))
+js_dists = np.load(os.path.join(sample_dist_dir, 'js.npy'))
+
+# %%
+plt.figure(figsize=(6, 6), dpi=300)
+im = plt.imshow(kl_yao)
+plt.colorbar(im)
+figure_path = os.path.join(sample_dist_dir, 'kl_yao_heatmap.pdf')
+plt.savefig(figure_path)
+plt.close()
+
+plt.figure(figsize=(6, 6), dpi=300)
+im = plt.imshow(js_dists)
+plt.colorbar(im)
+figure_path = os.path.join(sample_dist_dir, 'js_heatmap.pdf')
+plt.savefig(figure_path)
+plt.close()
+
+# %%
+plt.figure(figsize=(6, 6), dpi=300)
+kl_yao_grid = sns.clustermap(kl_yao, xticklabels=False, yticklabels=False)
+figure_path = os.path.join(sample_dist_dir, 'kl_yao_heatmap_clustered.pdf')
+plt.savefig(figure_path)
+plt.close()
+
+plt.figure(figsize=(6, 6), dpi=300)
+js_grid = sns.clustermap(js_dists, xticklabels=False, yticklabels=False)
+figure_path = os.path.join(sample_dist_dir, 'js_heatmap_clustered.pdf')
+plt.savefig(figure_path)
+plt.close()
+
+# %%
+def heatmap_by_dendrogram_order(plot_data, cluster_grid, figure_path,
+                                figure_size=(6, 6), x_label=None,
+                                y_label=None):
+    reordered_sessions = [int(session_list[i])
+                       for i in cluster_grid.dendrogram_row.reordered_ind]
+    reordered_data = plot_data[reordered_sessions, :]
+
+    plt.figure(figsize=figure_size, dpi=300)
+    plt.imshow(reordered_data)
+    if x_label:
+        plt.xlabel(x_label)
+    if y_label:
+        plt.ylabel(y_label)
+    plt.savefig(figure_path)
+    plt.close()
+
+# %%
+heatmap_by_dendrogram_order(
+    y_all, kl_yao_grid, os.path.join(sample_dist_dir, 'traj_kl_yao.pdf'),
+    x_label='Ca2+ response', y_label='Cells')
+heatmap_by_dendrogram_order(
+    y_all, js_grid, os.path.join(sample_dist_dir, 'traj_js.pdf'),
+    x_label='Ca2+ response', y_label='Cells')
+
+analyzer.load_expression_data('../../data/vol_adjusted_genes_transpose.txt')
+heatmap_by_dendrogram_order(
+    analyzer.raw_data.to_numpy().T, kl_yao_grid,
+    os.path.join(sample_dist_dir, 'gene_exp_kl_yao.pdf'),
+    x_label='Genes', y_label='Cells')
+heatmap_by_dendrogram_order(
+    analyzer.raw_data.to_numpy().T, js_grid,
+    os.path.join(sample_dist_dir, 'gene_exp_js.pdf'),
+    x_label='Genes', y_label='Cells')

@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib
+import seaborn as sns
 from tqdm import tqdm, trange
 import scanpy as sc
 from anndata import AnnData
@@ -20,8 +22,20 @@ param_names = ['sigma', 'L', 'Katp', 'KoffPLC', 'Vplc', 'Kip3', 'KoffIP3',
                'a', 'dinh', 'Ke', 'Be', 'd1', 'd5', 'epr', 'eta1', 'eta2',
                'eta3', 'c0', 'k3']
 num_params = len(param_names)
+params_on_plot = {
+    'sigma': r'$\sigma$', 'KonATP': r'$K_{\mathrm{on, ATP}}$', 'L': r'ATP',
+    'Katp': r'$K_{\mathrm{ATP}}$', 'KoffPLC': r'$K_{\mathrm{off, ATP}}$',
+    'Vplc': r'$V_{\mathrm{PLC}}$', 'Kip3': r'$K_{\mathrm{IP3}}$',
+    'KoffIP3': r'$K_{\mathrm{off, IP3}}$', 'a': r'$a$',
+    'dinh': r'$d_{\mathrm{inh}}$','Ke': r'$K_e$', 'Be': r'$B_e$',
+    'd1': r'$d_1$', 'd5': r'$d_5$', 'epr': r'$\epsilon$', 'eta1': r'$\eta_1$',
+    'eta2': r'$\eta_2$', 'eta3': r'$\eta_3$','c0': r'$c_0$', 'k3': r'$k_3$'
+}
 
 use_highly_variable_genes = False
+
+matplotlib.rcParams['font.sans-serif'] = ['Arial']
+matplotlib.rcParams['font.size'] = 12
 
 # %%
 # load gene expression
@@ -93,9 +107,9 @@ def get_chain_data(chain, first_cell, last_cell):
             chain['sample_means'] = chain['sample_means'].append(
                 cell_sample_means, ignore_index=True)
 
-get_chain_data(chain_1, 1, 100)
-get_chain_data(chain_2, 1, 100)
-get_chain_data(chain_3, 1, 100)
+get_chain_data(chain_1, 10, 109)
+get_chain_data(chain_2, 5, 104)
+get_chain_data(chain_3, 10, 109)
 full_chains = (chain_1, chain_2, chain_3)
 
 # %%
@@ -191,29 +205,27 @@ common_cell_ids = [i for i in chain_1['cell_ids'] if i in common_cell_id_set]
 # make violin plots for each parameter of both chains in terms of chain
 # progression
 # only mixed samples are used
-def violin_multi_plot(chains, output_path, num_rows=4, num_cols=1,
-                      quantile_min=0.1, quantile_max=0.9,
-                      canvas_size=(8.5, 11), dpi=100, ylims=None,
-                      chain_colors=None):
+def param_distribution_multi_plot(chains, output_path, num_rows=4, num_cols=1,
+                                  quantile_min=0.1, quantile_max=0.9,
+                                  page_size=(8.5, 11), dpi=100, ylims=None,
+                                  chain_colors=None):
     """Make multiple violin plots in a PDF"""
     if not isinstance(chains, list) and not isinstance(chains, tuple):
         chains = [chains]
     num_subplots_per_page = num_rows * num_cols
     num_plots = num_params
     num_pages = math.ceil(num_plots / num_subplots_per_page)
-    xtick_pos = np.arange(1, len(common_cell_ids) + 1)
     if not chain_colors:
         chain_colors = [f'C{i}' for i in range(len(chains))]
     if not isinstance(chain_colors, list) and \
         not isinstance(chain_colors, list):
         chain_colors = [chain_colors]
-    progress_bar = tqdm(total=num_params)
 
     with PdfPages(output_path) as pdf:
         # generate each page
         for page in range(num_pages):
             # set page size
-            plt.figure(figsize=canvas_size, dpi=dpi)
+            plt.figure(figsize=page_size, dpi=dpi)
 
             # set number of subplots in current page
             if page == num_pages - 1:
@@ -225,39 +237,50 @@ def violin_multi_plot(chains, output_path, num_rows=4, num_cols=1,
             for plot_idx in range(num_subplots):
                 plt.subplot(num_rows, num_cols, plot_idx + 1)
                 param = param_names[page * num_subplots_per_page + plot_idx]
-                progress_bar.update(1)
 
                 # plot each chain
                 for i, chain in enumerate(chains):
                     # get data inside quantiles ranges
-                    violin_data = []
+                    subplot_data = []
                     for s in chain['samples']:
                         s_param = s[param]
                         s_min = s_param.quantile(q=quantile_min)
                         s_max = s_param.quantile(q=quantile_max)
                         s_param = s_param[
                             (s_min <= s_param) & (s_param <= s_max)]
-                        violin_data.append(s_param)
+                        subplot_data.append(s_param)
 
-                    violin_parts = plt.violinplot(violin_data)
-                    if chain_colors is not None:
-                        for pc in violin_parts['bodies']:
-                            pc.set_facecolor(chain_colors[i])
-                            pc.set_edgecolor(chain_colors[i])
+                    # violin_parts = plt.violinplot(subplot_data)
+                    # if chain_colors is not None:
+                    #     for pc in violin_parts['bodies']:
+                    #         pc.set_facecolor(chain_colors[i])
+                    #         pc.set_edgecolor(chain_colors[i])
 
-                        for p in ['cmins', 'cmaxes', 'cbars']:
-                            violin_parts[p].set_facecolor(chain_colors[i])
-                            violin_parts[p].set_edgecolor(chain_colors[i])
+                    #     for p in ['cmins', 'cmaxes', 'cbars']:
+                    #         violin_parts[p].set_facecolor(chain_colors[i])
+                    #         violin_parts[p].set_edgecolor(chain_colors[i])
+                    ax = sns.boxplot(data=subplot_data, color=chain_colors[i],
+                                     linewidth=0.5, showfliers=False)
+                    for patch in ax.artists:
+                        r, g, b, _ = patch.get_facecolor()
+                        patch.set_facecolor((r, g, b, 0.5))
+                    plt.xticks(ticks=xtick_locs, labels=xtick_labels)
 
-                plt.xticks(xtick_pos, common_cell_ids, rotation='vertical')
+                # plt.xticks(xtick_pos, common_cell_ids, rotation='vertical')
                 if ylims is not None:
                     plt.ylim(ylims[param])
-                plt.title(param)
+                plt.title(params_on_plot[param])
 
             plt.tight_layout()
             pdf.savefig()
             plt.close()
 
+# %%
+param_page_size = (6, 1.6)
+num_xticks = int(np.round(len(common_cell_ids) / 20)) + 1
+xtick_locs = np.arange(num_xticks) * 20 - 1
+xtick_locs[0] += 1
+xtick_labels = xtick_locs + 1
 violin_ylims = {'sigma': (0, 0.2), 'L': (0, 0.04), 'Katp': (0, 0.08),
                 'KoffPLC': (0, 0.08), 'Vplc': (0, 0.65), 'Kip3': (0, 0.15),
                 'KoffIP3': (0, 0.14), 'a': (0, 0.04), 'dinh': (0, 1),
@@ -265,45 +288,44 @@ violin_ylims = {'sigma': (0, 0.2), 'L': (0, 0.04), 'Katp': (0, 0.08),
                 'epr': (0, 1.2), 'eta1': (570, 600), 'eta2': (0, 1),
                 'eta3': (0, 5), 'c0': (0, 100), 'k3': (0, 0.8)}
 
-violin_multi_plot([filtered_chain_1, filtered_chain_2],
+param_distribution_multi_plot([filtered_chain_1, filtered_chain_2],
                   os.path.join(output_dir, 'param_violin_full.pdf'), num_rows=1,
-                  canvas_size=(20, 5), dpi=300)
+                  page_size=param_page_size, dpi=300)
 
-violin_multi_plot([filtered_chain_1, filtered_chain_2],
-                  os.path.join(output_dir, 'param_violin.pdf'), num_rows=1,
-                  canvas_size=(20, 5), dpi=300, ylims=violin_ylims)
+# violin_multi_plot([filtered_chain_1, filtered_chain_2],
+#                   os.path.join(output_dir, 'param_violin.pdf'), num_rows=1,
+#                   page_size=violin_page_size, dpi=300, ylims=violin_ylims)
 
-violin_multi_plot(filtered_chain_1,
-                  os.path.join(output_dir, 'param_violin_1.pdf'), num_rows=1,
-                  canvas_size=(20, 5), dpi=300, chain_colors='C0',
-                  ylims=violin_ylims)
+# violin_multi_plot(filtered_chain_1,
+#                   os.path.join(output_dir, 'param_violin_1.pdf'), num_rows=1,
+#                   page_size=violin_page_size, dpi=300, chain_colors='C0',
+#                   ylims=violin_ylims)
 
-violin_multi_plot(filtered_chain_2,
-                  os.path.join(output_dir, 'param_violin_2.pdf'), num_rows=1,
-                  canvas_size=(20, 5), dpi=300, chain_colors='C1',
-                  ylims=violin_ylims)
+# violin_multi_plot(filtered_chain_2,
+#                   os.path.join(output_dir, 'param_violin_2.pdf'), num_rows=1,
+#                   page_size=violin_page_size, dpi=300, chain_colors='C1',
+#                   ylims=violin_ylims)
 
-violin_multi_plot(filtered_chain_3,
-                  os.path.join(output_dir, 'param_violin_3.pdf'), num_rows=1,
-                  canvas_size=(20, 5), dpi=300, chain_colors='C2',
-                  ylims=violin_ylims)
+# violin_multi_plot(filtered_chain_3,
+#                   os.path.join(output_dir, 'param_violin_3.pdf'), num_rows=1,
+#                   page_size=violin_page_size, dpi=300, chain_colors='C2',
+#                   ylims=violin_ylims)
 
 # %%
 # plot fold changes in means for each parameter
-def fold_change_multi_plot(chains, output_path, canvas_size=(8.5, 11),
+def fold_change_multi_plot(chains, output_path, page_size=(8.5, 11),
                            num_rows=4, num_cols=1):
     """Make multiple scatter plots in a PDF"""
     num_subplots_per_page = num_rows * num_cols
     num_plots = num_params
     num_pages = math.ceil(num_plots / num_subplots_per_page)
-    xtick_pos = np.arange(1, len(common_cell_ids))
     progress_bar = tqdm(total=num_params, position=0, leave=True)
 
     with PdfPages(output_path) as pdf:
         # generate each page
         for page in range(num_pages):
             # set page size as US letter
-            plt.figure(figsize=canvas_size)
+            plt.figure(figsize=page_size)
 
             # set number of subplots in current page
             if page == num_pages - 1:
@@ -321,16 +343,24 @@ def fold_change_multi_plot(chains, output_path, canvas_size=(8.5, 11),
                 for chain in chains:
                     param_mean = chain['sample_means'][param].to_numpy()
                     fold_changes = param_mean[1:] / param_mean[:-1]
-                    plt.plot(fold_changes, '-', alpha=0.3)
+                    plt.plot(fold_changes, '-', alpha=0.5)
 
-                plt.xticks(xtick_pos, common_cell_ids[1:], rotation='vertical')
-                plt.title(param)
+                plt.xticks(ticks=xtick_locs, labels=xtick_labels)
+                plt.title(params_on_plot[param])
 
             plt.tight_layout()
             pdf.savefig()
             plt.close()
 
-fold_change_multi_plot((filtered_chain_1, filtered_chain_2, filtered_chain_3),
-                       os.path.join(output_dir, 'param_mean_fold_changes.pdf'))
+xtick_locs[-1] -= 1
+xtick_labels[-1] -= 1
+fold_change_multi_plot(
+    (filtered_chain_1, filtered_chain_2, filtered_chain_3),
+    os.path.join(output_dir, 'param_mean_fold_changes_all.pdf'),
+    page_size=param_page_size, num_rows=1)
+fold_change_multi_plot(
+    (filtered_chain_1, filtered_chain_2),
+    os.path.join(output_dir, 'param_mean_fold_changes.pdf'),
+    page_size=param_page_size, num_rows=1)
 
 # %%

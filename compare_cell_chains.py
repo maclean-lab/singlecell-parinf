@@ -3,6 +3,7 @@ import os
 import os.path
 import json
 import numpy as np
+import scipy.stats
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
@@ -10,9 +11,8 @@ import seaborn as sns
 
 # %%
 root_cell_id = 5106
-# first_cell, last_cell = 4940, 4828
 first_cell_order = 1
-last_cell_order = 60
+last_cell_order = 500
 
 # define directories for results produced by MultiSessionAnalyzers
 # run_group = 'full-models'
@@ -26,7 +26,7 @@ with open('stan_run_meta.json', 'r') as f:
 with open('stan_run_comparison_meta.json', 'r') as f:
     stan_run_comparison_meta = json.load(f)
 
-runs = stan_run_meta[run_group]['runs']
+runs = stan_run_comparison_meta[run_group]['runs']
 num_runs = len(runs)
 
 output_root = '../../result'
@@ -67,17 +67,18 @@ else:
         cell_lists[run] = cell_lists[run].to_list()
 
 pub_names = [stan_run_meta[r]['pub_name'] for r in runs]
+pub_names = [n.replace('\\$', '$') for n in pub_names]
 
 # define plot parameters
 dpi = 300
-figure_size = (11, 8.5)
+figure_size = (6, 4)
 run_colors = [stan_run_meta[r]['color'] for r in runs]
 
 # change font settings
 matplotlib.rcParams['font.sans-serif'] = ['Arial']
-matplotlib.rcParams['font.size'] = 12
+matplotlib.rcParams['font.size'] = 18
 
-marker_size = 8
+marker_size = 4
 
 # x-ticks for violin plot
 violin_xticks = np.arange(num_runs) + 1
@@ -85,8 +86,8 @@ violin_xticklabels = pub_names
 # x-ticks for plot of cells in one cell chain
 num_cells = last_cell_order - first_cell_order + 1
 if num_cells >= 100:
-    num_run_xticks = int(np.round(num_cells / 20)) + 1
-    run_xtick_locs = np.arange(num_run_xticks) * 20 - 1
+    num_run_xticks = int(np.round(num_cells / 50)) + 1
+    run_xtick_locs = np.arange(num_run_xticks) * 50 - 1
     run_xtick_locs[0] += 1
     run_xtick_labels = run_xtick_locs + first_cell_order
 else:
@@ -94,6 +95,7 @@ else:
     run_xtick_locs = np.arange(num_run_xticks) * 5
     run_xtick_labels = run_xtick_locs + first_cell_order
 
+# %%
 # load data
 trajectory_distances = []
 log_posteriors = []
@@ -147,14 +149,15 @@ add_stats(sampling_time, 'Sampling time')
 add_stats(rhats, 'R^hats')
 add_stats(num_mixed_chains, 'Mixed chains')
 add_stats(trajectory_distances, 'Trajectory distance')
+stats.index = pub_names
 
 print(stats)
 stats.to_csv(os.path.join(output_dir, 'stats.csv'))
 
 # print to latex code
-for row, suffix in enumerate(runs):
-    line = suffix
-    for i in range(0, 8, 2):
+for row, run in enumerate(runs):
+    line = pub_names[row]
+    for i in range(0, stats.shape[1], 2):
         line += f' & ${stats.iloc[row, i]:.2f} \pm {stats.iloc[row, i+1]:.2f}$'
     line += ' \\\\'
     print(line)
@@ -166,7 +169,7 @@ num_rows = 0
 for run, run_lp in zip(runs, log_posteriors):
     for cell_id, row in run_lp.iterrows():
         for chain, lp in row.items():
-            if cell_plot_order == 'cell_id':
+            if stan_run_comparison_meta[run_group]['order_by'] == 'cell_id':
                 cell = cell_id
             else:
                 cell = cell_lists[run].index(cell_id)
@@ -181,7 +184,7 @@ num_rows = 0
 for run, run_st in zip(runs, sampling_time):
     for cell_id, row in run_st.iterrows():
         for chain, t in row.items():
-            if cell_plot_order == 'cell_id':
+            if stan_run_comparison_meta[run_group]['order_by'] == 'cell_id':
                 cell = cell_id
             else:
                 cell = cell_lists[run].index(cell_id)
@@ -204,7 +207,9 @@ dist_violins['cmaxes'].set_color('k')
 dist_violins['cbars'].set_color('k')
 plt.xticks(ticks=violin_xticks, labels=violin_xticklabels)
 plt.ylabel('Mean trajectory distances')
-plt.ylim((0, 10))
+# plt.ylim((0, 4))
+
+plt.tight_layout()
 plt.savefig(figure_path, transparent=True)
 plt.close()
 
@@ -219,7 +224,7 @@ lp_high = 600
 mean_log_posteriors_long['LP'].clip(lower=lp_low, upper=lp_high, inplace=True)
 
 g = sns.stripplot(data=mean_log_posteriors_long, x='Cell', y='LP', hue='Run',
-                  order=cell_plot_order, alpha=0.5, palette=run_colors,
+                  order=cell_plot_order, alpha=0.8, palette=run_colors,
                   size=marker_size)
 
 # draw lines for means of chains
@@ -238,11 +243,12 @@ g.set_ylim(bottom=lp_low, top=lp_high)
 
 # update legend
 legend = g.legend()
-# legend.remove()
 for text, label in zip(legend.texts, pub_names):
     text.set_text(label)
+legend.remove()
 
 # export
+plt.tight_layout()
 plt.savefig(figure_path, transparent=True)
 plt.close()
 
@@ -275,11 +281,12 @@ g.set_ylim(bottom=sampling_time_low, top=sampling_time_high)
 
 # update legend
 legend = g.legend()
-# legend.remove()
 for text, label in zip(legend.texts, pub_names):
     text.set_text(label)
+legend.remove()
 
 # export
+plt.tight_layout()
 plt.savefig(figure_path, transparent=True)
 plt.close()
 
@@ -298,12 +305,40 @@ time_violins['cbars'].set_color('k')
 plt.xticks(ticks=violin_xticks, labels=violin_xticklabels)
 plt.ylim((0, 1000))
 plt.ylabel('Time (minutes)')
+plt.tight_layout()
 plt.savefig(figure_path)
 plt.close()
 
 # %%
 # make legends
-dummy_fig = plt.figure()
-fig_legend = plt.figure(figsize=(3, num_runs * 2), dpi=dpi)
+import matplotlib.patches as mpatches
+
+dummy_fig = plt.figure(figsize=(3, num_runs * 0.5), dpi=dpi)
+legend_patches = [mpatches.Patch(color=c, label=r)
+                  for c, r in zip(run_colors, pub_names)]
+dummy_fig.legend(legend_patches, pub_names, loc='center')
+dummy_fig.savefig(os.path.join(output_dir, 'figure_legend.pdf'))
+plt.close()
 
 # %%
+# compare warmup time for similar vs random
+analyzer_dirs[1] = analyzer_dirs[1].replace('500', '100')
+analyzer_dirs[2] = analyzer_dirs[2].replace('500', '086')
+analyzer_dirs[3] = analyzer_dirs[3].replace('500', '100')
+
+# load warmup time data
+warmup_time = []
+for d in analyzer_dirs:
+    data_path = os.path.join(d, 'warmup_time.csv')
+    run_data = pd.read_csv(data_path, index_col=0)
+    warmup_time.append(run_data)
+
+# run K-S test for similar vs each random run
+for i in range(1, 4):
+    wt_similar = warmup_time[0].to_numpy().flatten()
+    wt_similar = wt_similar[np.isfinite(wt_similar)]
+    wt_random = warmup_time[i].to_numpy().flatten()
+    wt_random = wt_random[np.isfinite(wt_random)]
+    stat, p_val = scipy.stats.ks_2samp(wt_similar, wt_random,
+                                       alternative='less')
+    print(f'{stat:.8f} {p_val:.8f}')

@@ -23,6 +23,9 @@ def main():
     # apply filter
     if args.filter_type == 'moving_average':
         y = moving_average(y_raw)
+    elif args.filter_type == 'savitzky_golay':
+        from scipy.signal import savgol_filter
+        y = savgol_filter(y_raw, 51, 2)
     else:
         print('No filter specified or unknown type of filter. Using raw '
               + 'trajectories')

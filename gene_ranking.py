@@ -5,6 +5,7 @@ import itertools
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib
 from matplotlib_venn import venn2
 
 # %%
@@ -78,7 +79,7 @@ ranking_3.sort_values(ascending=False, inplace=True)
 
 # %%
 ranking_length = np.amin(
-    [len(ranking_1), ranking_2.shape[0], ranking_2.shape[0]])
+    [len(ranking_1), ranking_2.shape[0], ranking_3.shape[0]])
 ranking_all = pd.DataFrame(data={'Ranking_1': ranking_1[:ranking_length],
                                  'Ranking_2': ranking_2.index[:ranking_length],
                                  'Ranking_3': ranking_3.index[:ranking_length]})
@@ -94,16 +95,19 @@ high_mi_genes = set(gene_ca_mi_data.index[:ranking_length])
 
 # %%
 # make Venn diagram
+matplotlib.rcParams['font.sans-serif'] = ['Arial']
+matplotlib.rcParams['font.size'] = 12
+
 for ranking, ranked_genes in ranking_all.items():
     ranked_genes = set(ranked_genes)
     overlapping_genes = ranked_genes & high_mi_genes
     high_mi_only_genes = high_mi_genes - ranked_genes
     high_corr_only_genes = ranked_genes - high_mi_genes
 
-    plt.figure(figsize=(6, 4), dpi=300)
+    plt.figure(figsize=(5, 4), dpi=300)
     v_handle = venn2(
         [high_mi_genes, ranked_genes],
-        set_labels=['From Gene-Ca MI','From gene-param correlation'])
+        set_labels=['From Gene-Ca MI','From gene-param\ncorrelation'])
 
     # change text on each patch to corresponding genes
     v_handle.get_label_by_id('10').set_text('\n'.join(high_mi_only_genes))
@@ -113,7 +117,13 @@ for ranking, ranked_genes in ranking_all.items():
     figure_path = os.path.join('../../result', run_dir,
                                'multi-sample-analysis-0001-0500',
                                f'high_MI_vs_high_corr_{ranking.lower()}.pdf')
+    plt.tight_layout()
     plt.savefig(figure_path)
     plt.close()
+
+# %%
+for i, row in ranking_all.iterrows():
+    line = f"{row['Ranking_1']} & {row['Ranking_2']} & {row['Ranking_3']} \\\\"
+    print(line)
 
 # %%

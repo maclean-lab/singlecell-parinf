@@ -3,6 +3,7 @@ import os
 import os.path
 import itertools
 import json
+
 import numpy as np
 import scipy.io
 import pandas as pd
@@ -11,13 +12,16 @@ from sklearn.manifold import MDS
 import umap
 import tqdm
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+import matplotlib as mpl
+
 from stan_helpers import StanSessionAnalyzer
 
 # %%
 # load samples
 # stan_run = '3'
 # stan_run = 'const-Be-eta1'
-stan_run = 'const-Be-eta1-mixed-0'
+stan_run = 'const-Be-eta1-mixed-2'
 first_cell_order = 1
 last_cell_order = 100
 analysis_param_mask = '0111111111011101111'
@@ -28,6 +32,8 @@ cell_list_path = os.path.join('cell_lists',
                               stan_run_meta[stan_run]['cell_list'])
 cell_list = pd.read_csv(cell_list_path, sep='\t')
 cell_list = cell_list.iloc[first_cell_order:last_cell_order + 1, :]
+sampled_cells = cell_list.loc[first_cell_order:last_cell_order,
+                              'Cell'].to_numpy()
 
 run_dir = os.path.join('../../result', stan_run_meta[stan_run]['output_dir'])
 all_param_names = ['sigma', 'KonATP', 'L', 'Katp', 'KoffPLC', 'Vplc', 'Kip3',
@@ -42,6 +48,44 @@ analysis_param_names = [all_param_names[i + 1]
                         if mask == '1']
 num_analysis_params = len(analysis_param_names)
 
+soptsc_vars = scipy.io.loadmat(
+    '../../result/SoptSC/SoptSC_feature_100/workspace.mat')
+
+# configure plotting
+plot_figures = False
+figure_size = (6, 6)
+dpi = 300
+pc_xtick_locs = np.arange(len(analysis_param_names))
+pc_xtick_labels = pc_xtick_locs + 1
+
+# change font settings
+mpl.rcParams['font.sans-serif'] = ['Arial']
+mpl.rcParams['font.size'] = 12
+
+def normalize_min_max(x, low, high):
+    return (x - low) / (high - low)
+
+def normalize_gaussian(x, mu, sigma):
+    return (x - mu) / sigma
+
+def project_samples(transformer_instance, x, norm_func, *args):
+    x = norm_func(x, *args)
+
+    if not isinstance(x, np.ndarray):
+        x = x.to_numpy()
+
+    if len(x.shape) == 1:
+        x = x[np.newaxis, :]
+
+    return transformer_instance.transform(x)
+
+# %%
+top_param_fractions = [0.9, 0.8, 0.7]
+top_param_counts = {}
+for fraction in top_param_fractions:
+    top_param_counts[fraction] = pd.DataFrame(
+        0, columns=analysis_param_names, index=range(num_analysis_params))
+
 pca_dir = os.path.join(run_dir, 'PCA')
 if not os.path.exists(pca_dir):
     os.mkdir(pca_dir)
@@ -53,20 +97,6 @@ if not os.path.exists(umap_dir):
 mds_dir = os.path.join(run_dir, 'MDS')
 if not os.path.exists(mds_dir):
     os.mkdir(mds_dir)
-
-# configure plotting
-plot_figures = False
-figure_size = (6, 6)
-dpi = 300
-pc_xtick_locs = np.arange(len(analysis_param_names))
-pc_xtick_labels = pc_xtick_locs + 1
-
-# %%
-top_param_fractions = [0.9, 0.8, 0.7]
-top_param_counts = {}
-for fraction in top_param_fractions:
-    top_param_counts[fraction] = pd.DataFrame(
-        0, columns=analysis_param_names, index=range(num_analysis_params))
 
 for i, cell_id in enumerate(tqdm.tqdm(cell_list['Cell'])):
     cell_dir = os.path.join(run_dir, 'samples', f'cell-{cell_id:04d}')
@@ -132,86 +162,90 @@ for i, cell_id in enumerate(tqdm.tqdm(cell_list['Cell'])):
                 if pca_loadings[param_idx, comp] >= param_threshold:
                     top_param_counts[fraction].iloc[comp, param_idx] += 1
 
-    # # run UMAP
-    # umap_reducer = umap.UMAP()
-    # umap_embedding = umap_reducer.fit_transform(samples)
-    # plt.figure(figsize=figure_size, dpi=dpi)
-    # plt.scatter(umap_embedding[:, 0], umap_embedding[:, 1])
-    # plt.savefig(os.path.join(umap_dir, f'{i + 1:04d}_cell_{cell_id:04d}.pdf'))
-    # plt.close()
+    # run UMAP
+    umap_reducer = umap.UMAP()
+    umap_embedding = umap_reducer.fit_transform(samples)
+    plt.figure(figsize=figure_size, dpi=dpi)
+    plt.scatter(umap_embedding[:, 0], umap_embedding[:, 1])
+    plt.savefig(os.path.join(umap_dir, f'{i + 1:04d}_cell_{cell_id:04d}.pdf'))
+    plt.close()
 
-    # # run MDS
-    # mds = MDS()
-    # mds_transformed_samples = mds.fit_transform(samples)
-    # plt.figure(figsize=figure_size, dpi=dpi)
-    # plt.scatter(mds_transformed_samples[:, 0], mds_transformed_samples[:, 1])
-    # plt.savefig(os.path.join(mds_dir, f'{i + 1:04d}_cell_{cell_id:04d}.pdf'))
-    # plt.close()
+    # run MDS
+    mds = MDS()
+    mds_transformed_samples = mds.fit_transform(samples)
+    plt.figure(figsize=figure_size, dpi=dpi)
+    plt.scatter(mds_transformed_samples[:, 0], mds_transformed_samples[:, 1])
+    plt.savefig(os.path.join(mds_dir, f'{i + 1:04d}_cell_{cell_id:04d}.pdf'))
+    plt.close()
 
 # %%
-def pca_on_cell(base_cell_idx, plot_lemon_prior, norm_func, random_seed=0):
-    def normalize_min_max(x, low, high):
-        return (x - low) / (high - low)
+def project_on_cell(method, base_cell_idx, plot_lemon_prior, norm_func,
+                    output_dir, random_seed=0):
+    def get_mean_dist(x):
+        return np.mean(np.linalg.norm(x, axis=1))
 
-    def normalize_gaussian(x, mu, sigma):
-        return (x - mu) / sigma
-
-    def project_samples(pca_instance, x, norm_func, *args):
-        x = norm_func(x, *args)
-
-        if not isinstance(x, np.ndarray):
-            x = x.to_numpy()
-
-        if len(x.shape) == 1:
-            x = x[np.newaxis, :]
-
-        return pca_instance.transform(x)
-
-    fig, ax = plt.subplots(figsize=figure_size, dpi=dpi)
-    ax.set_aspect('equal', adjustable='datalim')
-    colormap = plt.get_cmap('YlOrRd')
-
+    # initialize
     bit_generator = np.random.MT19937(random_seed)
-    # rng = np.random.default_rng(bit_generator)
 
-    # run PCA on as base cell
     if base_cell_idx == 0:
-        # base_cell_id = cell_list.loc[1, 'Parent']
-        base_cell_id = 5106
         root_dir = os.path.join('../../result',
                                 stan_run_meta[stan_run]['root_cell_dir'])
+        if 'Parent' in cell_list.columns:
+            base_cell_id = cell_list.loc[1, 'Parent']
+        else:
+            base_cell_id = int(root_dir[-4:])
         analyzer = StanSessionAnalyzer(root_dir, param_names=param_names)
     else:
         base_cell_id = cell_list.loc[base_cell_idx, 'Cell']
         cell_dir = os.path.join(run_dir, 'samples', f'cell-{base_cell_id:04d}')
         analyzer = StanSessionAnalyzer(cell_dir, param_names=param_names)
+
+
+    proj_stats = pd.DataFrame(columns=['Cell_ID', 'Similarity', 'Distance'])
+
+    # get similarity matrix
+    similarity_matrix = soptsc_vars['W']
+    similarity_matrix /= np.amax(similarity_matrix[base_cell_id, sampled_cells])
+
+    # set up plotting
+    fig, ax = plt.subplots(figsize=(5, 4), dpi=dpi)
+    ax.set_aspect('equal', adjustable='datalim')
+    ax.set_box_aspect(1)
+    colormap = plt.get_cmap('YlOrRd')
+
+    # run projection on base cell
     mixed_chains = analyzer.get_mixed_chains()
     base_samples = pd.concat([analyzer.samples[c] for c in mixed_chains],
                              axis=0, ignore_index=True)
     base_samples = base_samples.sample(n=1000, axis=0,
                                        random_state=bit_generator)
     base_samples = base_samples.loc[:, analysis_param_names]
-    # normalize samples to [0, 1]
+    # normalize samples
     base_min, base_max = base_samples.min(axis=0), base_samples.max(axis=0)
     base_mean, base_std = base_samples.mean(axis=0), base_samples.std(axis=0)
     if norm_func == 'min_max':
         base_samples = normalize_min_max(base_samples, base_min, base_max)
     else:
         base_samples = normalize_gaussian(base_samples, base_mean, base_std)
-    pca = PCA(n_components=num_analysis_params, svd_solver='full')
-    pca.fit(base_samples.to_numpy())
 
-    sampled_cells = cell_list.loc[first_cell_order:last_cell_order,
-                                  'Cell'].to_numpy()
+    if method == 'umap':
+        transformer = umap.UMAP()
+    elif method == 'mds':
+        transformer = MDS()
+    else:
+        transformer = PCA(n_components=num_analysis_params, svd_solver='full')
+    projections = transformer.fit_transform(base_samples.to_numpy())
+    ax.scatter(projections[:, 0], projections[:, 1], s=1, c='C0', alpha=0.3,
+               edgecolors='none', zorder=3)
 
-    # get similarity matrix
-    soptsc_vars = scipy.io.loadmat(
-            '../../result/SoptSC/SoptSC_feature_100/workspace.mat')
-    similarity_matrix = soptsc_vars['W']
-    similarity_matrix /= np.amax(similarity_matrix[base_cell_id, sampled_cells])
+    # add stats for base cell
+    stats_row = {'Cell_ID': base_cell_id,
+                 'Similarity': similarity_matrix[base_cell_id, base_cell_id],
+                 'Distance': get_mean_dist(projections[:, :2])}
+    proj_stats = proj_stats.append(stats_row, ignore_index=True)
 
-    for i, cell_id in enumerate(tqdm.tqdm(sampled_cells)):
-        if i == base_cell_idx - 1:
+    for cell_id in tqdm.tqdm(sampled_cells):
+        if cell_id == base_cell_id:
             continue
 
         cell_dir = os.path.join(run_dir, 'samples', f'cell-{cell_id:04d}')
@@ -228,47 +262,63 @@ def pca_on_cell(base_cell_idx, plot_lemon_prior, norm_func, random_seed=0):
         samples = samples.loc[:, analysis_param_names]
 
         if norm_func == 'min_max':
-            pcs = project_samples(pca, samples, normalize_min_max, base_min,
-                                  base_max)
+            projections = project_samples(
+                transformer, samples, normalize_min_max, base_min, base_max)
         else:
-            pcs = project_samples(pca, samples, normalize_gaussian, base_mean,
-                                  base_std)
+            projections = project_samples(
+                transformer, samples, normalize_gaussian, base_mean, base_std)
 
         sim = similarity_matrix[base_cell_id, cell_id]
-        zorder = 2 if sim > 0 else 1
-        ax.scatter(pcs[:, 0], pcs[:, 1], s=1, color=colormap(sim),
-                   alpha=0.3, edgecolors='none', zorder=zorder)
+        stats_row = {'Cell_ID': cell_id, 'Similarity': sim,
+                     'Distance': get_mean_dist(projections[:, :2])}
+        proj_stats = proj_stats.append(stats_row, ignore_index=True)
 
-    pcs = pca.transform(base_samples.to_numpy())
-    ax.scatter(pcs[:, 0], pcs[:, 1], s=1, c='C0', alpha=0.3, edgecolors='none',
-               zorder=3)
+        zorder = 2 if sim > 0 else 1
+        ax.scatter(projections[:, 0], projections[:, 1], s=1,
+                   color=colormap(sim), alpha=0.3, edgecolors='none',
+                   zorder=zorder)
 
     if plot_lemon_prior:
         if norm_func == 'min_max':
-            lemon_prior_on_pca = project_samples(pca, lemon_prior_mu,
-                                                 normalize_min_max, base_min,
-                                                 base_max)
+            lemon_prior_projection = project_samples(
+                transformer, lemon_prior_mu, normalize_min_max, base_min,
+                base_max)
         else:
-            lemon_prior_on_pca = project_samples(pca, lemon_prior_mu,
-                                                 normalize_gaussian, base_mean,
-                                                 base_std)
+            lemon_prior_projection = project_samples(
+                transformer, lemon_prior_mu, normalize_gaussian, base_mean,
+                base_std)
 
-        ax.scatter(lemon_prior_on_pca[:, 0], lemon_prior_on_pca[:, 1], c='k',
-                   marker='x')
+        ax.scatter(lemon_prior_projection[:, 0], lemon_prior_projection[:, 1],
+                   c='k', marker='x')
 
         figure_path = os.path.join(
-            pca_proj_dir,
-            f'samples_on_{base_cell_idx:04d}_pca_{norm_func}_vs_lemon.png')
+            output_dir,
+            f'samples_on_{base_cell_idx:04d}_{norm_func}_vs_lemon.png')
     else:
         figure_path = os.path.join(
-            pca_proj_dir, f'samples_on_{base_cell_idx:04d}_pca_{norm_func}.png')
+            output_dir,
+            f'samples_on_{base_cell_idx:04d}_{norm_func}.png')
 
-    fig.savefig(figure_path)
+    # add axis labels
+    ax.set_xlabel('PC1')
+    ax.set_ylabel('PC2')
+
+    ax.set_title(f'Cell {base_cell_id:04d}')
+
+    # add legend
+    legend_handles = [Line2D([0], [0], linestyle='', color='C0', marker='.',
+                             label='Focal cell', markersize=10)]
+    ax.legend(handles=legend_handles, loc='upper right')
+
+    # add colorbar
+    colormap_norm = mpl.colors.Normalize(vmin=0, vmax=1)
+    fig.colorbar(mpl.cm.ScalarMappable(norm=colormap_norm, cmap=colormap),
+                 ax=ax, label='Similarity')
+
+    fig.savefig(figure_path, transparent=True)
     plt.close()
 
-pca_proj_dir = os.path.join(run_dir, 'PCA-projection')
-if not os.path.exists(pca_proj_dir):
-    os.mkdir(pca_proj_dir)
+    return proj_stats
 
 lemon_prior = pd.read_csv('stan_models/equiv_2/calcium_model_alt_prior.txt',
                           sep='\t', index_col=0)
@@ -276,11 +326,198 @@ lemon_prior_mu = lemon_prior.loc[analysis_param_names, 'mu']
 
 # plot all samples on PCs of root cell
 # base_cell_indices = [0, 1, 101, 201, 301, 401]
-base_cell_indices = [0, 1, 21, 41, 61, 81]
+# base_cell_indices = [0, 1, 21, 41, 61, 81]
+projection_methods = ['umap']
+base_cell_indices = [0, 101]
 show_lemon_prior = [True, False]
 norm_funcs = ['min_max', 'gaussian']
-for idx, show, func in itertools.product(
-        base_cell_indices, show_lemon_prior, norm_funcs):
-    pca_on_cell(idx, show, func, random_seed=0)
+proj_stats_all = {}
+
+proj_dir = {}
+proj_dir['pca'] = os.path.join(run_dir, 'PCA-projection')
+if not os.path.exists(proj_dir['pca']):
+    os.mkdir(proj_dir['pca'])
+proj_dir['umap'] = os.path.join(run_dir, 'UMAP-projection')
+if not os.path.exists(proj_dir['umap']):
+    os.mkdir(proj_dir['umap'])
+proj_dir['mds'] = os.path.join(run_dir, 'MDS-projection')
+if not os.path.exists(proj_dir['mds']):
+    os.mkdir(proj_dir['mds'])
+
+for m, idx, show, func in itertools.product(
+        projection_methods, base_cell_indices, show_lemon_prior, norm_funcs):
+    stats = project_on_cell(m, idx, show, func, proj_dir[m], random_seed=0)
+    if not show:
+        proj_stats_all[(m, idx, func)] = stats
 
 # %%
+# plot stats from projection
+for (m, idx, func), stats in proj_stats_all.items():
+    dists_similar = stats['Distance'][stats['Similarity'] > 0]
+    num_similar = dists_similar.size
+    dists_dissimilar = stats['Distance'][stats['Similarity'] == 0]
+    # dists_dissimilar = dists_dissimilar.sample(n=num_similar, random_state=0)
+    x_max = max(dists_similar.max(), dists_dissimilar.max())
+
+    plt.figure(figsize=(4, 4), dpi=300)
+    plt.hist(dists_similar, bins=10, range=(0, x_max), density=True, alpha=0.5,
+             label='Similar')
+    plt.hist(dists_dissimilar, bins=10, range=(0, x_max), density=True,
+             alpha=0.5, label='Dissimilar')
+    plt.xlabel('Distance from origin')
+    plt.yticks([])
+    plt.ylabel('Frequency')
+    plt.legend()
+    if idx == 0:
+        root_dir = os.path.join('../../result',
+                                stan_run_meta[stan_run]['root_cell_dir'])
+        if 'Parent' in cell_list.columns:
+            cell_id = cell_list.loc[1, 'Parent']
+        else:
+            cell_id = int(root_dir[-4:])
+    else:
+        cell_id = cell_list.loc[idx, 'Cell']
+    plt.title(f'Cell {cell_id:04d}')
+    figure_path = os.path.join(proj_dir[m],
+                               f'samples_on_{idx:04d}_{func}_dists.pdf')
+    plt.savefig(figure_path, transparent=True)
+    plt.close()
+
+# %%
+# compute distance between adjacent cells
+random_seed = 0
+bit_generator = np.random.MT19937(random_seed)
+pca_stats = pd.DataFrame(columns=['CellID', 'Distance', 'Similarity'])
+norm_func = 'gaussian'
+proj_dir = os.path.join(run_dir, 'PCA-projection-neighbor')
+if not os.path.exists(proj_dir):
+    os.mkdir(proj_dir)
+
+# run PCA for root cell
+prev_cell_idx = 0
+# load sample
+root_dir = os.path.join(
+    '../../result', stan_run_meta[stan_run]['root_cell_dir'])
+analyzer = StanSessionAnalyzer(root_dir, param_names=param_names)
+prev_cell_id = int(root_dir[-4:])
+mixed_chains = analyzer.get_mixed_chains()
+prev_sample = pd.concat([analyzer.samples[c] for c in mixed_chains],
+                        axis=0, ignore_index=True)
+prev_sample = prev_sample.sample(n=1000, axis=0, random_state=bit_generator)
+prev_sample = prev_sample.loc[:, analysis_param_names]
+# normalize sample
+if norm_func == 'min_max':
+    prev_min, prev_max = prev_sample.min(axis=0), prev_sample.max(axis=0)
+    prev_sample_normalized = normalize_min_max(prev_sample, prev_min, prev_max)
+else:
+    prev_mean, prev_std = prev_sample.mean(axis=0), prev_sample.std(axis=0)
+    prev_sample_normalized = normalize_gaussian(prev_sample, prev_mean,
+                                                prev_std)
+# run PCA
+pca = PCA(n_components=num_analysis_params)
+prev_sample_projected = pca.fit_transform(prev_sample_normalized)
+dist_row = {'CellID': prev_cell_id, 'Distance': np.nan, 'Similarity': np.nan}
+pca_stats = pca_stats.append(dist_row, ignore_index=True)
+
+# plot ratio of variance explained for the root cell
+plt.figure(figsize=figure_size, dpi=dpi)
+plt.plot(pca.explained_variance_ratio_, marker='.', linestyle='none')
+plt.tight_layout()
+figure_path = os.path.join(
+    proj_dir, f'cell_{prev_cell_id:04d}_var_explained_ratio.pdf')
+plt.savefig(figure_path)
+plt.close()
+
+for cell_id in tqdm.tqdm(sampled_cells):
+    # get a subsample of size 1000 from mixed chains of current cell
+    cell_dir = os.path.join(run_dir, 'samples', f'cell-{cell_id:04d}')
+    analyzer = StanSessionAnalyzer(cell_dir, param_names=param_names)
+
+    mixed_chains = analyzer.get_mixed_chains()
+    if not mixed_chains:
+        continue
+
+    curr_sample = pd.concat([analyzer.samples[c] for c in mixed_chains],
+                            axis=0, ignore_index=True)
+    curr_sample = curr_sample.sample(n=1000, axis=0,
+                                     random_state=bit_generator)
+    curr_sample = curr_sample.loc[:, analysis_param_names]
+    if norm_func == 'min_max':
+        curr_sample_normalized = normalize_min_max(curr_sample, prev_min,
+                                                   prev_max)
+    else:
+        curr_sample_normalized = normalize_gaussian(curr_sample, prev_mean,
+                                                    prev_std)
+
+    # project current cell on previous cell's principal components
+    curr_sample_projected = pca.transform(curr_sample_normalized)
+
+    # compute distance between projected samples
+    dist_row = {'CellID': cell_id,
+                'Distance': np.mean(np.linalg.norm(curr_sample, axis=1)),
+                'Similarity': soptsc_vars['W'][prev_cell_id, cell_id]}
+    pca_stats = pca_stats.append(dist_row, ignore_index=True)
+
+    # plot projected samples
+    plt.figure(figsize=figure_size, dpi=dpi)
+    plt.scatter(prev_sample_projected[:, 0], prev_sample_projected[:, 1],
+                label='Previous cell')
+    plt.scatter(curr_sample_projected[:, 0], curr_sample_projected[:, 1],
+                label='Current cell')
+    plt.xlabel('PC1')
+    plt.xlabel('PC2')
+    plt.legend()
+    plt.tight_layout()
+    figure_path = os.path.join(
+        proj_dir,
+        f'cell_{cell_id:04d}_on_cell_{prev_cell_id:04d}_{norm_func}.pdf')
+    plt.savefig(figure_path)
+    plt.close()
+
+    # run PCA on current cell
+    if norm_func == 'min_max':
+        prev_min, prev_max = curr_sample.min(axis=0), curr_sample.max(axis=0)
+        prev_sample_normalized = normalize_min_max(curr_sample, prev_min,
+                                                   prev_max)
+    else:
+        prev_mean, prev_std = curr_sample.mean(axis=0), curr_sample.std(axis=0)
+        prev_sample_normalized = normalize_gaussian(curr_sample, prev_mean,
+                                                    prev_std)
+    pca = PCA(n_components=num_analysis_params)
+    prev_sample_projected = pca.fit_transform(prev_sample_normalized)
+    prev_cell_id = cell_id
+
+    # plot ratio of variance explained
+    plt.figure(figsize=figure_size, dpi=dpi)
+    plt.plot(pca.explained_variance_ratio_, marker='.', linestyle='none')
+    plt.xlabel('PC')
+    plt.ylabel('Ratio of variance explained')
+    plt.tight_layout()
+    figure_path = os.path.join(
+        proj_dir, f'cell_{cell_id:04d}_var_explained_ratio_{norm_func}.pdf')
+    plt.savefig(figure_path)
+    plt.close()
+
+output_path = os.path.join(proj_dir, f'pca_stats_{norm_func}.csv')
+pca_stats.to_csv(output_path)
+
+# summarize PCA results
+# plot histogram of PCA distances
+plt.figure(figsize=figure_size, dpi=dpi)
+plt.hist(pca_stats['Distance'])
+plt.xlabel('Distance')
+plt.ylabel('Number of cell pairs')
+plt.tight_layout()
+figure_path = os.path.join(proj_dir, f'distance_hist_{norm_func}.pdf')
+plt.savefig(figure_path)
+plt.close()
+
+# plot distance vs similarity
+plt.figure(figsize=figure_size, dpi=dpi)
+plt.scatter(pca_stats['Distance'], pca_stats['Similarity'])
+plt.xlabel('Distance')
+plt.ylabel('Similarity')
+plt.tight_layout()
+figure_path = os.path.join(proj_dir, f'distance_vs_similarity_{norm_func}.pdf')
+plt.savefig(figure_path)
+plt.close()
