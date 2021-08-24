@@ -1216,18 +1216,33 @@ plt.savefig(figure_path)
 plt.close()
 
 # %%
+# initialize computation of distances between posterior samples
 from stan_helpers import get_kl_nn
 from stan_helpers import get_jensen_shannon
 import seaborn as sns
 
+log_normalize_samples = True
 sample_dist_dir = os.path.join(output_root, 'sample-dists')
+if log_normalize_samples:
+    sample_dist_dir += '-log-normalized'
 if not os.path.exists(sample_dist_dir):
     os.mkdir(sample_dist_dir)
 
-session_samples = [a.get_samples().iloc[:, 1:].to_numpy()
-                   for a in analyzer.session_analyzers]
+if log_normalize_samples:
+    session_samples = [np.log1p(a.get_samples().iloc[:, 1:].to_numpy())
+                       for a in analyzer.session_analyzers]
+else:
+    session_samples = [a.get_samples().iloc[:, 1:].to_numpy()
+                       for a in analyzer.session_analyzers]
+
+analyzer.load_expression_data('../../data/vol_adjusted_genes_transpose.txt')
+log_data = np.log(analyzer.raw_data.to_numpy().T + 1)
+log_data_min = np.amin(log_data, axis=0)
+log_data_max = np.amax(log_data, axis=0)
+normalized_data = (log_data - log_data_min) / (log_data_max - log_data_min)
 
 # %%
+# compute distances and save
 kl_yao = get_kl_nn(session_samples)
 np.save(os.path.join(sample_dist_dir, 'kl.npy'), kl_yao)
 js_dists = get_jensen_shannon(session_samples)
@@ -1237,66 +1252,65 @@ np.save(os.path.join(sample_dist_dir, 'js.npy'), js_dists)
 # load saved distance matrix if necessary
 kl_yao = np.load(os.path.join(sample_dist_dir, 'kl.npy'))
 js_dists = np.load(os.path.join(sample_dist_dir, 'js.npy'))
+js_10000_dists = np.load(os.path.join(sample_dist_dir, 'js_10000.npy'))
 
 # %%
-plt.figure(figsize=(6, 6), dpi=300)
-im = plt.imshow(kl_yao)
-plt.colorbar(im)
-figure_path = os.path.join(sample_dist_dir, 'kl_yao_heatmap.pdf')
-plt.savefig(figure_path)
-plt.close()
+def cluster_by_sample_distances(dist_mat, cluster_method, figure_prefix):
+    '''Cluster cells according to disances between posterior samples'''
+    from scipy.cluster.hierarchy import linkage, fcluster, leaves_list
+    from scipy.spatial.distance import squareform
 
-plt.figure(figsize=(6, 6), dpi=300)
-im = plt.imshow(js_dists)
-plt.colorbar(im)
-figure_path = os.path.join(sample_dist_dir, 'js_heatmap.pdf')
-plt.savefig(figure_path)
-plt.close()
+    # cluster with a distance matrix (get linkage data)
+    dist_mat_1d = squareform(dist_mat)
+    Z = linkage(dist_mat_1d, method=cluster_method)
 
-# %%
-plt.figure(figsize=(6, 6), dpi=300)
-kl_yao_grid = sns.clustermap(kl_yao, xticklabels=False, yticklabels=False)
-figure_path = os.path.join(sample_dist_dir, 'kl_yao_heatmap_clustered.pdf')
-plt.savefig(figure_path)
-plt.close()
+    # get cluster labels
+    cluster_labels = fcluster(Z, 5, criterion='maxclust')
+    reordered_cell_indices = leaves_list(Z)
+    reordered_sessions = [int(session_list[i]) for i in reordered_cell_indices]
 
-plt.figure(figsize=(6, 6), dpi=300)
-js_grid = sns.clustermap(js_dists, xticklabels=False, yticklabels=False)
-figure_path = os.path.join(sample_dist_dir, 'js_heatmap_clustered.pdf')
-plt.savefig(figure_path)
-plt.close()
+    # plot heatmap of distance matrix reordered by clustering result
+    plt.figure(figsize=(6, 6), dpi=300)
+    cluster_colors = [f'C{label - 1}' for label in cluster_labels]
+    _ = sns.clustermap(kl_yao, row_linkage=Z, col_linkage=Z,
+                       xticklabels=False, yticklabels=False,
+                       row_colors=cluster_colors)
+    figure_path = os.path.join(
+        sample_dist_dir,
+        f'{figure_prefix}_{cluster_method}_distances.pdf')
+    plt.savefig(figure_path)
+    plt.close()
 
-# %%
-def heatmap_by_dendrogram_order(plot_data, cluster_grid, figure_path,
-                                figure_size=(6, 6), x_label=None,
-                                y_label=None):
-    reordered_sessions = [int(session_list[i])
-                       for i in cluster_grid.dendrogram_row.reordered_ind]
-    reordered_data = plot_data[reordered_sessions, :]
+    # plot trajectories reordered by clustering result
+    plt.figure(figsize=(4, 6), dpi=300)
+    plt.imshow(y_all[reordered_sessions, :])
+    plt.xlabel('Ca2+ response')
+    plt.ylabel('Cells')
+    plt.tight_layout()
+    figure_path = os.path.join(
+        sample_dist_dir, f'{figure_prefix}_{cluster_method}_trajectories.pdf')
+    plt.savefig(figure_path)
+    plt.close()
 
-    plt.figure(figsize=figure_size, dpi=300)
-    plt.imshow(reordered_data)
-    if x_label:
-        plt.xlabel(x_label)
-    if y_label:
-        plt.ylabel(y_label)
+    # plot gene expression reordered by clustering result
+    plt.figure(figsize=(4, 6), dpi=300)
+    plt.imshow(normalized_data[reordered_sessions, :])
+    plt.xlabel('Genes')
+    plt.ylabel('Cells')
+    plt.tight_layout()
+    figure_path = os.path.join(
+        sample_dist_dir,
+        f'{figure_prefix}_{cluster_method}_gene_expression.pdf')
     plt.savefig(figure_path)
     plt.close()
 
 # %%
-heatmap_by_dendrogram_order(
-    y_all, kl_yao_grid, os.path.join(sample_dist_dir, 'traj_kl_yao.pdf'),
-    x_label='Ca2+ response', y_label='Cells')
-heatmap_by_dendrogram_order(
-    y_all, js_grid, os.path.join(sample_dist_dir, 'traj_js.pdf'),
-    x_label='Ca2+ response', y_label='Cells')
-
-analyzer.load_expression_data('../../data/vol_adjusted_genes_transpose.txt')
-heatmap_by_dendrogram_order(
-    analyzer.raw_data.to_numpy().T, kl_yao_grid,
-    os.path.join(sample_dist_dir, 'gene_exp_kl_yao.pdf'),
-    x_label='Genes', y_label='Cells')
-heatmap_by_dendrogram_order(
-    analyzer.raw_data.to_numpy().T, js_grid,
-    os.path.join(sample_dist_dir, 'gene_exp_js.pdf'),
-    x_label='Genes', y_label='Cells')
+cluster_methods = ['single', 'complete', 'average', 'centroid', 'median',
+                   'ward']
+for method in cluster_methods:
+    print(f'Clustering kl_yao using {method} linkage...')
+    cluster_by_sample_distances(kl_yao, method, 'kl_yao')
+    print(f'Clustering js using {method} linkage...')
+    cluster_by_sample_distances(js_dists, method, 'js')
+    print(f'Clustering js_10000 using {method} linkage...')
+    cluster_by_sample_distances(js_10000_dists, method, 'js_10000')

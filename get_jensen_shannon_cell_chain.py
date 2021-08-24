@@ -17,6 +17,8 @@ def main():
     last_cell_order = args.last_cell_order
 
     # load cell chain
+    print(f'Loading samples from {stan_run}')
+
     with open('stan_run_meta.json', 'r') as f:
         stan_run_meta = json.load(f)
 
@@ -39,18 +41,27 @@ def main():
     analyzer = StanMultiSessionAnalyzer(session_list, output_dir, session_dirs,
                                         param_names=param_names)
 
-    session_samples = [a.get_samples().iloc[:, 1:].to_numpy()
-                       for a in analyzer.session_analyzers]
+    if args.log_normalize:
+        session_samples = [np.log1p(a.get_samples().iloc[:, 1:].to_numpy())
+                           for a in analyzer.session_analyzers]
+    else:
+        session_samples = [a.get_samples().iloc[:, 1:].to_numpy()
+                           for a in analyzer.session_analyzers]
+    print(f'Samples from {stan_run} loaded')
 
     # compute Jensen-Shannon distances
     sample_dist_dir = os.path.join('result', 'sample-dists')
+    if args.log_normalize:
+        sample_dist_dir += '-log-normalized'
     if not os.path.exists(sample_dist_dir):
         os.mkdir(sample_dist_dir)
 
-    js_dists = get_jensen_shannon(session_samples,
-                                  subsample_size=args.subsample_size,
-                                  random_seed=args.random_seed)
+    print('Computing Jensen-Shannon distances...')
+    js_dists = get_jensen_shannon(
+        session_samples, subsample_size=args.subsample_size,
+        random_seed=args.random_seed, verbose=args.verbose)
     np.save(os.path.join(sample_dist_dir, f'{stan_run}_js.npy'), js_dists)
+    print('Jensen-Shannon distances computed and saved')
 
 def get_args():
     arg_parser = argparse.ArgumentParser(
@@ -60,7 +71,10 @@ def get_args():
     arg_parser.add_argument('--first_cell_order', type=int, required=True)
     arg_parser.add_argument('--last_cell_order', type=int, required=True)
     arg_parser.add_argument('--subsample_size', type=int, default=1000)
+    arg_parser.add_argument('--log_normalize', default=False,
+                            action='store_true')
     arg_parser.add_argument('--random_seed', type=int, default=0)
+    arg_parser.add_argument('--verbose', default=False, action='store_true')
 
     return arg_parser.parse_args()
 
