@@ -17,7 +17,7 @@ def main():
     last_cell_order = args.last_cell_order
 
     # load cell chain
-    print(f'Loading samples from {stan_run}')
+    print(f'Loading samples from {stan_run}...')
 
     with open('stan_run_meta.json', 'r') as f:
         stan_run_meta = json.load(f)

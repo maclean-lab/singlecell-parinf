@@ -89,8 +89,8 @@ y_prime, _ = get_trajectory_derivatives(t0, downsample_offset=t_downsample)
 
 # get similarity matrix
 soptsc_vars = scipy.io.loadmat(
-        "../../result/SoptSC/SoptSC_feature_100/workspace.mat")
-similarity_matrix = soptsc_vars["W"]
+        '../../result/SoptSC/SoptSC_feature_100/workspace.mat')
+similarity_matrix = soptsc_vars['W']
 
 # initialize the analyzer for the cell chain
 print('Initializing the analyzer for the cell chain...')
@@ -1216,101 +1216,3 @@ plt.savefig(figure_path)
 plt.close()
 
 # %%
-# initialize computation of distances between posterior samples
-from stan_helpers import get_kl_nn
-from stan_helpers import get_jensen_shannon
-import seaborn as sns
-
-log_normalize_samples = True
-sample_dist_dir = os.path.join(output_root, 'sample-dists')
-if log_normalize_samples:
-    sample_dist_dir += '-log-normalized'
-if not os.path.exists(sample_dist_dir):
-    os.mkdir(sample_dist_dir)
-
-if log_normalize_samples:
-    session_samples = [np.log1p(a.get_samples().iloc[:, 1:].to_numpy())
-                       for a in analyzer.session_analyzers]
-else:
-    session_samples = [a.get_samples().iloc[:, 1:].to_numpy()
-                       for a in analyzer.session_analyzers]
-
-analyzer.load_expression_data('../../data/vol_adjusted_genes_transpose.txt')
-log_data = np.log(analyzer.raw_data.to_numpy().T + 1)
-log_data_min = np.amin(log_data, axis=0)
-log_data_max = np.amax(log_data, axis=0)
-normalized_data = (log_data - log_data_min) / (log_data_max - log_data_min)
-
-# %%
-# compute distances and save
-kl_yao = get_kl_nn(session_samples)
-np.save(os.path.join(sample_dist_dir, 'kl.npy'), kl_yao)
-js_dists = get_jensen_shannon(session_samples)
-np.save(os.path.join(sample_dist_dir, 'js.npy'), js_dists)
-
-# %%
-# load saved distance matrix if necessary
-kl_yao = np.load(os.path.join(sample_dist_dir, 'kl.npy'))
-js_dists = np.load(os.path.join(sample_dist_dir, 'js.npy'))
-js_10000_dists = np.load(os.path.join(sample_dist_dir, 'js_10000.npy'))
-
-# %%
-def cluster_by_sample_distances(dist_mat, cluster_method, figure_prefix):
-    '''Cluster cells according to disances between posterior samples'''
-    from scipy.cluster.hierarchy import linkage, fcluster, leaves_list
-    from scipy.spatial.distance import squareform
-
-    # cluster with a distance matrix (get linkage data)
-    dist_mat_1d = squareform(dist_mat)
-    Z = linkage(dist_mat_1d, method=cluster_method)
-
-    # get cluster labels
-    cluster_labels = fcluster(Z, 5, criterion='maxclust')
-    reordered_cell_indices = leaves_list(Z)
-    reordered_sessions = [int(session_list[i]) for i in reordered_cell_indices]
-
-    # plot heatmap of distance matrix reordered by clustering result
-    plt.figure(figsize=(6, 6), dpi=300)
-    cluster_colors = [f'C{label - 1}' for label in cluster_labels]
-    _ = sns.clustermap(kl_yao, row_linkage=Z, col_linkage=Z,
-                       xticklabels=False, yticklabels=False,
-                       row_colors=cluster_colors)
-    figure_path = os.path.join(
-        sample_dist_dir,
-        f'{figure_prefix}_{cluster_method}_distances.pdf')
-    plt.savefig(figure_path)
-    plt.close()
-
-    # plot trajectories reordered by clustering result
-    plt.figure(figsize=(4, 6), dpi=300)
-    plt.imshow(y_all[reordered_sessions, :])
-    plt.xlabel('Ca2+ response')
-    plt.ylabel('Cells')
-    plt.tight_layout()
-    figure_path = os.path.join(
-        sample_dist_dir, f'{figure_prefix}_{cluster_method}_trajectories.pdf')
-    plt.savefig(figure_path)
-    plt.close()
-
-    # plot gene expression reordered by clustering result
-    plt.figure(figsize=(4, 6), dpi=300)
-    plt.imshow(normalized_data[reordered_sessions, :])
-    plt.xlabel('Genes')
-    plt.ylabel('Cells')
-    plt.tight_layout()
-    figure_path = os.path.join(
-        sample_dist_dir,
-        f'{figure_prefix}_{cluster_method}_gene_expression.pdf')
-    plt.savefig(figure_path)
-    plt.close()
-
-# %%
-cluster_methods = ['single', 'complete', 'average', 'centroid', 'median',
-                   'ward']
-for method in cluster_methods:
-    print(f'Clustering kl_yao using {method} linkage...')
-    cluster_by_sample_distances(kl_yao, method, 'kl_yao')
-    print(f'Clustering js using {method} linkage...')
-    cluster_by_sample_distances(js_dists, method, 'js')
-    print(f'Clustering js_10000 using {method} linkage...')
-    cluster_by_sample_distances(js_10000_dists, method, 'js_10000')

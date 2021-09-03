@@ -2137,7 +2137,7 @@ def get_jensen_shannon(posterior_samples, subsample_size=1000, random_seed=0,
     for i, j in itertools.combinations_with_replacement(range(num_samples), 2):
         if verbose:
             print('Computing Jensen-Shannon distance between sample '
-                  f'{i:04d} and sample {j:04d}..')
+                  f'{i:04d} and sample {j:04d}...')
 
         sample_i = posterior_samples[i]
         sample_j = posterior_samples[j]

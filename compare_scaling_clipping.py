@@ -26,4 +26,3 @@ if not os.path.exists(output_dir):
 num_runs = len(analyzer_dirs)
 
 # %%
-# plot parameters in same

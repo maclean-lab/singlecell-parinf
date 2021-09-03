@@ -17,21 +17,23 @@ def main():
     min_peak = args.min_peak
     output_file = args.output
 
+    if method == 'random':
+        get_cells_random(output_file, root=root_cell, min_peak=min_peak)
+        return
+
     # load similarity matrix
     soptsc_vars = scipy.io.loadmat(
-        "../../result/SoptSC/SoptSC_feature_100/workspace.mat")
-    similarity_matrix = soptsc_vars["W"]
+        '../../result/SoptSC/SoptSC_feature_100/workspace.mat')
+    similarity_matrix = soptsc_vars['W']
 
-    # plot similarity matrix
-    if method == "plot":
+    if method == 'plot':
         plot_similarity(similarity_matrix, output_file)
-    elif method == "greedy":
+    elif method == 'greedy':
         get_cells_greedy(similarity_matrix, output_file, root=root_cell)
-    elif method == "bfs":
+    elif method == 'bfs':
         get_cells_bfs(similarity_matrix, output_file, root=root_cell,
-                      stochastic=stochastic, min_similarity=min_similarity,
-                      min_peak=min_peak)
-    elif method == "dfs":
+                      min_similarity=min_similarity)
+    elif method == 'dfs':
         get_cells_dfs(similarity_matrix, output_file, root=root_cell,
                       stochastic=stochastic, min_similarity=min_similarity,
                       min_peak=min_peak)
@@ -39,10 +41,18 @@ def main():
 def plot_similarity(similarity_matrix, output_file):
     plt.clf()
     plt.figure(figsize=(16, 16))
-    plt.imshow(similarity_matrix, cmap="gray")
+    plt.imshow(similarity_matrix, cmap='gray')
     plt.colorbar()
     plt.savefig(output_file)
     plt.close()
+
+def get_cells_random(output_file, root=0, min_peak=0.0):
+    """get cell list by random shuffle"""
+    cells = select_cells(min_peak=min_peak)
+    cells.remove(root)
+    cells = pd.DataFrame(cells, columns=['Cell'])
+    cells = cells.sample(frac=1, replace=False, axis=0)
+    cells.to_csv(output_file, sep='\t', index=False)
 
 def get_cells_greedy(similarity_matrix, output_file, root=0, verbose=False):
     num_cells = similarity_matrix.shape[0]
@@ -61,18 +71,16 @@ def get_cells_greedy(similarity_matrix, output_file, root=0, verbose=False):
         if similarity_matrix[ordered_cells[i - 1], ordered_cells[i]] == 0:
             num_unsimilars += 1
             if verbose:
-                print("Warning: the {}-th cell is added with 0 ".format(i)
-                      + "similarity")
+                print(f'Warning: the {i}-th cell is added with 0 similarity')
 
     if verbose:
-        print("There are {} cells that are not similar ".format(num_unsimilars)
-            + "to their predecessors")
+        print(f'There are {num_unsimilars} cells that are not similar '
+              + 'to their predecessors')
 
     ordered_cells = pd.Series(ordered_cells)
     ordered_cells.to_csv(output_file, header=False, index=False)
 
-def get_cells_bfs(similarity_matrix, output_file, root=0, stochastic=False,
-                  min_similarity=0.0, min_peak=0.0):
+def get_cells_bfs(similarity_matrix, output_file, root=0, min_similarity=0.0):
     """get cell ordering using breadth-first search"""
     # initialize BFS
     num_cells = similarity_matrix.shape[0]
@@ -108,8 +116,8 @@ def get_cells_bfs(similarity_matrix, output_file, root=0, stochastic=False,
             curr_level = next_level
             next_level = collections.deque()
 
-    bfs_result = pd.DataFrame({"Cell": ordered_cells, "Parent": parents})
-    bfs_result.to_csv(output_file, sep="\t", index=False)
+    bfs_result = pd.DataFrame({'Cell': ordered_cells, 'Parent': parents})
+    bfs_result.to_csv(output_file, sep='\t', index=False)
 
 def get_cells_dfs(similarity_matrix, output_file, root=0, stochastic=False,
                   min_similarity=0.0, min_peak=0.0):
@@ -158,21 +166,21 @@ def get_cells_dfs(similarity_matrix, output_file, root=0, stochastic=False,
                 parent_stack.append(cell)
 
     if i + 1 < num_cells:
-        print("Warning: {} cell(s) not visited".format(num_cells - i - 1))
+        print(f'Warning: {num_cells - i - 1} cell(s) not visited')
 
     # # find cells with more than 1 child
-    # print("Cells with more than 1 child:")
-    # print("order\tcell\tchildren")
+    # print('Cells with more than 1 child:')
+    # print('order\tcell\tchildren')
     # for i, cell in enumerate(ordered_cells):
     #     if num_children[cell] > 1:
     #         children = np.squeeze(np.argwhere(parents == cell))
-    #         print("{}\t{}\t{}".format(i, cell, children))
+    #         print(f'{i}\t{cell}\t{children}')
 
-    dfs_result = pd.DataFrame({"Cell": ordered_cells, "Parent": parents})
-    dfs_result.to_csv(output_file, sep="\t", index=False)
+    dfs_result = pd.DataFrame({'Cell': ordered_cells, 'Parent': parents})
+    dfs_result.to_csv(output_file, sep='\t', index=False)
 
 def select_cells(min_peak=0.0):
-    y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
+    y = np.loadtxt('canorm_tracjectories.csv', delimiter=',')
     selected = np.where(np.max(y, axis=1) >= min_peak)
     selected = set(selected[0])
 
@@ -181,15 +189,15 @@ def select_cells(min_peak=0.0):
 def get_args():
     """parse command line arguments"""
     arg_parser = ArgumentParser(
-        description="Create a list of cells ordered by similarity")
-    arg_parser.add_argument("--method", type=str, required=True)
-    arg_parser.add_argument("--root_cell", type=int, required=True)
-    arg_parser.add_argument("--stochastic", default=False, action="store_true")
-    arg_parser.add_argument("--min_similarity", type=float, default=0.0)
-    arg_parser.add_argument("--min_peak", type=float, default=0.0)
-    arg_parser.add_argument("--output", type=str, required=True)
+        description='Create a list of cells')
+    arg_parser.add_argument('--method', type=str, required=True)
+    arg_parser.add_argument('--root_cell', type=int, required=True)
+    arg_parser.add_argument('--stochastic', default=False, action='store_true')
+    arg_parser.add_argument('--min_similarity', type=float, default=0.0)
+    arg_parser.add_argument('--min_peak', type=float, default=0.0)
+    arg_parser.add_argument('--output', type=str, required=True)
 
     return arg_parser.parse_args()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

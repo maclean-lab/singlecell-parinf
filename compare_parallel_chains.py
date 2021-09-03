@@ -14,8 +14,7 @@ from tqdm import tqdm, trange
 import scanpy as sc
 from anndata import AnnData
 
-from stan_helpers import StanSessionAnalyzer
-from compare_sessions import compare_params
+from stan_helpers import StanSessionAnalyzer, pdf_multi_plot
 
 # %%
 param_names = ['sigma', 'L', 'Katp', 'KoffPLC', 'Vplc', 'Kip3', 'KoffIP3',
@@ -123,15 +122,41 @@ common_cell_id_set.update(chain_2['cell_ids'])
 common_cell_ids = np.intersect1d(chain_1['cell_ids'], chain_2['cell_ids'])
 
 # %%
+def compare_params(analyzers, figure_name):
+    """make violin plots for parameters sampled from different Stan
+    sessions
+    """
+    all_samples = []
+    num_sessions = len(session_ids)
+
+    for param in param_names:
+        param_samples = []
+
+        # go over each chain in a session
+        for idx in range(num_sessions):
+            for chain in chain_list[idx]:
+                chain_sample = analyzers[idx].samples[chain][param].to_numpy()
+                param_samples.append(chain_sample)
+
+        all_samples.append(param_samples)
+
+    # make violin plots for all parameters
+    figure_path = os.path.join(output_dir, 'param-violins-by-cell',
+                               figure_name)
+    xticks = [f"{session_ids[idx]}:{chain}" for idx in range(num_sessions)
+              for chain in chain_list[idx]]
+    pdf_multi_plot(plt.violinplot, all_samples, figure_path, num_rows=4,
+                   num_cols=1, titles=param_names, xticks=xticks,
+                   xtick_rotation=90)
+
+# %%
 for cell_id in common_cell_id_set:
     chain_1_cell_order = np.where(chain_1['cell_ids'] == cell_id)[0][0]
     chain_2_cell_order = np.where(chain_2['cell_ids'] == cell_id)[0][0]
     analyzer_1 = chain_1['analyzers'][chain_1_cell_order]
     analyzer_2 = chain_2['analyzers'][chain_2_cell_order]
-    output_name = f'param_violin_{cell_id:04d}.pdf'
-    compare_params([analyzer_1, analyzer_2], session_ids, chain_list,
-                   os.path.join(output_dir, 'param-violins-by-cell'),
-                   param_names, output_name=output_name)
+    compare_params([analyzer_1, analyzer_2],
+                   f'param_violin_{cell_id:04d}.pdf')
 
 # %%
 # make scatter plots of parameter means vs expression of every gene
