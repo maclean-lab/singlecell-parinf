@@ -50,8 +50,12 @@ def get_cells_random(output_file, root=0, min_peak=0.0):
     """get cell list by random shuffle"""
     cells = select_cells(min_peak=min_peak)
     cells.remove(root)
+    cells = np.array(list(cells))
+
+    rng = np.random.default_rng()
+    rng.shuffle(cells)
+    cells = np.insert(cells, 0, root)
     cells = pd.DataFrame(cells, columns=['Cell'])
-    cells = cells.sample(frac=1, replace=False, axis=0)
     cells.to_csv(output_file, sep='\t', index=False)
 
 def get_cells_greedy(similarity_matrix, output_file, root=0, verbose=False):
