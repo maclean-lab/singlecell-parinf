@@ -33,14 +33,15 @@ os.chdir(working_dir)
 # stan_run = 'simple-prior'
 # stan_run = 'const-eta1'
 # stan_run = 'const-Be'
-stan_run = 'const-Be-eta1'
+# stan_run = 'const-Be-eta1'
 # stan_run = 'const-Be-eta1-mixed-2'
+stan_run = 'const-Be-eta1-random-1'
 # stan_run = 'lemon-prior-1000'
 # stan_run = 'lemon-prior-500'
 
 # additional flags
 first_cell_order = 1
-last_cell_order = 500
+last_cell_order = 100
 sensitive_params = ['L', 'Katp', 'KoffPLC', 'Vplc', 'Kip3', 'KoffIP3', 'a',
                     'dinh', 'd1', 'epr', 'eta2']
 pca_sampled_only = False

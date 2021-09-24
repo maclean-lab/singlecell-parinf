@@ -543,7 +543,7 @@ class StanSessionAnalyzer:
             else:
                 return None
 
-    def get_samples(self, rhat_upper_bound=4.0):
+    def get_samples(self, rhat_upper_bound=4.0, excluded_params=None):
         """Get sampled parameters of mixed chains"""
         mixed_chains = self.get_mixed_chains(rhat_upper_bound=rhat_upper_bound)
 
@@ -551,6 +551,9 @@ class StanSessionAnalyzer:
             return None
 
         mixed_samples = pd.concat([self.samples[c] for c in mixed_chains])
+
+        if excluded_params is not None:
+            mixed_samples.drop(labels=excluded_params, axis=1, inplace=True)
 
         return mixed_samples
 
@@ -2079,8 +2082,7 @@ def get_mode_continuous_rv(x, method='kde', bins=100):
 
     return mode
 
-
-def get_kl_nn(posterior_samples, random_seed=0):
+def get_kl_nn(posterior_samples, random_seed=0, verbose=False):
     '''Compute KL divergence based nearest neighbors
 
     samples: list of posterior samples, each has shape num_draws * num_params
@@ -2099,6 +2101,10 @@ def get_kl_nn(posterior_samples, random_seed=0):
         D[i, i] = 0.5
 
         for j in range(i + 1, num_samples):
+            if verbose:
+                print(f'\rFinding nearest neighbors for samples {i} and {j}',
+                      end='', flush=False)
+
             n_i = posterior_samples[i].shape[0]
             n_j = posterior_samples[j].shape[0]
             n = min(n_i, n_j)
@@ -2113,6 +2119,9 @@ def get_kl_nn(posterior_samples, random_seed=0):
                 ((nn_indices[:n] < n).astype(int),
                  (nn_indices[n:] >= n).astype(int))
             ))
+
+    if verbose:
+        print()
 
     D = 1 - D.T
     KL = D * np.log(D * 2) + (1 - D) * np.log((1 - D) * 2)
