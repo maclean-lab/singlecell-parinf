@@ -104,25 +104,79 @@
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8_mixed_2.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-mixed-2",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
-        "color": "C2"
+        "color": "C1"
     },
-    "const-Be-eta1-mixed-all": {
+    "const-Be-eta1-mixed-3": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",
-        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-mixed_all",
-        "cell_list": "dfs_feature_100_root_5106_0.000_1.8_mixed_all.txt",
-        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-mixed-all",
+        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-mixed_3",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8_mixed_3.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-mixed-3",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
-        "color": "C0"
+        "color": "C1"
+    },
+    "const-Be-eta1-mixed-4": {
+        "param_mask": "0111111111011101111",
+        "ode_variant": "equiv_2_const_Be_eta1",
+        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-mixed_4",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8_mixed_4.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-mixed-4",
+        "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
+        "color": "C1"
     },
     "const-Be-eta1-random-1": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",
         "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-random-1",
-        "cell_list": "random_root_5106_1.8.txt",
+        "cell_list": "random_root_5106_1.8_1.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-random-1",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
         "color": "C0"
+    },
+    "const-Be-eta1-random-2": {
+        "param_mask": "0111111111011101111",
+        "ode_variant": "equiv_2_const_Be_eta1",
+        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-random-2",
+        "cell_list": "random_root_5106_1.8_2.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-random-2",
+        "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
+        "color": "C1"
+    },
+    "const-Be-eta1-random-3": {
+        "param_mask": "0111111111011101111",
+        "ode_variant": "equiv_2_const_Be_eta1",
+        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-random-3",
+        "cell_list": "random_root_5106_1.8_3.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-random-3",
+        "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
+        "color": "C2"
+    },
+    "const-Be-eta1-random-4": {
+        "param_mask": "0111111111011101111",
+        "ode_variant": "equiv_2_const_Be_eta1",
+        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-random-4",
+        "cell_list": "random_root_5106_1.8_4.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-random-4",
+        "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
+        "color": "C3"
+    },
+    "const-Be-eta1-random-5": {
+        "param_mask": "0111111111011101111",
+        "ode_variant": "equiv_2_const_Be_eta1",
+        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-random-5",
+        "cell_list": "random_root_5106_1.8_5.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-random-5",
+        "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
+        "color": "C4"
+    },
+    "const-Be-eta1-random-6": {
+        "param_mask": "0111111111011101111",
+        "ode_variant": "equiv_2_const_Be_eta1",
+        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-random-6",
+        "cell_list": "random_root_5106_1.8_6.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-random-6",
+        "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
+        "color": "C5"
     },
     "lemon-prior-1000": {
         "param_mask": "0111111111111111111",

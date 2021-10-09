@@ -5,6 +5,8 @@ import itertools
 import pickle
 import re
 
+from typing import List, Dict, Union, Optional
+
 import math
 import numpy as np
 import scipy.integrate
@@ -31,9 +33,54 @@ from tqdm import tqdm
 from pystan import StanModel
 
 class StanSession:
-    def __init__(self, stan_model_path, output_dir, data=None, num_chains=4,
-                 num_iters=1000, warmup=1000, thin=1, control={},
-                 rhat_upper_bound=1.1):
+    """Wrapper for fitting data using pystan.
+
+    Attributes:
+        model_name (str): Name of the Stan model.
+        model: .
+        output_dir (Union[str, bytes, os.PathLike]): Directory to save pystan
+            output.
+        data (Dict, optional): Data to be fit. Defaults to None.
+        num_chains (int, optional): Number of MCMC chains. Defaults to 4.
+        num_iters (int, optional): Number of total MCMC iterations. Defaults
+            to 2000.
+        warmup (int, optional): Number of warmup iterations. Defaults to 1000.
+        thin (int, optional): Thinning interval. Defaults to 1.
+        control (Optional[Dict], optional): Control parameters for NUTS.
+            Defaults to {}.
+        rhat_upper_bound (float, optional): Upper bound for R^hat when
+            determining convergence. Defaults to 1.1.
+        fit (pystan.StanFit4model): fit instance from NUTS.
+        inference_data (arviz.InferenceData): inference data convereted from
+            Stan fit instance.
+        fit_summary: Summary table of Stan fit.
+    """
+
+    def __init__(self, stan_model_path: Union[str, bytes, os.PathLike],
+                 output_dir: Union[str, bytes, os.PathLike],
+                 data: Dict = None, num_chains: int = 4,
+                 num_iters: int = 2000, warmup: int = 1000, thin: int = 1,
+                 control: Optional[Dict] = None,
+                 rhat_upper_bound: float = 1.1) -> None:
+        """
+        Args:
+            stan_model_path (Union[str, bytes, os.PathLike]): Path to Stan
+                model. Can be a Stan model specification or compiled Stan
+                model.
+            output_dir (Union[str, bytes, os.PathLike]): Directory to save
+                pystan output.
+            data (Dict, optional): Data to be fit. Defaults to None.
+            num_chains (int, optional): Number of MCMC chains. Defaults to 4.
+            num_iters (int, optional): Number of total MCMC iterations.
+                Defaults to 2000.
+            warmup (int, optional): Number of warmup iterations. Defaults to
+                1000.
+            thin (int, optional): Thinning interval. Defaults to 1.
+            control (Optional[Dict], optional): Control parameters for NUTS.
+                Defaults to None.
+            rhat_upper_bound (float, optional): Upper bound for R^hat when
+            determining convergence. Defaults to 1.1.
+        """
         # load Stan model
         stan_model_filename = os.path.basename(stan_model_path)
         self.model_name, model_ext = os.path.splitext(stan_model_filename)
@@ -65,8 +112,11 @@ class StanSession:
         self.num_iters = num_iters
         self.warmup = warmup
         self.thin = thin
-        self.control = control
+        self.control = control if control else {}
         self.rhat_upper_bound = rhat_upper_bound
+        self.fit = None
+        self.fit_summary = None
+        self.inference_data = None
 
         sys.stdout.flush()
 
@@ -304,9 +354,9 @@ class StanSessionAnalyzer:
                 time_text = sf.readlines()[-2]
                 sampling_time[chain_idx] = float(time_text.split()[1])
                 if unit == 'm':
-                   sampling_time[chain_idx] /= 60
+                    sampling_time[chain_idx] /= 60
                 elif unit == 'h':
-                   sampling_time[chain_idx] /= 3600
+                    sampling_time[chain_idx] /= 3600
 
         return sampling_time
 
@@ -741,7 +791,7 @@ class StanMultiSessionAnalyzer:
         if sort:
             self.param_param_corrs.sort_values(
                 'Correlation', ascending=False, inplace=True,
-                ignore_index=True, key=lambda x: np.abs(x))
+                ignore_index=True, key=np.abs)
 
         if plot:
             figure_path = os.path.join(self.output_dir,
@@ -989,7 +1039,7 @@ class StanMultiSessionAnalyzer:
                 fig.savefig(output_path)
                 plt.close(fig)
 
-    def plot_param_pairs(self, param_pairs, sessions=[], num_rows=4,
+    def plot_param_pairs(self, param_pairs, sessions=None, num_rows=4,
                          num_cols=2, page_size=(8.5, 11),
                          param_names_on_plot=None, titles=None):
         '''Make scatter plot of sample means for a pair of parameters, plus
@@ -1004,6 +1054,8 @@ class StanMultiSessionAnalyzer:
         if sessions:
             sessions = [s for s in sessions if s in self.session_list]
             num_plots += len(sessions)
+        else:
+            sessions = []
         num_pages = math.ceil(num_plots / num_subplots_per_page)
         if param_names_on_plot:
             param_0_label = param_names_on_plot[param_pairs[0]]
@@ -1348,7 +1400,10 @@ class StanMultiSessionAnalyzer:
 
     def simulate_trajectories(self, ode, t0, ts, y0, y_ref, target_var_idx,
                               figure_size=(3, 2), dpi=300, output_paths=None,
-                              exclude_sessions=[]):
+                              exclude_sessions=None):
+        if not exclude_sessions:
+            exclude_sessions = []
+
         for idx, analyzer in enumerate(self.session_analyzers):
             if self.session_list[idx] in exclude_sessions:
                 continue
@@ -2081,92 +2136,3 @@ def get_mode_continuous_rv(x, method='kde', bins=100):
         mode = support[np.argmax(pdf)]
 
     return mode
-
-def get_kl_nn(posterior_samples, random_seed=0, verbose=False):
-    '''Compute KL divergence based nearest neighbors
-
-    samples: list of posterior samples, each has shape num_draws * num_params
-    See https://github.com/wollmanlab/ODEparamFitting_ABCSMC/blob/master/estimateKLdivergenceBasedOnNN.m
-    '''
-    from sklearn.neighbors import NearestNeighbors
-    bit_generator = np.random.MT19937(random_seed)
-    rng = np.random.default_rng(bit_generator)
-
-    k = 2
-    num_samples = len(posterior_samples)
-    D = np.ones((num_samples, num_samples))
-    nn = NearestNeighbors(n_neighbors=k, algorithm='kd_tree')
-
-    for i in range(num_samples):
-        D[i, i] = 0.5
-
-        for j in range(i + 1, num_samples):
-            if verbose:
-                print(f'\rFinding nearest neighbors for samples {i} and {j}',
-                      end='', flush=False)
-
-            n_i = posterior_samples[i].shape[0]
-            n_j = posterior_samples[j].shape[0]
-            n = min(n_i, n_j)
-            P_i = posterior_samples[i][rng.choice(n_i, size=n), :]
-            P_j = posterior_samples[j][rng.choice(n_j, size=n), :]
-            P_ij = np.vstack((P_i, P_j))
-
-            nn.fit(P_ij)
-            _, nn_indices = nn.kneighbors(P_ij)
-            nn_indices = nn_indices[:, k - 1]
-            D[i, j] = np.mean(np.concatenate(
-                ((nn_indices[:n] < n).astype(int),
-                 (nn_indices[n:] >= n).astype(int))
-            ))
-
-    if verbose:
-        print()
-
-    D = 1 - D.T
-    KL = D * np.log(D * 2) + (1 - D) * np.log((1 - D) * 2)
-    for i, j in itertools.combinations(range(num_samples), 2):
-        if np.isnan(KL[j, i]):
-            KL[j, i] = 1.0
-
-        KL[i, j] = KL[j, i]
-
-    return KL
-
-def get_jensen_shannon(posterior_samples, subsample_size=1000, random_seed=0,
-                       verbose=False):
-    '''Compute Jensen-Shannon distance between pairs of samples'''
-    bit_generator = np.random.MT19937(random_seed)
-    rng = np.random.default_rng(bit_generator)
-
-    num_samples = len(posterior_samples)
-    num_params = posterior_samples[0].shape[1]
-    js_dists = np.empty((num_samples, num_samples))
-
-    for i, j in itertools.combinations_with_replacement(range(num_samples), 2):
-        if verbose:
-            print('Computing Jensen-Shannon distance between sample '
-                  f'{i:04d} and sample {j:04d}...')
-
-        sample_i = posterior_samples[i]
-        sample_j = posterior_samples[j]
-        sample_min = np.minimum(np.amin(sample_i, axis=0),
-                                np.amin(sample_j, axis=0))
-        sample_max = np.maximum(np.amax(sample_i, axis=0),
-                                np.amax(sample_j, axis=0))
-        estimation_points = \
-            rng.random(size=(subsample_size, num_params)) \
-                * (sample_max - sample_min) + sample_min
-
-        kernel_i = scipy.stats.gaussian_kde(sample_i.T)
-        density_i = kernel_i(estimation_points.T)
-        kernel_j = scipy.stats.gaussian_kde(sample_j.T)
-        density_j = kernel_j(estimation_points.T)
-
-        js_ij =  scipy.spatial.distance.jensenshannon(density_i, density_j)
-        if np.isnan(js_ij):
-            js_dists[i, j] = js_dists[j, i] = 1.0
-        else:
-            js_dists[i, j] = js_dists[j, i] = js_ij
-
-    return js_dists
