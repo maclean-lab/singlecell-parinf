@@ -63,9 +63,9 @@ def main():
 
     num_samples = len(session_samples)
     if args.scale:
-        sample_max = np.amin([np.amin(s, axis=0) for s in session_samples],
+        sample_max = np.amax([np.amax(s, axis=0) for s in session_samples],
                              axis=0)
-        sample_min = np.amax([np.amax(s, axis=0) for s in session_samples],
+        sample_min = np.amin([np.amin(s, axis=0) for s in session_samples],
                              axis=0)
 
         for i in range(num_samples):
