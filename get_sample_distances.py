@@ -128,13 +128,14 @@ def get_args():
     arg_parser = argparse.ArgumentParser(
         description='Compute distances between posterior samples')
     arg_parser.add_argument('--stan_runs', nargs='+', required=True)
-    arg_parser.add_argument('--list_begin', nargs='+', required=True)
-    arg_parser.add_argument('--list_end', nargs='+', required=True)
+    arg_parser.add_argument('--list_begin', nargs='+', type=int, required=True)
+    arg_parser.add_argument('--list_end', nargs='+', type=int, required=True)
     arg_parser.add_argument('--log_normalize', default=False,
                             action='store_true')
     arg_parser.add_argument('--scale', default=False, action='store_true')
     arg_parser.add_argument('--methods', nargs='+', required=True)
-    arg_parser.add_argument('--num_neighbors', nargs='+', default=[2])
+    arg_parser.add_argument('--num_neighbors', nargs='+', type=int,
+                            default=[2])
     arg_parser.add_argument('--random_seed', type=int, default=0)
 
     return arg_parser.parse_args()
