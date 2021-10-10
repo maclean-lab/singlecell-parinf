@@ -39,7 +39,7 @@ def main():
         cell_list = run_cell_list.iloc[l_begin:l_end + 1, :]
         run_root = os.path.join('result', stan_run_meta[run]['output_dir'][5:])
         session_list.extend([str(c) for c in cell_list['Cell']])
-        session_dirs.extend([os.path.join(run_root, 'samples', f'cell-{c:04d}')
+        session_dirs.extend([os.path.join(run_root, f'cell-{c:04d}')
                              for c in cell_list['Cell']])
 
     if len(stan_runs) == 1:
