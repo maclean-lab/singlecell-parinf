@@ -14,7 +14,7 @@ def get_kl_nn(posterior_samples: List[np.ndarray], method: str = 'yao',
     For each pair of posterior samples, KL(P || Q) is computed, where P is the
     probability that nearest data points of a data point come from the other
     sample for each, and Q is the probability under null condition (i.e.
-    pair of identical posterior samples).  Original implementation in MATLAB:
+    pair of identical posterior samples). Original implementation in MATLAB:
     https://github.com/wollmanlab/ODEparamFitting_ABCSMC/blob/master/estimateKLdivergenceBasedOnNN.m
 
     Args:

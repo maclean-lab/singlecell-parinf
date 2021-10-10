@@ -86,30 +86,36 @@ def main():
     print('Computing sample distances using different methods...')
 
     # Yao 2016 version
-    print('Current method: Yao 2016')
-    sample_dists = get_kl_nn(
-        session_samples, method='yao', random_seed=args.random_seed)
-    np.save(os.path.join(sample_dist_dir, 'kl_yao.npy'), sample_dists)
-
-    # Yao 2016 version; nan's are replace by 1.0
-    print('Current method: Yao 2016 (nan replaced by 1.0)')
-    sample_dists = get_kl_nn(
-        session_samples, method='yao', nan_sub=1, random_seed=args.random_seed)
-    np.save(os.path.join(sample_dist_dir, 'kl_yao_1.npy'), sample_dists)
-
-    # Other variants
-    for k in [2, 3, 5, 10]:
-        print(f'Current method: k = {k}; consider any neighbor')
+    if 'yao' in args.methods:
+        print('Current method: Yao 2016')
         sample_dists = get_kl_nn(
-            session_samples, method='neighbor_any', k=k,
-            random_seed=args.random_seed)
-        np.save(os.path.join(sample_dist_dir, f'kl_{k}.npy'), sample_dists)
+            session_samples, method='yao', random_seed=args.random_seed)
+        np.save(os.path.join(sample_dist_dir, 'kl_yao.npy'), sample_dists)
 
-        print(f'Current method: k = {k}; consider fraction of neighbors')
+    # Yao 2016 version where nan's are replace by 1.0
+    if 'yao_1' in args.methods:
+        print('Current method: Yao 2016 (nan replaced by 1.0)')
         sample_dists = get_kl_nn(
-            session_samples, method='neighbor_fraction', k=k,
+            session_samples, method='yao', nan_sub=1,
             random_seed=args.random_seed)
-        np.save(os.path.join(sample_dist_dir, f'kl_{k}_frac.npy'), sample_dists)
+        np.save(os.path.join(sample_dist_dir, 'kl_yao_1.npy'), sample_dists)
+
+    # Other KL variants
+    for k in args.num_neighbors:
+        if 'neighbor_any' in args.methods:
+            print(f'Current method: k = {k}; consider any neighbor')
+            sample_dists = get_kl_nn(
+                session_samples, method='neighbor_any', k=k,
+                random_seed=args.random_seed)
+            np.save(os.path.join(sample_dist_dir, f'kl_{k}.npy'), sample_dists)
+
+        if 'neighbor_fraction' in args.methods:
+            print(f'Current method: k = {k}; consider fraction of neighbors')
+            sample_dists = get_kl_nn(
+                session_samples, method='neighbor_fraction', k=k,
+                random_seed=args.random_seed)
+            np.save(os.path.join(sample_dist_dir, f'kl_{k}_frac.npy'),
+                    sample_dists)
 
     print('All sample distances computed and saved.')
 
@@ -127,6 +133,8 @@ def get_args():
     arg_parser.add_argument('--log_normalize', default=False,
                             action='store_true')
     arg_parser.add_argument('--scale', default=False, action='store_true')
+    arg_parser.add_argument('--methods', nargs='+', required=True)
+    arg_parser.add_argument('--num_neigbors', nargs='+', default=[2])
     arg_parser.add_argument('--random_seed', type=int, default=0)
 
     return arg_parser.parse_args()
