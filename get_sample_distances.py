@@ -134,7 +134,7 @@ def get_args():
                             action='store_true')
     arg_parser.add_argument('--scale', default=False, action='store_true')
     arg_parser.add_argument('--methods', nargs='+', required=True)
-    arg_parser.add_argument('--num_neigbors', nargs='+', default=[2])
+    arg_parser.add_argument('--num_neighbors', nargs='+', default=[2])
     arg_parser.add_argument('--random_seed', type=int, default=0)
 
     return arg_parser.parse_args()
