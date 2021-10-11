@@ -28,7 +28,7 @@ stan_runs = ['const-Be-eta1']
 list_ranges = [(1, 500)]
 # list_ranges = [(1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
 # list_ranges = [(1, 382), (1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
-log_normalize_samples = True
+log_normalize_samples = False
 max_num_clusters = 3
 excluded_params = []
 # excluded_params = ['Ke', 'eta2', 'k3']
@@ -134,12 +134,10 @@ sample_cluster_root = os.path.join(output_root, 'posterior-clustering')
 if log_normalize_samples:
     sample_cluster_root += '-log-normalized'
 if len(excluded_params) > 1:
-    dir_suffix = '_no'
+    sample_cluster_root += '_no'
     for pn in excluded_params:
         if pn != 'sigma':
-            dir_suffix += f'_{pn}'
-
-    sample_cluster_root += dir_suffix
+            sample_cluster_root += f'_{pn}'
 if not os.path.exists(sample_cluster_root):
     os.mkdir(sample_cluster_root)
 
@@ -154,10 +152,10 @@ computed_cluster_keys = []
 # %%
 # compute distances and save
 sample_dists['kl_yao'] = get_kl_nn(session_samples, verbose=True)
-np.save(os.path.join(sample_cluster_root, 'kl.npy'), sample_dists['kl_yao'])
+np.save(os.path.join(sample_cluster_root, 'kl_yao.npy'), sample_dists['kl_yao'])
 
 # %%
-for k in [2, 3, 5]:
+for k in [2, 3, 5, 10]:
     kl_key =f'kl_{k}'
     sample_dists[kl_key] = get_kl_nn(session_samples, method='neighbor_any',
                                      k=k, verbose=True)
@@ -176,9 +174,12 @@ np.save(os.path.join(sample_cluster_root, 'js.npy'), sample_dists['js'])
 
 # %%
 # load saved distance matrix if necessary
-sample_dists['kl_yao'] = np.load(os.path.join(sample_cluster_root, 'kl.npy'))
+sample_dists['kl_yao'] = np.load(
+    os.path.join(sample_cluster_root, 'kl_yao.npy'))
+sample_dists['kl_yao_1'] = np.load(
+    os.path.join(sample_cluster_root, 'kl_yao_1.npy'))
 
-for k in [2, 3, 5]:
+for k in [2, 3, 5, 10]:
     kl_key =f'kl_{k}'
     sample_dists[kl_key] = np.load(os.path.join(sample_cluster_root,
                                                 f'{kl_key}.npy'))
