@@ -124,11 +124,12 @@ def main():
                     sample_dists)
 
     # L^2 divergence
-    for k in args.k_l2:
-        print(f'Current method: L^2 with k = {k}', flush=True)
-        sample_dists = get_l2_divergence(session_samples, k=k,
-                                         random_seed=args.random_seed)
-        np.save(os.path.join(sample_dist_dir, f'l2_{k}.npy'), sample_dists)
+    if 'l2' in args.methods:
+        for k in args.k_l2:
+            print(f'Current method: L^2 with k = {k}', flush=True)
+            sample_dists = get_l2_divergence(session_samples, k=k,
+                                             random_seed=args.random_seed)
+            np.save(os.path.join(sample_dist_dir, f'l2_{k}.npy'), sample_dists)
 
     print('All sample distances computed and saved.', flush=True)
 
