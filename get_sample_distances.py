@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from stan_helpers import StanMultiSessionAnalyzer
-from sample_distance import get_kl_nn
+from sample_distance import get_kl_nn, get_l2_divergence
 import calcium_models
 
 def main():
@@ -23,7 +23,7 @@ def main():
         stan_run_meta = json.load(f)
 
     # load cell chain
-    print('Loading samples...')
+    print('Loading samples...', flush=True)
 
     param_mask = stan_run_meta[stan_runs[0]]['param_mask']
     param_names = [calcium_models.param_names[i + 1]
@@ -54,7 +54,7 @@ def main():
     analyzer = StanMultiSessionAnalyzer(session_list, output_dir, session_dirs,
                                         param_names=param_names)
 
-    if args.log_normalize:
+    if args.log_transform:
         session_samples = [np.log1p(a.get_samples().iloc[:, 1:].to_numpy())
                            for a in analyzer.session_analyzers]
     else:
@@ -72,52 +72,65 @@ def main():
             session_samples[i] = \
                 (session_samples[i] - sample_min) / (sample_max - sample_min)
 
-    print('All samples loaded.')
+    print('All samples loaded.', flush=True)
 
     # compute distances
     sample_dist_dir = os.path.join(output_root, 'sample-dists')
-    if args.log_normalize:
-        sample_dist_dir += '-log-normalized'
+    if args.log_transform:
+        sample_dist_dir += '-log-transformed'
     if args.scale:
         sample_dist_dir += '-scaled'
     if not os.path.exists(sample_dist_dir):
         os.mkdir(sample_dist_dir)
 
-    print('Computing sample distances using different methods...')
+    print('Computing sample distances using different methods...', flush=True)
 
     # Yao 2016 version
     if 'yao' in args.methods:
-        print('Current method: Yao 2016')
+        print('Current method: Yao 2016', flush=True)
+
         sample_dists = get_kl_nn(
             session_samples, method='yao', random_seed=args.random_seed)
         np.save(os.path.join(sample_dist_dir, 'kl_yao.npy'), sample_dists)
 
     # Yao 2016 version where nan's are replace by 1.0
     if 'yao_1' in args.methods:
-        print('Current method: Yao 2016 (nan replaced by 1.0)')
+        print('Current method: Yao 2016 (nan replaced by 1.0)', flush=True)
+
         sample_dists = get_kl_nn(
             session_samples, method='yao', nan_sub=1,
             random_seed=args.random_seed)
         np.save(os.path.join(sample_dist_dir, 'kl_yao_1.npy'), sample_dists)
 
     # Other KL variants
-    for k in args.num_neighbors:
+    for k in args.k_kl:
         if 'neighbor_any' in args.methods:
-            print(f'Current method: k = {k}; consider any neighbor')
+            print(f'Current method: KL (any neighobr) with k = {k}',
+                  flush=True)
+
             sample_dists = get_kl_nn(
                 session_samples, method='neighbor_any', k=k,
                 random_seed=args.random_seed)
             np.save(os.path.join(sample_dist_dir, f'kl_{k}.npy'), sample_dists)
 
         if 'neighbor_fraction' in args.methods:
-            print(f'Current method: k = {k}; consider fraction of neighbors')
+            print(f'Current method: KL (neighbor fraction) with k = {k}',
+                  flush=True)
+
             sample_dists = get_kl_nn(
                 session_samples, method='neighbor_fraction', k=k,
                 random_seed=args.random_seed)
             np.save(os.path.join(sample_dist_dir, f'kl_{k}_frac.npy'),
                     sample_dists)
 
-    print('All sample distances computed and saved.')
+    # L^2 divergence
+    for k in args.k_l2:
+        print(f'Current method: L^2 with k = {k}', flush=True)
+        sample_dists = get_l2_divergence(session_samples, k=k,
+                                         random_seed=args.random_seed)
+        np.save(os.path.join(sample_dist_dir, f'l2_{k}.npy'), sample_dists)
+
+    print('All sample distances computed and saved.', flush=True)
 
 def get_args():
     """Parse command line arguments.
@@ -130,12 +143,12 @@ def get_args():
     arg_parser.add_argument('--stan_runs', nargs='+', required=True)
     arg_parser.add_argument('--list_begin', nargs='+', type=int, required=True)
     arg_parser.add_argument('--list_end', nargs='+', type=int, required=True)
-    arg_parser.add_argument('--log_normalize', default=False,
+    arg_parser.add_argument('--log_transform', default=False,
                             action='store_true')
     arg_parser.add_argument('--scale', default=False, action='store_true')
     arg_parser.add_argument('--methods', nargs='+', required=True)
-    arg_parser.add_argument('--num_neighbors', nargs='+', type=int,
-                            default=[2])
+    arg_parser.add_argument('--k_kl', nargs='+', type=int, default=[2])
+    arg_parser.add_argument('--k_l2', nargs='+', type=int, default=[5])
     arg_parser.add_argument('--random_seed', type=int, default=0)
 
     return arg_parser.parse_args()

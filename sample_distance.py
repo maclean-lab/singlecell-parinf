@@ -4,6 +4,7 @@ from typing import List
 import numpy as np
 import scipy.stats
 import scipy.spatial
+import scipy.special
 from sklearn.neighbors import NearestNeighbors
 
 def get_kl_nn(posterior_samples: List[np.ndarray], method: str = 'yao',
@@ -23,12 +24,13 @@ def get_kl_nn(posterior_samples: List[np.ndarray], method: str = 'yao',
         method (str, optional): Method for getting density estimate from
             nearest neighbors. Supported methods are 'yao', 'neighbor_fraction',
             and 'neighbor_any'. Defaults to 'yao'.
-        k (int, optional): Number of nearest neighbors to find.  Defaults to 2.
+        k (int, optional): Number of nearest neighbors to find. Defaults to 2.
         nan_sub (float, optional): Value used to substitute NaN. Default to
             log(2).
         random_seed (int, optional): Seed for random number generator. Defaults
             to 0.
-        verbose (bool, optional): Print information if True. Defaults to False.
+        verbose (bool, optional): Flag for printing additional information.
+            Defaults to False.
 
     Returns:
         np.ndarray: KL divergence between pairs of posterior samples
@@ -55,12 +57,14 @@ def get_kl_nn(posterior_samples: List[np.ndarray], method: str = 'yao',
             n_i = posterior_samples[i].shape[0]
             n_j = posterior_samples[j].shape[0]
             n = min(n_i, n_j)
-            P_i = posterior_samples[i][rng.choice(n_i, size=n), :]
-            P_j = posterior_samples[j][rng.choice(n_j, size=n), :]
+            P_i = posterior_samples[i][
+                rng.choice(n_i, size=n, replace=False), :]
+            P_j = posterior_samples[j][
+                rng.choice(n_j, size=n, replace=False), :]
             P_ij = np.vstack((P_i, P_j))
 
             nn.fit(P_ij)
-            _, nn_indices = nn.kneighbors(P_ij)
+            nn_indices = nn.kneighbors(P_ij, return_distance=False)
 
             if method == 'yao':
                 nn_indices = nn_indices[:, 1]
@@ -110,7 +114,8 @@ def get_jensen_shannon(posterior_samples: List[np.ndarray],
             density estimation. Defaults to 1000.
         random_seed (int, optional): Seed for random number generator.
             Defaults to 0.
-        verbose (bool, optional): Print information if True. Defaults to False.
+        verbose (bool, optional): Flag for printing additional information.
+            Defaults to False.
 
     Returns:
         float: Jensen-Shannon distances between pairs of posterior samples
@@ -152,3 +157,63 @@ def get_jensen_shannon(posterior_samples: List[np.ndarray],
         print('Jensen-Shannon distances computed for all pairs of samples')
 
     return js_dists
+
+def get_l2_divergence(posterior_samples: List[np.ndarray], k: int = 3,
+                      random_seed: int = 0, verbose: bool=False) -> np.ndarray:
+    """Compute L2 divergence using nearest neighbor.
+
+    The method is described at: https://www.cs.cmu.edu/~schneide/uai2011.pdf
+
+    Args:
+        posterior_samples (List[np.ndarray]): List of posterior samples.
+            Each sample is a matrix of size (sample_size, num_params).
+        k (int, optional): Number of nearest neighbors to find. Defaults to 2.
+        random_seed (int, optional): Seed for random number generator. Defaults
+            to 0.
+        verbose (bool, optional): Flag for printing additional information.
+            Defaults to False.
+
+    Returns:
+        np.ndarray: L^2 divergence between pairs of posterior samples
+    """
+    bit_generator = np.random.MT19937(random_seed)
+    rng = np.random.default_rng(bit_generator)
+
+    num_samples = len(posterior_samples)
+    d = posterior_samples[0].shape[1]
+    l2_div = np.empty((num_samples, num_samples))
+    c = np.power(np.pi, d / 2) / scipy.special.gamma(1 + d / 2)
+    nn = NearestNeighbors(n_neighbors=k)
+
+    for i in range(num_samples):
+        l2_div[i, i] = 0
+
+        for j in range(i + 1, num_samples):
+            if verbose:
+                print(f'\rComputing L^2 divergence for samples {i} and {j}',
+                      end='', flush=False)
+
+            # get subsamples
+            N_X = posterior_samples[i].shape[0]
+            N_Y = posterior_samples[j].shape[0]
+            N = min(N_X, N_Y)
+            X = posterior_samples[i][rng.choice(N_X, size=N, replace=False), :]
+            Y = posterior_samples[j][rng.choice(N_Y, size=N, replace=False), :]
+
+            # find nearest neighbors and compute rho^d and nu^d
+            nn.fit(X)
+            nn_indices = nn.kneighbors(X, return_distance=False)
+            rho_d = np.power(
+                np.linalg.norm(X - X[nn_indices[:, -1], :], axis=1), d)
+            nn_indices = nn.kneighbors(Y, return_distance=False)
+            nu_d = np.power(
+                np.linalg.norm(X - Y[nn_indices[:, -1], :], axis=1), d)
+
+            # compute L^2 divergence
+            l2_div[i, j] = l2_div[j, i] = \
+                np.mean((k - 1) / ((N - 1) * c * rho_d)
+                        - 2 * (k - 1) / (N * c * nu_d)
+                        + (N - 1) * c * rho_d * (k - 2) * (k - 1) /
+                            (np.power(N * c * nu_d, 2) * k))
+
+    return l2_div

@@ -17,7 +17,7 @@ import scanpy as sc
 
 from stan_helpers import StanMultiSessionAnalyzer, load_trajectories, \
     simulate_trajectory, get_mode_continuous_rv
-from sample_distance import get_kl_nn, get_jensen_shannon
+from sample_distance import get_kl_nn, get_jensen_shannon, get_l2_divergence
 import calcium_models
 
 # %%
@@ -28,7 +28,8 @@ stan_runs = ['const-Be-eta1']
 list_ranges = [(1, 500)]
 # list_ranges = [(1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
 # list_ranges = [(1, 382), (1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
-log_normalize_samples = False
+log_transform_samples = False
+scale_samples = False
 max_num_clusters = 3
 excluded_params = []
 # excluded_params = ['Ke', 'eta2', 'k3']
@@ -72,12 +73,14 @@ analyzer = StanMultiSessionAnalyzer(session_list, output_dir, session_dirs,
                                     param_names=param_names)
 session_list = analyzer.session_list
 session_list_int = [int(s) for s in session_list]
+num_sessions = len(session_list)
 
 excluded_params.append('sigma')
 param_names = [pn for pn in param_names if pn not in excluded_params]
+num_params = len(param_names)
 
 # log normalize posteriors
-if log_normalize_samples:
+if log_transform_samples:
     session_samples = [
         np.log1p(a.get_samples(excluded_params=excluded_params).to_numpy())
         for a in analyzer.session_analyzers
@@ -88,7 +91,17 @@ else:
         for a in analyzer.session_analyzers
     ]
 
-sample_means = np.empty((len(session_list), len(param_names)))
+if scale_samples:
+    sample_max = np.amax([np.amax(s, axis=0) for s in session_samples],
+                            axis=0)
+    sample_min = np.amin([np.amin(s, axis=0) for s in session_samples],
+                            axis=0)
+
+    for i in range(num_sessions):
+        session_samples[i] = \
+            (session_samples[i] - sample_min) / (sample_max - sample_min)
+
+sample_means = np.empty((num_sessions, num_params))
 for i, sample in enumerate(session_samples):
     sample_means[i, :] = np.mean(sample, axis=0)
 sample_means_min = np.amin(sample_means, axis=0)
@@ -96,7 +109,7 @@ sample_means_max = np.amax(sample_means, axis=0)
 sample_means = (sample_means - sample_means_min) / \
     (sample_means_max - sample_means_min)
 
-sample_modes = np.empty((len(session_list), len(param_names)))
+sample_modes = np.empty((num_sessions, num_params))
 for i, sample in enumerate(session_samples):
     for j, param in enumerate(param_names):
         sample_modes[i, j] = get_mode_continuous_rv(sample[:, j],
@@ -131,8 +144,10 @@ sc.tl.umap(adata)
 
 # set up folder for saving results
 sample_cluster_root = os.path.join(output_root, 'posterior-clustering')
-if log_normalize_samples:
-    sample_cluster_root += '-log-normalized'
+if log_transform_samples:
+    sample_cluster_root += '-log-transformed'
+if scale_samples:
+    sample_cluster_root += '-scaled'
 if len(excluded_params) > 1:
     sample_cluster_root += '_no'
     for pn in excluded_params:
@@ -142,7 +157,7 @@ if not os.path.exists(sample_cluster_root):
     os.mkdir(sample_cluster_root)
 
 sample_cluster_dir = os.path.join(sample_cluster_root,
-                                  f'max_clusters_{max_num_clusters}')
+                                  f'max-clusters-{max_num_clusters}')
 if not os.path.exists(sample_cluster_dir):
     os.mkdir(sample_cluster_dir)
 
@@ -169,6 +184,14 @@ for k in [2, 3, 5, 10]:
             sample_dists[kl_key])
 
 # %%
+for k in [5, 10, 20]:
+    l2_key = f'l2_{k}'
+    sample_dists[l2_key] = get_l2_divergence(session_samples[:100], k=k,
+                                            verbose=True)
+    np.save(os.path.join(sample_cluster_root, f'{l2_key}.npy'),
+            sample_dists[l2_key])
+
+# %%
 sample_dists['js'] = get_jensen_shannon(session_samples)
 np.save(os.path.join(sample_cluster_root, 'js.npy'), sample_dists['js'])
 
@@ -187,6 +210,11 @@ for k in [2, 3, 5, 10]:
     kl_key =f'kl_{k}_frac'
     sample_dists[kl_key] = np.load(os.path.join(sample_cluster_root,
                                                 f'{kl_key}.npy'))
+
+for k in [5, 10, 20]:
+    l2_key = f'l2_{k}'
+    sample_dists[l2_key] = np.load(os.path.join(sample_cluster_root,
+                                                f'{l2_key}.npy'))
 
 # %%
 sample_dists['js'] = np.load(os.path.join(sample_cluster_root, 'js.npy'))
@@ -407,7 +435,7 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
 
 # %%
 # cluster by posterior means or posterior modes
-cluster_methods = ['average', 'ward', 'kmeans']
+cluster_methods = ['ward', 'kmeans']
 stat_types = ['mean', 'mode']
 for st, method in itertools.product(stat_types, cluster_methods):
     if method != 'kmeans':
@@ -525,8 +553,8 @@ soptsc_vars = scipy.io.loadmat(
 similary_mat = soptsc_vars['W'][np.ix_(session_list_int, session_list_int)]
 similary_mat_1d = []
 sampled_dists_1d = {d: [] for d in sample_dists}
-for i in range(len(session_list)):
-    for j in range(i, len(session_list)):
+for i in range(num_sessions):
+    for j in range(i, num_sessions):
         similary_mat_1d.append(similary_mat[i, j])
 
         for metric in sample_dists:
