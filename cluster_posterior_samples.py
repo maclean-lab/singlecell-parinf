@@ -28,8 +28,8 @@ stan_runs = ['const-Be-eta1']
 list_ranges = [(1, 500)]
 # list_ranges = [(1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
 # list_ranges = [(1, 382), (1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
-log_transform_samples = False
-scale_samples = False
+log_transform_samples = True
+scale_samples = True
 max_num_clusters = 3
 excluded_params = []
 # excluded_params = ['Ke', 'eta2', 'k3']
@@ -79,7 +79,7 @@ excluded_params.append('sigma')
 param_names = [pn for pn in param_names if pn not in excluded_params]
 num_params = len(param_names)
 
-# log normalize posteriors
+# log transform posteriors
 if log_transform_samples:
     session_samples = [
         np.log1p(a.get_samples(excluded_params=excluded_params).to_numpy())
@@ -93,9 +93,9 @@ else:
 
 if scale_samples:
     sample_max = np.amax([np.amax(s, axis=0) for s in session_samples],
-                            axis=0)
+                         axis=0)
     sample_min = np.amin([np.amin(s, axis=0) for s in session_samples],
-                            axis=0)
+                         axis=0)
 
     for i in range(num_sessions):
         session_samples[i] = \
@@ -161,11 +161,11 @@ sample_cluster_dir = os.path.join(sample_cluster_root,
 if not os.path.exists(sample_cluster_dir):
     os.mkdir(sample_cluster_dir)
 
-sample_dists = {}
 computed_cluster_keys = []
 
 # %%
 # compute distances and save
+sample_dists = {}
 sample_dists['kl_yao'] = get_kl_nn(session_samples, verbose=True)
 np.save(os.path.join(sample_cluster_root, 'kl_yao.npy'), sample_dists['kl_yao'])
 
@@ -186,8 +186,8 @@ for k in [2, 3, 5, 10]:
 # %%
 for k in [5, 10, 20]:
     l2_key = f'l2_{k}'
-    sample_dists[l2_key] = get_l2_divergence(session_samples[:100], k=k,
-                                            verbose=True)
+    sample_dists[l2_key] = get_l2_divergence(session_samples, k=k,
+                                             verbose=True)
     np.save(os.path.join(sample_cluster_root, f'{l2_key}.npy'),
             sample_dists[l2_key])
 
@@ -197,6 +197,8 @@ np.save(os.path.join(sample_cluster_root, 'js.npy'), sample_dists['js'])
 
 # %%
 # load saved distance matrix if necessary
+sample_dists = {}
+
 sample_dists['kl_yao'] = np.load(
     os.path.join(sample_cluster_root, 'kl_yao.npy'))
 sample_dists['kl_yao_1'] = np.load(
@@ -211,6 +213,7 @@ for k in [2, 3, 5, 10]:
     sample_dists[kl_key] = np.load(os.path.join(sample_cluster_root,
                                                 f'{kl_key}.npy'))
 
+# %%
 for k in [5, 10, 20]:
     l2_key = f'l2_{k}'
     sample_dists[l2_key] = np.load(os.path.join(sample_cluster_root,
@@ -230,7 +233,6 @@ def cluster_by_sample_distances(dist_metric, cluster_method, plot=False):
     # cluster with a distance matrix (get linkage data)
     dist_mat_1d = squareform(sample_dists[dist_metric])
     Z = linkage(dist_mat_1d, method=cluster_method)
-    linkage_mat[(dist_metric, cluster_method)] = Z
 
     # get cluster labels
     labels = fcluster(Z, max_num_clusters, criterion='maxclust')
@@ -311,7 +313,6 @@ def cluster_by_sample_distances(dist_metric, cluster_method, plot=False):
 
 # %%
 dist_metrics = list(sample_dists.keys())
-linkage_mat = {}
 cluster_methods = ['ward']
 
 for metric, method in itertools.product(dist_metrics, cluster_methods):
@@ -332,7 +333,6 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
         labels = kmeans.fit_predict(data)
     else:
         Z = linkage(data, method=cluster_method)
-        linkage_mat[(stat_type, cluster_method)] = Z
         labels = fcluster(Z, max_num_clusters, criterion='maxclust')
 
     adata.obs[cluster_key] = labels
@@ -468,8 +468,7 @@ for cluster_key, test in itertools.product(computed_cluster_keys,
     # plot marker genes
     # sc.pl.rank_genes_groups(
     #     adata, n_genes=10, key=marker_gene_key, sharey=False,
-    #     save=f'_{metric}_{method}_{num_max_clusters}_{test}.pdf',
-    #     show=False)
+    #     save=f'_{test}.pdf', show=False)
 
     g = sc.pl.rank_genes_groups_heatmap(
         adata, n_genes=num_top_genes, groupby=cluster_key,
@@ -484,9 +483,6 @@ for cluster_key, test in itertools.product(computed_cluster_keys,
 
 # %%
 # compute trajectory statistics in each cluster
-# cluster_keys = ['kl_yao_ward', 'posterior_mean_kmeans',
-#                 'posterior_mode_kmeans', 'posterior_mean_ward',
-#                 'posterior_mode_ward']
 cluster_traj_stats = ['PeakMean', 'PeakStd', 'PeakTimeMean', 'PeakTimeStd',
                       'SteadyMean', 'SteadyStd']
 cluster_traj_stat_table = {}

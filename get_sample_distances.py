@@ -129,7 +129,9 @@ def main():
             print(f'Current method: L^2 with k = {k}', flush=True)
             sample_dists = get_l2_divergence(session_samples, k=k,
                                              random_seed=args.random_seed)
-            np.save(os.path.join(sample_dist_dir, f'l2_{k}.npy'), sample_dists)
+            output_path = os.path.join(sample_dist_dir,
+                                       f'l2_{k}_{args.subsample_size}.npy')
+            np.save(output_path, sample_dists)
 
     print('All sample distances computed and saved.', flush=True)
 
@@ -150,6 +152,7 @@ def get_args():
     arg_parser.add_argument('--methods', nargs='+', required=True)
     arg_parser.add_argument('--k_kl', nargs='+', type=int, default=[2])
     arg_parser.add_argument('--k_l2', nargs='+', type=int, default=[5])
+    arg_parser.add_argument('--subsample_size', type=int, default=50)
     arg_parser.add_argument('--random_seed', type=int, default=0)
 
     return arg_parser.parse_args()

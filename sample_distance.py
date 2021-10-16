@@ -159,7 +159,8 @@ def get_jensen_shannon(posterior_samples: List[np.ndarray],
     return js_dists
 
 def get_l2_divergence(posterior_samples: List[np.ndarray], k: int = 3,
-                      random_seed: int = 0, verbose: bool=False) -> np.ndarray:
+                      subsample_size: int = 50, random_seed: int = 0,
+                      verbose: bool=False) -> np.ndarray:
     """Compute L2 divergence using nearest neighbor.
 
     The method is described at: https://www.cs.cmu.edu/~schneide/uai2011.pdf
@@ -168,6 +169,8 @@ def get_l2_divergence(posterior_samples: List[np.ndarray], k: int = 3,
         posterior_samples (List[np.ndarray]): List of posterior samples.
             Each sample is a matrix of size (sample_size, num_params).
         k (int, optional): Number of nearest neighbors to find. Defaults to 2.
+        subsample_size (int, optional): Size of subsample to be used for
+            finding nearest neighbors. Defaults to 50.
         random_seed (int, optional): Seed for random number generator. Defaults
             to 0.
         verbose (bool, optional): Flag for printing additional information.
@@ -186,17 +189,19 @@ def get_l2_divergence(posterior_samples: List[np.ndarray], k: int = 3,
     nn = NearestNeighbors(n_neighbors=k)
 
     for i in range(num_samples):
-        l2_div[i, i] = 0
-
-        for j in range(i + 1, num_samples):
+        for j in range(num_samples):
             if verbose:
                 print(f'\rComputing L^2 divergence for samples {i} and {j}',
                       end='', flush=False)
 
+            if i == j:
+                l2_div[i, i] = 0
+                continue
+
             # get subsamples
             N_X = posterior_samples[i].shape[0]
             N_Y = posterior_samples[j].shape[0]
-            N = min(N_X, N_Y)
+            N = min(N_X, N_Y, subsample_size)
             X = posterior_samples[i][rng.choice(N_X, size=N, replace=False), :]
             Y = posterior_samples[j][rng.choice(N_Y, size=N, replace=False), :]
 
@@ -205,15 +210,24 @@ def get_l2_divergence(posterior_samples: List[np.ndarray], k: int = 3,
             nn_indices = nn.kneighbors(X, return_distance=False)
             rho_d = np.power(
                 np.linalg.norm(X - X[nn_indices[:, -1], :], axis=1), d)
-            nn_indices = nn.kneighbors(Y, return_distance=False)
+
+            nn.fit(Y)
+            nn_indices = nn.kneighbors(X, return_distance=False)
             nu_d = np.power(
                 np.linalg.norm(X - Y[nn_indices[:, -1], :], axis=1), d)
 
             # compute L^2 divergence
-            l2_div[i, j] = l2_div[j, i] = \
-                np.mean((k - 1) / ((N - 1) * c * rho_d)
-                        - 2 * (k - 1) / (N * c * nu_d)
-                        + (N - 1) * c * rho_d * (k - 2) * (k - 1) /
-                            (np.power(N * c * nu_d, 2) * k))
+            if np.all(rho_d == 0) or np.all(nu_d == 0):
+                l2_div[i, j] = np.inf
+            else:
+                l2_div[i, j] = np.mean(
+                    (k - 1) / ((N - 1) * c * rho_d)
+                    - 2 * (k - 1) / (N * c * nu_d)
+                    + (N - 1) * c * rho_d * (k - 2) * (k - 1)
+                        / (np.power(N * c * nu_d, 2) * k)
+                )
+
+    if verbose:
+        print('\nL^2 divergence computed for all pairs of samples.')
 
     return l2_div
