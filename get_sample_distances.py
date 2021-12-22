@@ -127,8 +127,9 @@ def main():
     if 'l2' in args.methods:
         for k in args.k_l2:
             print(f'Current method: L^2 with k = {k}', flush=True)
-            sample_dists = get_l2_divergence(session_samples, k=k,
-                                             random_seed=args.random_seed)
+            sample_dists = get_l2_divergence(
+                session_samples, k=k, subsample_size=args.subsample_size,
+                random_seed=args.random_seed)
             output_path = os.path.join(sample_dist_dir,
                                        f'l2_{k}_{args.subsample_size}.npy')
             np.save(output_path, sample_dists)

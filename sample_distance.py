@@ -217,7 +217,7 @@ def get_l2_divergence(posterior_samples: List[np.ndarray], k: int = 3,
                 np.linalg.norm(X - Y[nn_indices[:, -1], :], axis=1), d)
 
             # compute L^2 divergence
-            if np.all(rho_d == 0) or np.all(nu_d == 0):
+            if np.any(rho_d == 0) or np.any(nu_d == 0):
                 l2_div[i, j] = np.inf
             else:
                 l2_div[i, j] = np.mean(

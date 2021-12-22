@@ -15,9 +15,9 @@
         "runs": ["3", "lemon-prior-500", "lemon-prior-1000"],
         "order_by": "cell_id"
     },
-    "similar-vs-mixed": {
-        "runs": ["const-Be-eta1", "const-Be-eta1-mixed-0",
-            "const-Be-eta1-mixed-1", "const-Be-eta1-mixed-2"],
+    "similar-vs-random": {
+        "runs": ["const-Be-eta1", "const-Be-eta1-mixed-all",
+            "const-Be-eta1-random-all"],
         "order_by": "order_idx"
     }
 }

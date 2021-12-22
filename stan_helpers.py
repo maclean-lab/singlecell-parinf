@@ -5,7 +5,8 @@ import itertools
 import pickle
 import re
 
-from typing import List, Dict, Union, Optional
+from collections import OrderedDict
+from typing import Tuple, List, Dict, Union, Optional, Callable
 
 import math
 import numpy as np
@@ -37,7 +38,7 @@ class StanSession:
 
     Attributes:
         model_name (str): Name of the Stan model.
-        model: .
+        model: (StanModel). Compiled Stan model.
         output_dir (Union[str, bytes, os.PathLike]): Directory to save pystan
             output.
         data (Dict, optional): Data to be fit. Defaults to None.
@@ -50,8 +51,8 @@ class StanSession:
             Defaults to {}.
         rhat_upper_bound (float, optional): Upper bound for R^hat when
             determining convergence. Defaults to 1.1.
-        fit (pystan.StanFit4model): fit instance from NUTS.
-        inference_data (arviz.InferenceData): inference data convereted from
+        fit (pystan.StanFit4model): StanFit4model instance from NUTS.
+        inference_data (arviz.InferenceData): Inference data convereted from
             Stan fit instance.
         fit_summary: Summary table of Stan fit.
     """
@@ -79,7 +80,7 @@ class StanSession:
             control (Optional[Dict], optional): Control parameters for NUTS.
                 Defaults to None.
             rhat_upper_bound (float, optional): Upper bound for R^hat when
-            determining convergence. Defaults to 1.1.
+                determining convergence. Defaults to 1.1.
         """
         # load Stan model
         stan_model_filename = os.path.basename(stan_model_path)
@@ -95,16 +96,16 @@ class StanSession:
             with open(compiled_model_path, 'wb') as f:
                 pickle.dump(self.model, f)
 
-            print('Compiled stan model saved')
+            print('Compiled stan model saved', flush=True)
         elif model_ext == '.pkl':
             # load saved model
             with open(stan_model_path, 'rb') as f:
                 self.model = pickle.load(f)
 
-            print('Compiled stan model loaded')
+            print('Compiled stan model loaded', flush=True)
         else:
             # cannot load given file, exit
-            print('Unsupported input file')
+            print('Unsupported input file', flush=True)
             sys.exit(1)
 
         self.data = data
@@ -118,10 +119,17 @@ class StanSession:
         self.fit_summary = None
         self.inference_data = None
 
-        sys.stdout.flush()
-
     def run_sampling(self):
-        """Run Stan sampling"""
+        """Run NUTS sampling.
+
+        While sampling, sample (warmup + actual sample) of each chain i is
+        saved to 'chain_{i}.csv', with a header containing relevant
+        information. After sampling finished, pystan returns a StanFit4model
+        object, which is exported to a pickle file. Note that there is no
+        official support on reloading the pickle file. The StanFit4model is
+        also converted to an InferenceData object, which is exported to a
+        netcdf file. The netcdf file can be reloaded.
+        """
         if 'max_treedepth' not in self.control:
             self.control['max_treedepth'] = 10
         if 'adapt_delta' not in self.control:
@@ -133,28 +141,42 @@ class StanSession:
             warmup=self.warmup, thin=self.thin,
             sample_file=os.path.join(self.output_dir, 'chain'),
             control=self.control)
-        print('Stan sampling finished')
+        print('Stan sampling finished', flush=True)
 
         # save fit object
         stan_fit_path = os.path.join(self.output_dir, 'stan_fit.pkl')
         with open(stan_fit_path, 'wb') as f:
             pickle.dump(self.fit, f)
-        print('Stan fit object saved')
+        print('Stan fit object saved', flush=True)
 
         # convert fit object to arviz's inference data
-        print('Converting Stan fit object to Arviz inference data')
+        print('Converting Stan fit object to Arviz inference data...',
+              flush=True)
         self.inference_data = az.from_pystan(self.fit)
         inference_data_path = os.path.join(self.output_dir, 'arviz_inf_data.nc')
         az.to_netcdf(self.inference_data, inference_data_path)
-        print('Arviz inference data saved')
+        print('Arviz inference data saved', flush=True)
 
-        sys.stdout.flush()
+    def gather_fit_result(self, verbose: bool = True):
+        """Export results from StanFit4model object.
 
-    def gather_fit_result(self, verbose=True):
-        """Run analysis after sampling"""
+        Exported results include
+        - stan_fit_summary.txt: A summary text from pystan
+        - stan_fit_summary.csv: A summary table of sample statistics from
+            pystan
+        - stan_fit_samples.csv: Samples from all chains in one table
+        - stan_fit_trace.png: Trace plot of samples from pystan
+        - stan_fit_posterior.png: Plot of marginal posterior distribution of
+            each parameter
+        - stan_fit_pair.png: Pair plots of samples. Note that it does not
+            show all pairs of parameters due to limit of Arviz.
+
+        Args:
+            verbose (bool, optional): Flag for printing additional information.
+                Defaults to True.
+        """
         if verbose:
-            print('Gathering result from stan fit object...')
-            sys.stdout.flush()
+            print('Gathering result from stan fit object...', flush=True)
 
         # get summary of fit
         summary_path = os.path.join(self.output_dir, 'stan_fit_summary.txt')
@@ -169,16 +191,15 @@ class StanSession:
         fit_summary_path = os.path.join(self.output_dir, 'stan_fit_summary.csv')
         self.fit_summary.to_csv(fit_summary_path)
         if verbose:
-            print('Stan summary saved')
+            print('Stan summary saved', flush=True)
 
         # save samples
         fit_samples = self.fit.to_dataframe()
         fit_samples_path = os.path.join(self.output_dir,
                                         'stan_fit_samples.csv')
         fit_samples.to_csv(fit_samples_path)
-
         if verbose:
-            print('Stan samples saved')
+            print('Stan samples saved', flush=True)
 
         # make plots using arviz
         # make trace plot
@@ -188,7 +209,7 @@ class StanSession:
         plt.savefig(trace_figure_path)
         plt.close()
         if verbose:
-            print('Trace plot saved')
+            print('Trace plot saved', flush=True)
 
         # make plot for posterior
         plt.clf()
@@ -198,7 +219,7 @@ class StanSession:
         plt.savefig(posterior_figure_path)
         plt.close()
         if verbose:
-            print('Posterior plot saved')
+            print('Posterior plot saved', flush=True)
 
         # make pair plots
         plt.clf()
@@ -207,13 +228,15 @@ class StanSession:
         plt.savefig(pair_figure_path)
         plt.close()
         if verbose:
-            print('Pair plot saved')
+            print('Pair plot saved', flush=True)
 
-        sys.stdout.flush()
-
-    def get_mixed_chains(self):
+    def get_mixed_chains(self) -> Union[List, None]:
         """Get a combination of chains with good R_hat value of log
-        posteriors
+        posteriors.
+
+        Returns:
+            Union[List, None]: Indices of mixed MCMC chains as a list, or None
+                if no combination of more than 2 chains is mixed.
         """
         if 0.9 <= self.fit_summary.loc['lp__', 'Rhat'] <= self.rhat_upper_bound:
             return list(range(self.num_chains))
@@ -245,12 +268,24 @@ class StanSession:
         else:
             return None
 
-    def run_optimization(self):
+    def run_optimization(self) -> OrderedDict:
+        """Run Stan optimization
+
+        Returns:
+            OrderedDict: Optimized parameter values.
+        """
         optimized_params = self.model.optimizing(data=self.data)
 
         return optimized_params
 
-    def run_variational_bayes(self):
+    def run_variational_bayes(self) -> Dict:
+        """Run variational Bayes
+
+        Note this is an experimental feature as of pystan 2.19
+
+        Returns:
+            Dict: variational Bayes results
+        """
         sample_path = os.path.join(self.output_dir, 'chain_0.csv')
         diagnostic_path = os.path.join(self.output_dir, 'vb_diagnostic.txt')
         vb_results = self.model.vb(data=self.data, sample_file=sample_path,
@@ -259,10 +294,63 @@ class StanSession:
         return vb_results
 
 class StanSessionAnalyzer:
-    """Analyze samples from a Stan sampling/varitional Bayes session"""
-    def __init__(self, output_dir, stan_operation='sampling',
-                 sample_source='arviz_inf_data', num_chains=4, warmup=1000,
-                 param_names=None, verbose=False):
+    """Analyze samples from a Stan sampling/varitional Bayes session
+
+    Attributes:
+        output_dir (Union[str, bytes, os.PathLike]): Directory of Stan
+            output.
+        stan_operation (str, optional): Stan operation to perform.
+            Currently, only 'sampling' is supported Defaults to 'sampling'.
+        sample_source (str, optional): Source of saved sample file(s).
+            Supported sources are 'sample_files' (samples of individual
+            chains in csv), 'fit_export' (exported summary in txt
+            and samples of all chains in csv)), and 'arviz_inf_data' (
+            Arviz InferenceData saved as netcdf file). Defaults to
+            'arviz_inf_data'.
+        num_chains (int, optional): Number of MCMC chains. Required only
+            if sample_source is 'sample_files'. Defaults to 4.
+        warmup (int, optional): Number of warmup iterations. Required only
+            if sample_source is 'sample_files'. Defaults to 1000.
+        param_names (Union[None, List[str]], optional): Names of
+            parameters. If None, a list of default parameter names will be
+            generated (sigma, theta0, theta1, ...). Defaults to None.
+        samples (List[pd.DataFrame]): List of posterior samples as pandas
+            DataFrames.
+        log_posterior (List): List of log posterior probabilities of each MCMC
+            chain.
+        raw_samples: raw samples loaded from sample_source. The type is
+            different depending on the source.
+        num_samples (int): Number of MCMC draws in each chain.
+        num_params (int): Number of parameters in the underlying statistical
+            model.
+    """
+    def __init__(self, output_dir: Union[str, bytes, os.PathLike],
+                 stan_operation: str = 'sampling',
+                 sample_source: str = 'arviz_inf_data', num_chains: int = 4,
+                 warmup: int = 1000, param_names: Union[None, List[str]] = None,
+                 verbose: bool = False):
+        """
+        Args:
+            output_dir (Union[str, bytes, os.PathLike]): Directory of Stan
+                output.
+            stan_operation (str, optional): Stan operation to perform.
+                Currently, only 'sampling' is supported Defaults to 'sampling'.
+            sample_source (str, optional): Source of saved sample file(s).
+                Supported sources are 'sample_files' (samples of individual
+                chains in csv), 'fit_export' (exported summary in txt
+                and samples of all chains in csv)), and 'arviz_inf_data' (
+                Arviz InferenceData saved as netcdf file). Defaults to
+                'arviz_inf_data'.
+            num_chains (int, optional): Number of MCMC chains. Required only
+                if sample_source is 'sample_files'. Defaults to 4.
+            warmup (int, optional): Number of warmup iterations. Required only
+                if sample_source is 'sample_files'. Defaults to 1000.
+            param_names (Union[None, List[str]], optional): Names of
+                parameters. If None, a list of default parameter names will be
+                generated (sigma, theta0, theta1, ...). Defaults to None.
+            verbose (bool, optional): Flag for printing additional information.
+                Defaults to False.
+        """
         self.output_dir = output_dir
         self.stan_operation = stan_operation
         self.sample_source = sample_source
@@ -272,8 +360,7 @@ class StanSessionAnalyzer:
 
         # load sample files
         if verbose:
-            print('Loading stan sample files...')
-            sys.stdout.flush()
+            print('Loading stan sample files...', flush=True)
 
         self.samples = []
         self.log_posterior = []
@@ -343,8 +430,16 @@ class StanSessionAnalyzer:
         for samples in self.samples:
             samples.columns = self.param_names
 
-    def get_sampling_time(self, unit='s'):
-        '''get runtime for all chains'''
+    def get_sampling_time(self, unit: str = 's') -> np.ndarray:
+        """Get computational time for sampling for each MCMC chain.
+
+        Args:
+            unit (str, optional): Unit for time. Options are 's' for seconds,
+                'm' for minutes, and 'h' for hours. Defaults to 's'.
+
+        Returns:
+            np.ndarray: computational time for each chain.
+        """
         sampling_time = np.zeros(self.num_chains)
 
         for chain_idx in range(self.num_chains):
@@ -360,7 +455,12 @@ class StanSessionAnalyzer:
 
         return sampling_time
 
-    def get_tree_depths(self):
+    def get_tree_depths(self) -> np.ndarray:
+        """Get tree depths for each MCMC chain.
+
+        Returns:
+            np.ndarray: tree depth for each chain.
+        """
         if self.sample_source == 'arviz_inf_data':
             inf_data = self.raw_samples
         else:
@@ -369,11 +469,44 @@ class StanSessionAnalyzer:
 
         return inf_data.sample_stats['treedepth'].data
 
-    def simulate_chains(self, ode, t0, ts, y0, y_ref=None, show_progress=False,
-                        var_names=None, integrator='dopri5',
-                        subsample_step_size=None, plot=True, verbose=True,
-                        **integrator_params):
-        """Simulate trajectories for all chains"""
+    def simulate_chains(self, ode: Callable, t0: int, ts: np.ndarray,
+                        y0: np.ndarray, y_ref: Union[None, np.ndarray] = None,
+                        show_progress: bool = False,
+                        var_names: Union[None, List, np.ndarray] = None,
+                        integrator: str = 'dopri5',
+                        subsample_step_size: Union[None, int] = None,
+                        plot: bool = True, verbose: bool = True,
+                        **integrator_params) -> List[np.ndarray]:
+        """Simulate trajectories with parameters sampled by all MCMC chains.
+
+        Args:
+            ode (Callable): A Python function that returns $dy/dt$ given $y$,
+                $t$, and $theta$ (parameter values).
+            t0 (int): Initial time.
+            ts (np.ndarray): Time points.
+            y0 (np.ndarray): Initial values of $y$.
+            y_ref (Union[None, np.ndarray], optional): Reference values of $y$,
+                which will be plotted as empty circles if given. Defaults to
+                None.
+            show_progress (bool, optional): Flag for showing progress bar while
+                simulating trajectories. Defaults to False.
+            var_names (Union[None, List, np.ndarray], optional): Variables
+                names to be printed on trajectory plots, if not None. Defaults
+                to None.
+            integrator (str, optional): ODE integrator to solve the ODE. See
+                SciPy documentation for valid options. Defaults to 'dopri5'.
+            subsample_step_size (Union[None, int], optional): Number of draws
+                to skip in the posterior samples of parameters. Ignored if
+                None.  Defaults to None.
+            plot (bool, optional): Flag for plotting simulated trajectories.
+                Defaults to True.
+            verbose (bool, optional): Flag for printing additional information.
+                Defaults to True.
+            **integrator_params: parameters to be passed to the integrator.
+
+        Returns:
+            List[np.ndarray]: Simulated trajectories of all MCMC chains.
+        """
         num_vars = y0.size
         if y_ref is None:
             y_ref = [None] * num_vars
@@ -391,7 +524,8 @@ class StanSessionAnalyzer:
 
             # simulate trajectory from each samples
             if verbose:
-                print(f'Simulating trajectories from chain {chain_idx}...')
+                print(f'Simulating trajectories from chain {chain_idx}...',
+                      flush=True)
 
             for sample_idx, theta in tqdm(enumerate(thetas), total=num_samples,
                                           disable=not show_progress):
@@ -404,12 +538,22 @@ class StanSessionAnalyzer:
             if plot:
                 self._plot_trajectories(chain_idx, ts, y, y_ref, var_names)
 
-            sys.stdout.flush()
-
         return y_sim
 
-    def _plot_trajectories(self, chain_idx, ts, y, y_ref, var_names):
-        """Plot ODE solution (trajectory)"""
+    def _plot_trajectories(self, chain_idx: int, ts: np.ndarray, y: np.ndarray,
+                           y_ref: np.ndarray,
+                           var_names: Union[List, np.ndarray]):
+        """Plot ODE solution (trajectories) for an MCMC chain.
+
+        Args:
+            chain_idx (int): Index of the MCMC chain to be plotted. Only used
+                for saving the plot.
+            ts (np.ndarray): Time points
+            y (np.ndarray): ODE solution the MCMC chain to be plotted.
+            y_ref (np.ndarray): Reference values for the ODE solution.
+            var_names (Union[List, np.ndarray]): Variables names to be printed
+                on trajectory plots.
+        """
         num_vars = len(y_ref)
 
         plt.clf()
@@ -431,11 +575,40 @@ class StanSessionAnalyzer:
         plt.savefig(figure_name)
         plt.close()
 
-    def get_trajectory_distance(self, ode, t0, ts, y0, y_ref, target_var_idx,
-                                rhat_upper_bound=4.0, subsample_step_size=50,
-                                integrator='dopri5', **integrator_params):
-        '''Compute distance between a reference trajectory and trajectory
-        simulated from subsamples'''
+    def get_trajectory_distance(self, ode: Callable, t0: int, ts: np.ndarray,
+                                y0: np.ndarray, y_ref: np.ndarray,
+                                target_var_idx: int,
+                                rhat_upper_bound: float = 4.0,
+                                subsample_step_size: int = 50,
+                                integrator: str = 'dopri5',
+                                **integrator_params) -> np.ndarray:
+        """Compute distance between a reference trajectory and trajectories
+        simulated from subsamples of each MCMC chain.
+
+        Only mixed MCMC chains (i.e. chains with $\hat{R}$ under a threshold)
+        are included when computing the distnace.
+
+        Args:
+            ode (Callable): A Python function that returns $dy/dt$ given $y$,
+                $t$, and $theta$ (parameter values).
+            t0 (int): Initial time.
+            ts (np.ndarray): Time points.
+            y0 (np.ndarray): Initial values of $y$.
+            y_ref (np.ndarray): Reference values of $y$.
+            target_var_idx (int): Index of the trajectory in ODE to be compared
+                to the reference trajectories.
+            rhat_upper_bound (float, optional): Maximum $\hat{R}$ for mixed
+                chains. Defaults to 4.0.
+            subsample_step_size (int, optional): Number of draws to skip in the
+                posterior samples of parameters. Defaults to 50.
+            integrator (str, optional): ODE integrator to solve the ODE. See
+                SciPy documentation for valid options. Defaults to 'dopri5'.
+            **integrator_params: parameters to be passed to the integrator.
+
+        Returns:
+            np.ndarray: Average distance between the reference trajectory and
+                simulated trajectories of each MCMC chain.
+        """
         mixed_samples = self.get_samples(rhat_upper_bound=rhat_upper_bound)
         thetas = mixed_samples.to_numpy()[:, 1:]
         if subsample_step_size:
@@ -449,8 +622,28 @@ class StanSessionAnalyzer:
 
         return np.mean(y_diffs)
 
-    def get_sample_mean_trajectory(self, ode, t0, ts, y0, rhat_upper_bound=4.0,
-                                    integrator='dopri5', **integrator_params):
+    def get_sample_mean_trajectory(self, ode: Callable, t0: int,
+                                   ts: np.ndarray, y0: np.ndarray,
+                                   rhat_upper_bound: float = 4.0,
+                                   integrator: str = 'dopri5',
+                                   **integrator_params) -> np.ndarray:
+        """Simulate trajectories using posterior mean of parameters for mixed
+        chains.
+
+        Args:
+            ode (Callable): A Python function that returns $dy/dt$ given $y$,
+                $t$, and $theta$ (parameter values).
+            t0 (int): Initial time.
+            ts (np.ndarray): Time points.
+            y0 (np.ndarray): Initial values of $y$.
+            rhat_upper_bound (float, optional): Maximum $\hat{R}$ for mixed
+                chains. Defaults to 4.0.
+            integrator (str, optional): . Defaults to 'dopri5'.
+
+        Returns:
+            np.ndarray: Trajectories simulated from posterior mean of
+                parameters.
+        """
         sample_means = self.get_sample_means(rhat_upper_bound=rhat_upper_bound)
         thetas = sample_means.to_numpy()[1:]
         y = simulate_trajectory(ode, thetas, t0, ts, y0, integrator=integrator,
@@ -459,22 +652,25 @@ class StanSessionAnalyzer:
         return y
 
     def plot_parameters(self):
-        """Make plots for sampled parameters"""
+        """Make plots for sampled parameters of all MCMC chains"""
         for chain_idx in range(self.num_chains):
-            print(f'Making trace plot for chain {chain_idx}...')
+            print(f'Making trace plot for chain {chain_idx}...', flush=True)
             self._make_trace_plot(chain_idx)
 
-            print(f"Making violin plot for chain {chain_idx}...")
+            print(f'Making violin plot for chain {chain_idx}...', flush=True)
             self._make_violin_plot(chain_idx)
 
-            print(f"Making pairs plot for chain {chain_idx}...")
+            print(f'Making pairs plot for chain {chain_idx}...', flush=True)
             self._make_pair_plot(chain_idx)
 
-            sys.stdout.flush()
             sys.stderr.flush()
 
     def _make_trace_plot(self, chain_idx):
-        """Make trace plots for parameters"""
+        """Make trace plots for sampled parameters in an MCMC chain.
+
+        Args:
+            chain_idx (int): Index of the MCMC chain.
+        """
         samples = self.samples[chain_idx].to_numpy()
 
         plt.clf()
@@ -494,8 +690,14 @@ class StanSessionAnalyzer:
         plt.savefig(figure_name)
         plt.close()
 
-    def _make_violin_plot(self, chain_idx, use_log_scale=True):
-        """Make violin plot for parameters"""
+    def _make_violin_plot(self, chain_idx, use_log_scale: bool = True):
+        """Make violin plot for sampled parameters in an MCMC chain.
+
+        Args:
+            chain_idx ([type]): Index of the MCMC chain.
+            use_log_scale (bool, optional): Flag for plotting in log scale.
+                Defaults to True.
+        """
         plt.clf()
         plt.figure(figsize=(self.num_params, 4))
         if use_log_scale:
@@ -515,7 +717,11 @@ class StanSessionAnalyzer:
         plt.close()
 
     def _make_pair_plot(self, chain_idx):
-        """Make pair plot for parameters"""
+        """Make pair plots for sampled parameters in an MCMC chain.
+
+        Args:
+            chain_idx (int): Index of the MCMC chain.
+        """
         plt.clf()
         sns.pairplot(self.samples[chain_idx], diag_kind='kde',
                      plot_kws=dict(alpha=0.4, s=30, color='#191970',
@@ -527,7 +733,10 @@ class StanSessionAnalyzer:
         plt.close()
 
     def get_r_squared(self):
-        """Compute R^2 for all pairs of sampled parameters in each chain"""
+        """Compute R^2 for all pairs of sampled parameters in each chain.
+
+        Computed R^2 is saved to output directory in csv.
+        """
         for chain_idx in range(self.num_chains):
             r_squared = np.ones((self.num_params, self.num_params))
             for i, j in itertools.combinations(range(self.num_params), 2):
@@ -545,17 +754,32 @@ class StanSessionAnalyzer:
                 float_format='%.8f'
             )
 
-    def get_mixed_chains(self, rhat_upper_bound=4.0, return_rhat=False):
-        """Get a combination of chains with good R_hat value of log
-        posteriors
+    def get_mixed_chains(self, rhat_upper_bound: float = 4.0,
+                         return_rhat: bool = False) -> Union[None, List, Tuple]:
+        """Get a combination of chains such that their $\hat{R}$ for log
+        posteriors is below a threshold.
+
+        Args:
+            rhat_upper_bound (float, optional): Maximum $\hat{R}$ for mixed
+                chains. Defaults to 4.0.
+            return_rhat (bool, optional): Return $hat{R}$ alnog with list of
+                mixed chains if True. Defaults to False.
+
+        Returns:
+            Union[None, List, Tuple]: If return_rhat is set to False, indices
+                of mixed chains are returned as a list. Otherwise, $hat{R}$ is
+                returned alnog with mixed chains.
         """
         if self.num_chains <= 2 or \
                 not isinstance(self.raw_samples, az.InferenceData):
             return None
 
+        # check R_hat of all chains together
         sample_rhat = az.rhat(self.raw_samples.sample_stats[['lp']],
                               method='split')
         lp_rhat = sample_rhat['lp'].item()
+
+        # All chains are mixed, return all chains
         if 0.9 <= lp_rhat <= rhat_upper_bound:
             all_chains = list(range(self.num_chains))
             if return_rhat:
@@ -567,7 +791,9 @@ class StanSessionAnalyzer:
         best_rhat = np.inf
         best_rhat_dist = np.inf
 
-        # try remove one bad chain
+        # check if we can remove one bad chain and have others mixed
+        # if there are multiple combinations of mixed chains, return the one
+        # with smallest R_hat
         for chain_combo in itertools.combinations(range(self.num_chains),
                                                   self.num_chains - 1):
             chain_combo = list(chain_combo)
@@ -607,8 +833,16 @@ class StanSessionAnalyzer:
 
         return mixed_samples
 
-    def get_sample_means(self, rhat_upper_bound=4.0):
-        """Get means of all sampled parameters in mixed chains"""
+    def get_sample_means(self, rhat_upper_bound: float = 4.0) -> pd.Series:
+        """Get means of all sampled parameters in mixed MCMC chains.
+
+        Args:
+            rhat_upper_bound (float, optional): Maximum $\hat{R}$ for mixed
+                chains. Defaults to 4.0.
+
+        Returns:
+            pd.Series: means of sampled parameters in mixed MCMC chains.
+        """
         mixed_chains = self.get_mixed_chains(rhat_upper_bound=rhat_upper_bound)
 
         if not mixed_chains:
@@ -619,8 +853,21 @@ class StanSessionAnalyzer:
 
         return sample_means
 
-    def get_sample_modes(self, method='kde', bins=100, rhat_upper_bound=4.0):
-        """Get means of all sampled parameters in mixed chains"""
+    def get_sample_modes(self, method: str = 'kde', bins: int = 100,
+                         rhat_upper_bound: float = 4.0) -> pd.Series:
+        """Get modes of all sampled parameters in mixed MCMC chains.
+
+        Args:
+            method (str, optional): Method for estimating posterior mode.
+                Can be either 'kde' and 'histogram'. Defaults to 'kde'.
+            bins (int, optional): Number of bins if method is 'histogram'.
+                Defaults to 100.
+            rhat_upper_bound (float, optional): Maximum $\hat{R}$ for mixed
+                chains. Defaults to 4.0.
+
+        Returns:
+            pd.Series: modes of sampled parameters in mixed MCMC chains.
+        """
         mixed_chains = self.get_mixed_chains(rhat_upper_bound=rhat_upper_bound)
 
         if not mixed_chains:
@@ -634,12 +881,28 @@ class StanSessionAnalyzer:
 
         return sample_modes
 
-    def get_mean_log_posteriors(self):
-        """Get mean of log posterior density"""
+    def get_mean_log_posteriors(self) -> np.ndarray:
+        """Get mean of log posterior densities of all MCMC chains.
+
+        Returns:
+            np.ndarray: mean of log posterior densities of length num_chains.
+        """
         return np.array([np.mean(lp) for lp in self.log_posterior])
 
-    def get_log_posteriors(self, include_warmup=True):
-        """Get log posterior"""
+    def get_log_posteriors(self, include_warmup: bool = True) -> np.ndarray:
+        """Get log posterior densities of all MCMC chains.
+
+        Args:
+            include_warmup (bool, optional): Flag for including warmup
+                iterations in return log posterior densities. Defaults to True.
+
+        Returns:
+            np.ndarray: log posterior densities of all MCMC chains of shape
+                (num_chains, num_iterations), where num_iterations is either
+                number of sampling iterations if include_warmup is set to
+                False, or number of of warmup and sampling iterations
+                otherwise.
+        """
         # load sample files
         if self.sample_source == 'sample_files':
             samples = self.raw_samples
@@ -662,8 +925,16 @@ class StanSessionAnalyzer:
 
         return lps
 
-    def plot_log_posteriors(self, include_warmup=True):
-        """Plot log posterior, including warmup"""
+    def plot_log_posteriors(self, include_warmup: bool = True):
+        """Plot log posterior densities of all MCMC chains.
+
+        Each trace in the plot shows log posterior densities of all draws from
+        one MCMC chain. Warmup iterations are included if specified.
+
+        Args:
+            include_warmup (bool, optional): Flag for including warmup
+                iterations in return log posterior densities. Defaults to True.
+        """
         lps = self.get_log_posteriors(include_warmup=include_warmup)
 
         plt.figure(figsize=(6, 4), dpi=300)
@@ -1020,13 +1291,9 @@ class StanMultiSessionAnalyzer:
                 ax.scatter(p1_samples, p2_samples)
                 if param_names_on_plot:
                     ax.set_xlabel(param_names_on_plot[p1])
-                    print(param_names_on_plot[p1])
+                    ax.set_ylabel(param_names_on_plot[p2])
                 else:
                     ax.set_xlabel(p1)
-                if param_names_on_plot:
-                    ax.set_xlabel(param_names_on_plot[p2])
-                    print(param_names_on_plot[p2])
-                else:
                     ax.set_ylabel(p2)
 
                 # draw histogram for each parameter on the side
@@ -1555,7 +1822,8 @@ class StanMultiSessionAnalyzer:
                                       f'{param}_{qt}_stats.csv')
             stats[(param, qt)].to_csv(stats_path)
 
-    def load_expression_data(self, data_path, use_highly_variable_genes=False):
+    def load_expression_data(self, data_path, use_highly_variable_genes=False,
+                             plot=False):
         """Load and preprocess expression data"""
         # load raw expression data
         self.raw_data = pd.read_csv(data_path, sep='\t')
@@ -1576,7 +1844,7 @@ class StanMultiSessionAnalyzer:
         self.session_list = self.session_list.astype(int)
 
         # plot sample means vs genes expression if the latter is available
-        if hasattr(self, 'sample_means'):
+        if plot and hasattr(self, 'sample_means'):
             gvp_dir = os.path.join(self.output_dir, 'genes-vs-params')
             if not os.path.exists(gvp_dir):
                 os.mkdir(gvp_dir)
@@ -1956,8 +2224,8 @@ def get_trajectory_derivatives(t0, downsample_offset=-1, downsample_factor=10,
 def moving_average(x: np.ndarray, window: int = 20, verbose=True):
     """Compute moving average of trajectories"""
     if verbose:
-        print(f'Performing moving average with window size of {window}...')
-        sys.stdout.flush()
+        print(f'Performing moving average with window size of {window}...',
+              flush=True)
 
     # make x 2D if it is 1D
     num_dims = len(x.shape)
@@ -2038,8 +2306,8 @@ def get_prior_from_samples(prior_dir, prior_chains,
     """Get prior distribution from sampled parameters"""
     if verbose:
         chain_str = ', '.join(map(str, prior_chains))
-        print(f'Getting prior distribution from chain(s) {chain_str}...')
-        sys.stdout.flush()
+        print(f'Getting prior distribution from chain(s) {chain_str}...',
+              flush=True)
 
     # load sampled parameters
     if sample_source == 'sample_files':

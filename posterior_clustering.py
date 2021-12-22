@@ -22,14 +22,19 @@ import calcium_models
 
 # %%
 # initialize computation of distances between posterior samples
-stan_runs = ['const-Be-eta1']
+# stan_runs = ['3']
+# stan_runs = ['const-Be-eta1']
+# stan_runs = ['const-Be-eta1-mixed-1']
 # stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
-# stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
-list_ranges = [(1, 500)]
+# stan_runs = ['const-Be-eta1-random-3']
+stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
+# list_ranges = [(1, 500)]
+# list_ranges = [(1, 100)]
 # list_ranges = [(1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
-# list_ranges = [(1, 382), (1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
-log_transform_samples = True
-scale_samples = True
+# list_ranges = [(1, 359)]
+list_ranges = [(1, 571), (1, 372), (1, 359), (1, 341), (1, 335), (1, 370)]
+log_transform_samples = False
+scale_samples = False
 max_num_clusters = 3
 excluded_params = []
 # excluded_params = ['Ke', 'eta2', 'k3']
@@ -48,11 +53,11 @@ num_runs = len(stan_runs)
 session_list = []
 session_dirs = []
 for run, lr in zip(stan_runs, list_ranges):
+    run_root = os.path.join('../../result', stan_run_meta[run]['output_dir'])
     cell_list_path = os.path.join('cell_lists',
                                   stan_run_meta[run]['cell_list'])
     run_cell_list = pd.read_csv(cell_list_path, sep='\t')
     cell_list = run_cell_list.iloc[lr[0]:lr[1] + 1, :]
-    run_root = os.path.join('../../result', stan_run_meta[run]['output_dir'])
     session_list.extend([str(c) for c in cell_list['Cell']])
     session_dirs.extend([os.path.join(run_root, 'samples', f'cell-{c:04d}')
                          for c in cell_list['Cell']])
@@ -138,9 +143,14 @@ adata.raw = adata
 sc.pp.normalize_total(adata)
 sc.pp.log1p(adata)
 sc.pp.scale(adata)
-sc.tl.pca(adata)
+sc.tl.pca(adata, svd_solver='arpack')
 sc.pp.neighbors(adata)
 sc.tl.umap(adata)
+
+# add parameter stats to adata
+for i, param in enumerate(param_names):
+    adata.obs[f'{param}_mean'] = sample_means[:, i]
+    adata.obs[f'{param}_mode'] = sample_modes[:, i]
 
 # set up folder for saving results
 sample_cluster_root = os.path.join(output_root, 'posterior-clustering')
@@ -184,12 +194,21 @@ for k in [2, 3, 5, 10]:
             sample_dists[kl_key])
 
 # %%
-for k in [5, 10, 20]:
-    l2_key = f'l2_{k}'
-    sample_dists[l2_key] = get_l2_divergence(session_samples, k=k,
-                                             verbose=True)
-    np.save(os.path.join(sample_cluster_root, f'{l2_key}.npy'),
-            sample_dists[l2_key])
+for k, n in itertools.product([5, 10, 20], [20, 50, 100]):
+    if k < n:
+        l2_key = f'l2_{k}_{n}'
+        sample_dists[l2_key] = get_l2_divergence(
+            session_samples, k=k, subsample_size=n, verbose=True)
+
+        np.save(os.path.join(sample_cluster_root, f'{l2_key}.npy'),
+                sample_dists[l2_key])
+
+        for i, j in itertools.combinations(range(num_sessions), 2):
+            sample_dists[l2_key][i, j] = sample_dists[l2_key][j, i] \
+                = min(sample_dists[l2_key][i, j], sample_dists[l2_key][j, i])
+
+            if (sample_dists[l2_key][i, j] < 0):
+                sample_dists[l2_key][i, j] = sample_dists[l2_key][j, i] = 0
 
 # %%
 sample_dists['js'] = get_jensen_shannon(session_samples)
@@ -214,15 +233,49 @@ for k in [2, 3, 5, 10]:
                                                 f'{kl_key}.npy'))
 
 # %%
-for k in [5, 10, 20]:
-    l2_key = f'l2_{k}'
-    sample_dists[l2_key] = np.load(os.path.join(sample_cluster_root,
-                                                f'{l2_key}.npy'))
+for k, n in itertools.product([5, 10, 20], [20, 50, 100]):
+    if k < n:
+        l2_key = f'l2_{k}_{n}'
+        sample_dists[l2_key] = np.load(os.path.join(sample_cluster_root,
+                                                    f'{l2_key}.npy'))
+
+        for i, j in itertools.combinations(range(num_sessions), 2):
+            sample_dists[l2_key][i, j] = sample_dists[l2_key][j, i] \
+                = min(sample_dists[l2_key][i, j], sample_dists[l2_key][j, i])
+
+            if (sample_dists[l2_key][i, j] < 0):
+                sample_dists[l2_key][i, j] = sample_dists[l2_key][j, i] = 0
 
 # %%
 sample_dists['js'] = np.load(os.path.join(sample_cluster_root, 'js.npy'))
 sample_dists['js_10000'] = np.load(
     os.path.join(sample_cluster_root, 'js_10000.npy'))
+
+# %%
+# plot parameter stats on PCA/UMAP
+sc.settings.figdir = sample_cluster_root
+
+with plt.rc_context({"figure.figsize": (4, 4), "figure.dpi": (300)}):
+    for param in param_names:
+        # plot parameter mean
+        _ = sc.pl.pca(adata, color=f'{param}_mean', save=f'_{param}_mean.pdf',
+                      show=False)
+        plt.close('all')
+
+        _ = sc.pl.umap(adata, color=f'{param}_mean', save=f'_{param}_mean.pdf',
+                       show=False)
+        plt.close('all')
+
+        # plo parametert mode
+        _ = sc.pl.pca(adata, color=f'{param}_mode', save=f'_{param}_mode.pdf',
+                      show=False)
+        plt.close('all')
+
+        _ = sc.pl.umap(adata, color=f'{param}_mode', save=f'_{param}_mode.pdf',
+                       show=False)
+        plt.close('all')
+
+sc.settings.figdir = sample_cluster_dir
 
 # %%
 def cluster_by_sample_distances(dist_metric, cluster_method, plot=False):
@@ -443,13 +496,13 @@ for st, method in itertools.product(stat_types, cluster_methods):
     else:
         print(f'Clustering posterior {st} using k-means...')
 
-    cluster_by_sample_stats(st, method, plot=True)
+    cluster_by_sample_stats(st, method, plot=False)
 
 # %%
 # find differential genes in each cluster
 marker_gene_tests = ['t-test', 'wilcoxon', 't-test_overestim_var']
-num_top_genes = 10 if max_num_clusters < 5 else 5
-# p_val_max = 1.1
+num_top_genes = 100
+marker_gene_max_pval = 1.01
 
 for cluster_key, test in itertools.product(computed_cluster_keys,
                                            marker_gene_tests):
@@ -462,8 +515,12 @@ for cluster_key, test in itertools.product(computed_cluster_keys,
     marker_gene_key = f'{cluster_key}_{test}'
     sc.tl.rank_genes_groups(adata, cluster_key, n_genes=num_top_genes,
                             method=test, key_added=marker_gene_key)
-    # marker_gene_table = sc.get.rank_genes_groups_df(
-    #     adata, None, key=marker_gene_key, pval_cutoff=p_val_max)
+
+    marker_gene_table = sc.get.rank_genes_groups_df(
+        adata, None, key=marker_gene_key, pval_cutoff=marker_gene_max_pval)
+    marker_gene_table_path = os.path.join(result_dir,
+                                          f'{test}_marker_genes.csv')
+    marker_gene_table.to_csv(marker_gene_table_path)
 
     # plot marker genes
     # sc.pl.rank_genes_groups(
@@ -471,15 +528,89 @@ for cluster_key, test in itertools.product(computed_cluster_keys,
     #     save=f'_{test}.pdf', show=False)
 
     g = sc.pl.rank_genes_groups_heatmap(
-        adata, n_genes=num_top_genes, groupby=cluster_key,
+        adata, n_genes=min(10, 50 // max_num_clusters), groupby=cluster_key,
         key=marker_gene_key, dendrogram=False, use_raw=False, show=False,
         save=f'_{test}_marker_genes.pdf')
     plt.close('all')
 
     g = sc.pl.rank_genes_groups_violin(
-        adata, key=marker_gene_key, use_raw=False, show=False,
+        adata, n_genes=10, key=marker_gene_key, use_raw=False, show=False,
         save=f'_{test}.pdf')
     plt.close('all')
+
+# %%
+# get GO terms for marker genes in clusters
+from goatools.base import download_go_basic_obo
+from goatools.obo_parser import GODag
+from goatools.base import download_ncbi_associations
+from goatools.anno.genetogo_reader import Gene2GoReader
+from goatools.test_data.genes_NCBI_9606_ProteinCoding import GENEID2NT \
+    as GeneID2nt
+from goatools.goea.go_enrichment_ns import GOEnrichmentStudyNS
+
+# initialize GO analysis
+cluster_key = 'posterior_mean_ward'
+marker_gene_test = 't-test'
+# filter_col = 'pvals'
+filter_col = 'pvals_adj'
+marker_gene_max_pval = 0.05
+go_max_pval = 0.05
+
+obo_path = download_go_basic_obo()
+obo_dag = GODag(obo_path)
+gene2go_path = download_ncbi_associations()
+gene_annoation = Gene2GoReader(gene2go_path, taxids=[9606])
+ns2assoc = gene_annoation.get_ns2assc()
+go_study = GOEnrichmentStudyNS(GeneID2nt.keys(), ns2assoc, obo_dag,
+                               propagate_counts = False, alpha = go_max_pval,
+                               methods = ['fdr_bh'])
+
+# create reverse mapping from gene symbols to gene IDs
+symbol2id = {}
+for gene_id, nt in GeneID2nt.items():
+    gene_symbol = nt.Symbol.upper()
+    symbol2id[gene_symbol] = gene_id
+
+    for alias in nt.Aliases.split(', '):
+        symbol2id[alias.upper()] = gene_id
+
+result_dir = os.path.join(sample_cluster_dir, cluster_key.replace('_', '-'))
+marker_gene_table_path = os.path.join(
+    result_dir, f'{marker_gene_test}_marker_genes.csv')
+marker_gene_table = pd.read_csv(marker_gene_table_path, index_col=0)
+go_tables = {}
+
+for cluster in np.unique(marker_gene_table['group']):
+    # get gene ids from gene symbols
+    gene_symbols = marker_gene_table['names'][
+        (marker_gene_table['group'] == cluster)
+        & (marker_gene_table[filter_col] < marker_gene_max_pval)].tolist()
+    gene_ids = [symbol2id[s] for s in gene_symbols]
+    go_tables[cluster] = pd.DataFrame(
+        columns=['go_id', 'term', 'p_val_adj', 'gene_count', 'genes'])
+    go_tables[cluster] = go_tables[cluster].astype({'gene_count': int})
+
+    # run GO study
+    if len(gene_ids) > 0:
+        go_records = go_study.run_study(gene_ids)
+
+        # collect all significant GO terms
+        for gr in go_records:
+            if gr.p_fdr_bh < go_max_pval:
+                go_genes = [GeneID2nt[i].Symbol.upper() for i in gr.study_items]
+                row = {'go_id': gr.goterm.id, 'term': gr.name,
+                    'p_val_adj': gr.p_fdr_bh, 'gene_count': gr.study_count,
+                    'genes': '.'.join(go_genes)}
+                go_tables[cluster] = go_tables[cluster].append(
+                    row, ignore_index=True)
+
+        # sort GO terms by adjusted p-value
+        go_tables[cluster].sort_values('p_val_adj', ascending=False)
+
+    # export GO table
+    go_table_path = os.path.join(
+        result_dir, f'go_terms_{marker_gene_test}_{cluster}_{filter_col}.csv')
+    go_tables[cluster].to_csv(go_table_path)
 
 # %%
 # compute trajectory statistics in each cluster
