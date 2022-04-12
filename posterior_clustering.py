@@ -7,9 +7,12 @@ import json
 import numpy as np
 from scipy.cluster.hierarchy import linkage, fcluster, leaves_list
 from scipy.spatial.distance import squareform
+from scipy.stats import ks_2samp
 import scipy.io
 from sklearn.cluster import KMeans
+from sklearn.metrics import adjusted_rand_score
 import pandas as pd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
@@ -26,13 +29,13 @@ import calcium_models
 # stan_runs = ['const-Be-eta1']
 # stan_runs = ['const-Be-eta1-mixed-1']
 # stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
-# stan_runs = ['const-Be-eta1-random-3']
-stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
-# list_ranges = [(1, 500)]
+stan_runs = ['const-Be-eta1-random-1']
+# stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
+list_ranges = [(1, 500)]
 # list_ranges = [(1, 100)]
 # list_ranges = [(1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
 # list_ranges = [(1, 359)]
-list_ranges = [(1, 571), (1, 372), (1, 359), (1, 341), (1, 335), (1, 370)]
+# list_ranges = [(1, 571), (1, 372), (1, 359), (1, 341), (1, 335), (1, 370)]
 log_transform_samples = False
 scale_samples = False
 max_num_clusters = 3
@@ -72,6 +75,10 @@ if not os.path.exists(output_root):
     os.mkdir(output_root)
 output_dir = os.path.join(output_root, 'multi-sample-analysis')
 
+# change font settings
+mpl.rcParams['font.sans-serif'] = ['Arial']
+mpl.rcParams['font.size'] = 12
+
 # load all samples
 print('Loading samples...')
 analyzer = StanMultiSessionAnalyzer(session_list, output_dir, session_dirs,
@@ -82,6 +89,7 @@ num_sessions = len(session_list)
 
 excluded_params.append('sigma')
 param_names = [pn for pn in param_names if pn not in excluded_params]
+param_names_on_plot = [calcium_models.params_on_plot[p] for p in param_names]
 num_params = len(param_names)
 
 # log transform posteriors
@@ -171,7 +179,7 @@ sample_cluster_dir = os.path.join(sample_cluster_root,
 if not os.path.exists(sample_cluster_dir):
     os.mkdir(sample_cluster_dir)
 
-computed_cluster_keys = []
+computed_cluster_keys = set()
 
 # %%
 # compute distances and save
@@ -291,7 +299,7 @@ def cluster_by_sample_distances(dist_metric, cluster_method, plot=False):
     labels = fcluster(Z, max_num_clusters, criterion='maxclust')
     adata.obs[cluster_key] = labels
     adata.obs[cluster_key] = adata.obs[cluster_key].astype('category')
-    computed_cluster_keys.append(cluster_key)
+    computed_cluster_keys.add(cluster_key)
 
     if not plot:
         return
@@ -370,11 +378,17 @@ cluster_methods = ['ward']
 
 for metric, method in itertools.product(dist_metrics, cluster_methods):
     print(f'Clustering {metric} using {method} linkage...')
-    cluster_by_sample_distances(metric, method, plot=True)
+    cluster_by_sample_distances(metric, method, plot=False)
 
 # %%
+figure_title = 'Posterior clustering'
+if 'const-Be-eta1' in stan_runs:
+    figure_title += ', similar'
+elif 'const-Be-eta1-random-1' in stan_runs:
+    figure_title += ', random'
+
 def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
-    cluster_key = f'posterior_{stat_type}_{cluster_method}'
+    cluster_key = f'{stat_type}_{cluster_method}'
 
     if stat_type == 'mean':
         data = sample_means
@@ -390,13 +404,13 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
 
     adata.obs[cluster_key] = labels
     adata.obs[cluster_key] = adata.obs[cluster_key].astype('category')
-    computed_cluster_keys.append(cluster_key)
+    computed_cluster_keys.add(cluster_key)
 
     if not plot:
         return
 
     result_dir = os.path.join(sample_cluster_dir,
-                              cluster_key.replace('_', '-'))
+                              'posterior-' + cluster_key.replace('_', '-'))
     if not os.path.exists(result_dir):
         os.mkdir(result_dir)
     sc.settings.figdir = result_dir
@@ -413,6 +427,7 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
                         xticklabels=False, yticklabels=reordered_labels)
         plt.xlabel('Time')
         plt.ylabel('Ca2+ response')
+        plt.title(figure_title)
         plt.tight_layout()
         figure_path = os.path.join(result_dir, 'clustered_trajectories.pdf')
         plt.savefig(figure_path)
@@ -420,9 +435,12 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
 
         # plot posterior means reordered by clustering result
         plt.figure(figsize=(4, 6), dpi=300)
-        _ = sns.heatmap(sample_means[reordered_session_indices, :],
-                        xticklabels=param_names, yticklabels=reordered_labels)
+        g = sns.heatmap(sample_means[reordered_session_indices, :],
+                        xticklabels=param_names_on_plot,
+                        yticklabels=reordered_labels)
         plt.ylabel('Cells')
+        plt.xticks(fontsize=10)
+        plt.title(figure_title)
         plt.tight_layout()
         figure_path = os.path.join(result_dir, 'clustered_posterior_means.pdf')
         plt.savefig(figure_path)
@@ -431,8 +449,11 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
         # plot posterior modes reordered by clustering result
         plt.figure(figsize=(4, 6), dpi=300)
         _ = sns.heatmap(sample_modes[reordered_session_indices, :],
-                        xticklabels=param_names, yticklabels=reordered_labels)
+                        xticklabels=param_names_on_plot,
+                        yticklabels=reordered_labels)
         plt.ylabel('Cells')
+        plt.xticks(fontsize=10)
+        plt.title(figure_title)
         plt.tight_layout()
         figure_path = os.path.join(result_dir, 'clustered_posterior_modes.pdf')
         plt.savefig(figure_path)
@@ -448,30 +469,33 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
                            figsize=(4, 6), cbar_pos=None)
         g.ax_heatmap.set_xlabel('Cells')
         g.ax_heatmap.set_ylabel('Ca2+ response')
+        plt.title(figure_title)
         plt.tight_layout()
         figure_path = os.path.join(result_dir, 'clustered_trajectories.pdf')
         plt.savefig(figure_path)
         plt.close('all')
 
         # plot posterior means reordered by clustering result
-        plt.figure(figsize=(4, 6), dpi=300)
         g = sns.clustermap(sample_means, row_linkage=Z, col_cluster=False,
-                           xticklabels=param_names, yticklabels=False,
+                           xticklabels=param_names_on_plot, yticklabels=False,
                            row_colors=cluster_colors, figsize=(4, 6),
                            cbar_pos=None)
         g.ax_heatmap.set_ylabel('Cells')
+        plt.xticks(fontsize=10)
+        plt.title(figure_title)
         plt.tight_layout()
         figure_path = os.path.join(result_dir, 'clustered_posterior_means.pdf')
         g.savefig(figure_path, dpi=300)
         plt.close('all')
 
         # plot posterior modes reordered by clustering result
-        plt.figure(figsize=(4, 6), dpi=300)
         g = sns.clustermap(sample_modes, row_linkage=Z, col_cluster=False,
-                           xticklabels=param_names, yticklabels=False,
+                           xticklabels=param_names_on_plot, yticklabels=False,
                            row_colors=cluster_colors, figsize=(4, 6),
                            cbar_pos=None)
         g.ax_heatmap.set_ylabel('Cells')
+        plt.xticks(fontsize=10)
+        plt.title(figure_title)
         plt.tight_layout()
         figure_path = os.path.join(result_dir, 'clustered_posterior_modes.pdf')
         g.savefig(figure_path, dpi=300)
@@ -488,8 +512,8 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
 
 # %%
 # cluster by posterior means or posterior modes
-cluster_methods = ['ward', 'kmeans']
-stat_types = ['mean', 'mode']
+cluster_methods = ['ward']#, 'kmeans']
+stat_types = ['mean']#, 'mode']
 for st, method in itertools.product(stat_types, cluster_methods):
     if method != 'kmeans':
         print(f'Clustering posterior {st} using {method} linkage...')
@@ -497,6 +521,19 @@ for st, method in itertools.product(stat_types, cluster_methods):
         print(f'Clustering posterior {st} using k-means...')
 
     cluster_by_sample_stats(st, method, plot=False)
+
+    # rename cluster names for plotting
+    if 'const-Be-eta1' in stan_runs and st == 'mean' and method == 'ward':
+        cluster_key = 'mean_ward'
+        cluster_names = ['Early', 'Low', 'Late-high']
+        adata.rename_categories(cluster_key, cluster_names)
+        cluster_colors = ['C0', 'C1', 'C2']
+    if 'const-Be-eta1-random-1' in stan_runs and st == 'mean' \
+            and method == 'ward':
+        cluster_key = 'mean_ward'
+        cluster_names = ['C1', 'C2', 'C3']
+        adata.rename_categories(cluster_key, cluster_names)
+        cluster_colors = ['C6', 'C7', 'C8']
 
 # %%
 # find differential genes in each cluster
@@ -507,8 +544,11 @@ marker_gene_max_pval = 1.01
 for cluster_key, test in itertools.product(computed_cluster_keys,
                                            marker_gene_tests):
     print(f'Finding marker genes for {cluster_key} using {test}...')
-    result_dir = os.path.join(sample_cluster_dir,
-                              cluster_key.replace('_', '-'))
+    metric, method = cluster_key.split('_')
+    result_dir = f'{metric}-{method}'
+    if metric in ('mean', 'mode'):
+        result_dir = 'posterior-' + result_dir
+    result_dir = os.path.join(sample_cluster_dir, result_dir)
     sc.settings.figdir = result_dir
 
     # get marker genes
@@ -533,6 +573,18 @@ for cluster_key, test in itertools.product(computed_cluster_keys,
         save=f'_{test}_marker_genes.pdf')
     plt.close('all')
 
+    g = sc.pl.rank_genes_groups_dotplot(
+        adata, n_genes=min(10, 50 // max_num_clusters), groupby=cluster_key,
+        key=marker_gene_key, dendrogram=False, use_raw=False, show=False,
+        save=f'_{test}_marker_genes.pdf')
+    plt.close('all')
+
+    g = sc.pl.rank_genes_groups_matrixplot(
+        adata, n_genes=min(10, 50 // max_num_clusters), groupby=cluster_key,
+        key=marker_gene_key, dendrogram=False, use_raw=False, show=False,
+        save=f'_{test}_marker_genes.pdf')
+    plt.close('all')
+
     g = sc.pl.rank_genes_groups_violin(
         adata, n_genes=10, key=marker_gene_key, use_raw=False, show=False,
         save=f'_{test}.pdf')
@@ -551,8 +603,8 @@ from goatools.goea.go_enrichment_ns import GOEnrichmentStudyNS
 # initialize GO analysis
 cluster_key = 'posterior_mean_ward'
 marker_gene_test = 't-test'
-# filter_col = 'pvals'
-filter_col = 'pvals_adj'
+filter_col = 'pvals'
+# filter_col = 'pvals_adj'
 marker_gene_max_pval = 0.05
 go_max_pval = 0.05
 
@@ -561,9 +613,6 @@ obo_dag = GODag(obo_path)
 gene2go_path = download_ncbi_associations()
 gene_annoation = Gene2GoReader(gene2go_path, taxids=[9606])
 ns2assoc = gene_annoation.get_ns2assc()
-go_study = GOEnrichmentStudyNS(GeneID2nt.keys(), ns2assoc, obo_dag,
-                               propagate_counts = False, alpha = go_max_pval,
-                               methods = ['fdr_bh'])
 
 # create reverse mapping from gene symbols to gene IDs
 symbol2id = {}
@@ -574,6 +623,14 @@ for gene_id, nt in GeneID2nt.items():
     for alias in nt.Aliases.split(', '):
         symbol2id[alias.upper()] = gene_id
 
+# get gene IDs for all genes in the dataset
+pop_ids = set()
+for gene in adata.var_names:
+    pop_ids.add(symbol2id[gene])
+
+go_study = GOEnrichmentStudyNS(pop_ids, ns2assoc, obo_dag,
+                               propagate_counts = False, alpha = go_max_pval,
+                               methods = ['fdr_bh'])
 result_dir = os.path.join(sample_cluster_dir, cluster_key.replace('_', '-'))
 marker_gene_table_path = os.path.join(
     result_dir, f'{marker_gene_test}_marker_genes.csv')
@@ -620,8 +677,11 @@ cluster_traj_stat_table = {}
 num_steady_pts = ts.size // 5
 
 for cluster_key in computed_cluster_keys:
-    result_dir = os.path.join(sample_cluster_dir,
-                              cluster_key.replace('_', '-'))
+    metric, method = cluster_key.split('_')
+    result_dir = f'{metric}-{method}'
+    if metric in ('mean', 'mode'):
+        result_dir = 'posterior-' + result_dir
+    result_dir = os.path.join(sample_cluster_dir, result_dir)
     cluster_names = adata.obs[cluster_key].cat.categories
     cluster_traj_stat_table[cluster_key] = pd.DataFrame(
         columns=cluster_traj_stats, index=cluster_names)
@@ -647,21 +707,28 @@ for cluster_key in computed_cluster_keys:
         cluster_traj_features['peak_times'].append(peak_times)
 
         # compute steady state stats
-        steady_states = np.mean(y_cluster[:, -num_steady_pts:],
-                                        axis=1)
+        steady_states = np.mean(y_cluster[:, -num_steady_pts:], axis=1)
         row['SteadyMean'] = np.mean(steady_states)
         row['SteadyStd'] = np.std(steady_states)
         cluster_traj_features['steady_states'].append(steady_states)
 
         cluster_traj_stat_table[cluster_key].loc[cluster, :] = row
 
-    for feature, values in cluster_traj_features.items():
-        plt.figure(figsize=(6, 4), dpi=300)
-        plt.hist(values, bins=20, density=True, label=cluster_names)
-        plt.legend()
+    table_path = os.path.join(result_dir, 'traj_stats.csv')
+    cluster_traj_stat_table[cluster_key].to_csv(table_path)
 
-        figure_title = ' '.join(feature.split('_'))
-        figure_title = figure_title.capitalize()
+    # plot histogram of each feature
+    for feature, values in cluster_traj_features.items():
+        plt.figure(figsize=(4, 2), dpi=300)
+        if feature == 'peaks':
+            # for peak distribution, plot KDE instead
+            for cn, v, cc in zip(cluster_names, values, cluster_colors):
+                sns.kdeplot(data=v, color=cc, fill=True, alpha=0.2, label=cn)
+            plt.xlim((0, 10))
+            plt.yticks(ticks=[])
+        else:
+            plt.hist(values, bins=10, density=True, label=cluster_names)
+        plt.legend()
         plt.title(figure_title)
 
         plt.tight_layout()
@@ -670,8 +737,199 @@ for cluster_key in computed_cluster_keys:
         plt.savefig(figure_path)
         plt.close()
 
-    table_path = os.path.join(result_dir, 'traj_stats.csv')
-    cluster_traj_stat_table[cluster_key].to_csv(table_path)
+    # test peak time:
+    peak_time_ks_table = pd.DataFrame(
+        columns=['Cluster A', 'Cluster B', 'KS stat', 'p-value'])
+    for i, j in itertools.combinations(range(len(cluster_names)), 2):
+        ks, p_val = ks_2samp(cluster_traj_features['peak_times'][i],
+                             cluster_traj_features['peak_times'][j],
+                             alternative='less')
+        row = {'Cluster A': cluster_names[i], 'Cluster B': cluster_names[j],
+               'KS stat': ks, 'p-value': p_val}
+        peak_time_ks_table = peak_time_ks_table.append(row, ignore_index=True)
+
+        ks, p_val = ks_2samp(cluster_traj_features['peak_times'][j],
+                             cluster_traj_features['peak_times'][i],
+                             alternative='less')
+        row = {'Cluster A': cluster_names[j], 'Cluster B': cluster_names[i],
+               'KS stat': ks, 'p-value': p_val}
+        peak_time_ks_table = peak_time_ks_table.append(row, ignore_index=True)
+
+    table_path = os.path.join(result_dir, 'traj_peak_time_ks.csv')
+    peak_time_ks_table.to_csv(table_path)
+
+# %%
+# make ribbon plot for trajectories in each cluster
+t_plot_max = 100
+num_plot_points = np.sum(ts <= t_plot_max)
+ts_plot = ts[:num_plot_points]
+
+for cluster_key in computed_cluster_keys:
+    metric, method = cluster_key.split('_')
+    result_dir = f'{metric}-{method}'
+    if metric in ('mean', 'mode'):
+        result_dir = 'posterior-' + result_dir
+    result_dir = os.path.join(sample_cluster_dir, result_dir)
+    cluster_names = adata.obs[cluster_key].cat.categories
+    num_clusters = len(cluster_names)
+
+    fig, axs = plt.subplots(nrows=num_clusters, ncols=1, sharex=True,
+                            figsize=(3, num_clusters + 1), dpi=300)
+    for i, cluster in enumerate(cluster_names):
+        cluster_cells = [int(c) for c in session_list
+                         if adata.obs.loc[c, cluster_key] == cluster]
+        y_cluster = y_all[cluster_cells, :]
+        y_mean = np.mean(y_cluster, axis=0)
+        y_std = np.std(y_cluster, axis=0, ddof=1)
+        y_mean = y_mean[:num_plot_points]
+        y_std = y_std[:num_plot_points]
+
+        axs[i].plot(ts_plot, y_mean, color=f'C{i}')
+        axs[i].fill_between(ts_plot, y_mean - y_std, y_mean + y_std,
+                            color=f'C{i}', alpha=0.2)
+
+        # add a vertical line at peak time
+        peak_time = ts_plot[np.argmax(y_mean)]
+        axs[i].plot(np.full(2, peak_time), np.array([0, 4]), 'k--')
+
+        if i == num_clusters - 1:
+            axs[i].set_xlabel('Time')
+        axs[i].set_ylim(bottom=0, top=4)
+        axs[i].set_title(f'Cluster {cluster}')
+
+    plt.tight_layout()
+    figure_path = os.path.join(result_dir, 'traj_ribbon.pdf')
+    plt.savefig(figure_path)
+    plt.close()
+
+# %%
+# plot trajectories for PLC, IP3, h for randomly selected cells
+import tqdm
+
+random_seed = 0
+bit_generator = np.random.MT19937(random_seed)
+rng = np.random.default_rng(bit_generator)
+traj_sim_step_size = 50
+num_cluster_sample_cells = 20
+num_chain_samples = analyzer.session_analyzers[0].samples[0].shape[0]
+num_chain_trajs = num_chain_samples // traj_sim_step_size
+num_cell_trajs = num_chain_trajs * analyzer.num_chains
+num_cluster_trajs = num_cluster_sample_cells * num_cell_trajs
+
+for cluster_key in computed_cluster_keys:
+    metric, method = cluster_key.split('_')
+    result_dir = f'{metric}-{method}'
+    if metric in ('mean', 'mode'):
+        result_dir = 'posterior-' + result_dir
+    result_dir = os.path.join(sample_cluster_dir, result_dir)
+    cluster_names = adata.obs[cluster_key].cat.categories
+    num_clusters = len(cluster_names)
+
+    plc_trajs = {}
+    ip3_trajs = {}
+    h_trajs = {}
+
+    for i, cluster in enumerate(cluster_names):
+        print(f'Simulating for cluster {cluster}...', flush=True)
+        cluster_cell_indices = [idx for idx, c in enumerate(session_list)
+                                if adata.obs.loc[c, cluster_key] == cluster]
+        chosen_cell_indices = rng.choice(
+            cluster_cell_indices, size=num_cluster_sample_cells, replace=False)
+        plc_trajs[cluster] = np.empty((num_cluster_trajs, ts.size))
+        ip3_trajs[cluster] = np.empty((num_cluster_trajs, ts.size))
+        h_trajs[cluster] = np.empty((num_cluster_trajs, ts.size))
+        traj_idx = 0
+
+        for idx in tqdm.tqdm(chosen_cell_indices):
+            y0 = np.array([0, 0, 0.7, y0_all[idx]])
+            y_sim = analyzer.session_analyzers[idx].simulate_chains(
+                calcium_ode, 0, ts, y0, subsample_step_size=traj_sim_step_size,
+                plot=False, verbose=False)
+            for chain in range(analyzer.num_chains):
+                plc_trajs[cluster][traj_idx:traj_idx+num_chain_trajs, :] \
+                    = y_sim[chain][:, :, 0]
+                ip3_trajs[cluster][traj_idx:traj_idx+num_chain_trajs, :] \
+                    = y_sim[chain][:, :, 1]
+                h_trajs[cluster][traj_idx:traj_idx+num_chain_trajs, :] \
+                    = y_sim[chain][:, :, 2]
+
+                traj_idx += num_chain_trajs
+
+# %%
+# plot samples of PLC, IP3, h
+jet_cmap = plt.get_cmap('jet')
+traj_colors = jet_cmap(np.linspace(0.0, 1.0, num_cluster_sample_cells))
+
+for cluster_key in computed_cluster_keys:
+    fig, axs = plt.subplots(nrows=3, ncols=num_clusters, sharex=True,
+                            sharey='row', figsize=(2 * num_clusters, 4),
+                            dpi=300)
+
+    for i, cluster in enumerate(cluster_names):
+        for j in range(num_cluster_sample_cells):
+            traj_start_idx = j * num_cell_trajs
+            traj_stop_idx = (j + 1) * num_cell_trajs
+            axs[0][i].plot(
+                ts, plc_trajs[cluster][traj_start_idx:traj_stop_idx, :].T,
+                color=traj_colors[j], alpha=0.2)
+            axs[0][i].set_title(f'{cluster}, PLC')
+            axs[1][i].plot(
+                ts, ip3_trajs[cluster][traj_start_idx:traj_stop_idx, :].T,
+                color=traj_colors[j], alpha=0.2)
+            axs[1][i].set_ylim(top=2)
+            axs[1][i].set_title(f'{cluster}, IP3')
+            axs[2][i].plot(
+                ts, h_trajs[cluster][traj_start_idx:traj_stop_idx, :].T,
+                color=traj_colors[j], alpha=0.2)
+            axs[2][i].set_title(f'{cluster}, h')
+
+    fig.tight_layout()
+    figure_path = os.path.join(result_dir, 'trajs_other_vars.png')
+    fig.savefig(figure_path)
+    plt.close('all')
+
+for cluster_key in computed_cluster_keys:
+    fig, axs = plt.subplots(nrows=3, ncols=num_clusters, sharex=True,
+                            sharey='row', figsize=(2 * num_clusters, 4),
+                            dpi=300)
+
+    for i, cluster in enumerate(cluster_names):
+        plc_mean = np.mean(plc_trajs[cluster], axis=0)
+        plc_std = np.std(plc_trajs[cluster], axis=0, ddof=1)
+        axs[0][i].plot(ts, plc_mean, color=f'C{i}')
+        axs[0][i].fill_between(ts, plc_mean - plc_std, plc_mean + plc_std,
+                               color=f'C{i}', alpha=0.2)
+        axs[0][i].set_title(f'Cluster {cluster}, PLC')
+        ip3_mean = np.mean(ip3_trajs[cluster], axis=0)
+        ip3_std = np.std(ip3_trajs[cluster], axis=0, ddof=1)
+        axs[1][i].plot(ts, ip3_mean, color=f'C{i}')
+        axs[1][i].fill_between(ts, ip3_mean - ip3_std, ip3_mean + plc_std,
+                               color=f'C{i}', alpha=0.2)
+        axs[1][i].set_title(f'Cluster {cluster}, IP3')
+        h_mean = np.mean(h_trajs[cluster], axis=0)
+        h_std = np.std(h_trajs[cluster], axis=0, ddof=1)
+        axs[2][i].plot(ts, h_mean, color=f'C{i}')
+        axs[2][i].fill_between(ts, h_mean - h_std, h_mean + h_std,
+                               color=f'C{i}', alpha=0.2)
+        axs[2][i].set_title(f'Cluster {cluster}, h')
+
+    fig.tight_layout()
+    figure_path = os.path.join(result_dir, 'trajs_other_vars_ribbon.pdf')
+    fig.savefig(figure_path)
+    plt.close('all')
+
+# %%
+# compare with Leiden clustering on genes
+leiden_data_path = os.path.join(output_root, 'gene-clustering',
+                                'leiden_0.50_adata.h5ad')
+adata_leiden = sc.read_h5ad(leiden_data_path)
+rand_scores = {}
+
+for cluster_key in computed_cluster_keys:
+    rand_scores[cluster_key] = adjusted_rand_score(
+        adata_leiden.obs['leiden_0.50'], adata.obs[cluster_key])
+
+    print(rand_scores[cluster_key])
 
 # %%
 # sample distance vs similarity

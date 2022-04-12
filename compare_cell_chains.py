@@ -12,14 +12,14 @@ import seaborn as sns
 # %%
 root_cell_id = 5106
 first_cell_order = 1
-last_cell_order = 500
+last_cell_order = 200
 
 # define directories for results produced by MultiSessionAnalyzers
-# run_group = 'full-models'
+run_group = 'full-models'
 # run_group = '3-vs-const'
 # run_group = 'scaling'
 # run_group = '3-vs-lemon'
-run_group = 'similar-vs-mixed'
+# run_group = 'similar-vs-mixed'
 
 with open('stan_run_meta.json', 'r') as f:
     stan_run_meta = json.load(f)
@@ -255,7 +255,7 @@ plt.close()
 # %%
 # plot sampling time
 figure_path = os.path.join(output_dir, 'sampling_time.pdf')
-plt.figure(figsize=figure_size, dpi=dpi)
+plt.figure(figsize=(6, 7), dpi=dpi)
 
 # make scatter plot, with upper bound for time
 sampling_time_low = 0
@@ -268,7 +268,7 @@ g = sns.stripplot(data=sampling_time_long, x='Cell', y='Time', hue='Run',
 # draw lines for means of chains
 for i in range(num_runs):
     run_mean = np.full(num_cells, np.mean(sampling_time[i].values))
-    g.plot(run_mean, color=run_colors[i])
+    g.plot(run_mean, color=run_colors[i], linewidth=5)
 
 # set labels on axes
 g.set_xticks(run_xtick_locs)
@@ -279,11 +279,14 @@ g.set_ylabel('Time (minutes)')
 # set limits
 g.set_ylim(bottom=sampling_time_low, top=sampling_time_high)
 
+# add title
+g.set_title('Runtime comparison')
+
 # update legend
 legend = g.legend()
 for text, label in zip(legend.texts, pub_names):
     text.set_text(label)
-legend.remove()
+# legend.remove()
 
 # export
 plt.tight_layout()
@@ -302,22 +305,12 @@ time_violins['cmeans'].set_color('k')
 time_violins['cmins'].set_color('k')
 time_violins['cmaxes'].set_color('k')
 time_violins['cbars'].set_color('k')
-plt.xticks(ticks=violin_xticks, labels=violin_xticklabels)
+plt.xticks(ticks=violin_xticks, labels=violin_xticklabels, rotation=45)
 plt.ylim((0, 1000))
 plt.ylabel('Time (minutes)')
+plt.title('NUTS runtime comparison')
 plt.tight_layout()
 plt.savefig(figure_path)
-plt.close()
-
-# %%
-# make legends
-import matplotlib.patches as mpatches
-
-dummy_fig = plt.figure(figsize=(3, num_runs * 0.5), dpi=dpi)
-legend_patches = [mpatches.Patch(color=c, label=r)
-                  for c, r in zip(run_colors, pub_names)]
-dummy_fig.legend(legend_patches, pub_names, loc='center')
-dummy_fig.savefig(os.path.join(output_dir, 'figure_legend.pdf'))
 plt.close()
 
 # %%
@@ -342,3 +335,14 @@ for i in range(1, 4):
     stat, p_val = scipy.stats.ks_2samp(wt_similar, wt_random,
                                        alternative='less')
     print(f'{stat:.8f} {p_val:.8f}')
+
+# %%
+# make legends
+import matplotlib.patches as mpatches
+
+dummy_fig = plt.figure(figsize=(3, num_runs * 0.5), dpi=dpi)
+legend_patches = [mpatches.Patch(color=c, label=r)
+                  for c, r in zip(run_colors, pub_names)]
+dummy_fig.legend(legend_patches, pub_names, loc='center')
+dummy_fig.savefig(os.path.join(output_dir, 'figure_legend.pdf'))
+plt.close()

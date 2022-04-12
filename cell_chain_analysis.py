@@ -76,6 +76,8 @@ else:
 
 output_root = os.path.join('../../result', output_root)
 output_dir = 'multi-sample-analysis'
+if num_runs == 1:
+    output_dir += f'-{list_ranges[0][0]:04d}-{list_ranges[0][1]:04d}'
 if pca_sampled_only:
     output_dir += '-pca-sampled-only'
 output_dir = os.path.join(output_root, output_dir)
@@ -189,7 +191,7 @@ analyzer.get_sample_means()
 # %%
 print('Plotting select pairs of parameters...')
 param_pair_sessions = analyzer.session_list[::50].tolist()
-param_plot_titles = ['Sample means'] \
+param_plot_titles = ['MAP values'] \
     + [f'Cell {c}' for c in param_pair_sessions]
 for pairs in select_param_pairs:
     analyzer.plot_param_pairs(
@@ -227,7 +229,7 @@ print('Computing correlation between top genes and parameters...')
 analyzer.compute_gene_param_correlations(analyzer.top_pc_gene_list)
 
 print('Running regression for genes vs parameters...')
-num_top_pairs = 20
+num_top_pairs = 450
 high_corr_pairs = []
 for i in range(num_top_pairs):
     gene = analyzer.sorted_gene_vs_param_pairs.loc[i, 'Gene']
@@ -254,7 +256,7 @@ plt.imshow(gradient, aspect=3.0, cmap=plt.get_cmap('viridis'))
 plt.axis('off')
 plt.title('Cell positions', fontdict={'fontsize': 'medium'})
 legend_patches = [mpatches.Patch(color='C1', label='Huber')]
-plt.legend(legend_patches, ['Huber Regression'], loc='upper left',
+plt.legend(legend_patches, ['Regression line'], loc='upper left',
            frameon=False, bbox_to_anchor=(0.0, 0.0))
 figure_path = os.path.join(
     output_dir, 'high_corr_pairs_scatter_huber_legend.pdf')
@@ -277,6 +279,41 @@ for i, row in analyzer.sorted_gene_vs_param_pairs.iterrows():
 
     if i == 19:
         break
+
+# %%
+# plot histogram of gene-param correlations
+from statsmodels.stats.multitest import multipletests
+
+sorted_gene_vs_param_corrs_path = os.path.join(
+    analyzer.output_dir, 'genes-vs-params', 'pearson_corrs_sorted.csv')
+
+sorted_gene_vs_param_corrs = pd.read_csv(sorted_gene_vs_param_corrs_path,
+                                         index_col=0)
+reject, pval_adj, _, alpha_adj = multipletests(
+    sorted_gene_vs_param_corrs['p-value'], alpha=0.05, method='bonferroni')
+
+print('Correlation at cutoff for adjusted p-values:')
+print(sorted_gene_vs_param_corrs.loc[sum(pval_adj < 0.05) - 1, 'Correlation'])
+
+# %%
+plt.figure(figsize=(6, 4), dpi=300)
+bin_colors = ['C1'] * 4 + ['C0'] * 11 + ['C1'] * 5
+_, _, hist_patches = plt.hist(sorted_gene_vs_param_corrs['Correlation'],
+                              bins=20)
+for p, c in zip(hist_patches, bin_colors):
+    p.set_facecolor(c)
+plt.xlabel('Correlation')
+plt.ylabel('Count')
+plt.title('Genes-parameter correlations')
+legend_patches = [hist_patches[0], hist_patches[10]]
+plt.legend(legend_patches,
+           ['Adjusted\np-value<0.05', 'Adjusted\np-value≥0.05'],
+           fontsize='small')
+plt.tight_layout()
+figure_path = os.path.join(analyzer.output_dir, 'genes-vs-params',
+                           'pearson_corrs_hist.pdf')
+plt.savefig(figure_path)
+plt.close('all')
 
 # %%
 # analyze warmup
@@ -323,7 +360,7 @@ plt.close()
 plt.figure(figsize=(6, 6), dpi=300)
 session_list_int.insert(0, 5106)  # add root cell
 similar_cells = similarity_matrix[np.ix_(session_list_int, session_list_int)]
-similar_cells = similar_cells / np.amax(similar_cells, axis=1)
+similar_cells = np.ceil(similar_cells)
 
 plt.imshow(similar_cells, cmap='binary', interpolation='none')
 plt.tight_layout()

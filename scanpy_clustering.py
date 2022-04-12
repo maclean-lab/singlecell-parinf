@@ -4,6 +4,7 @@ import json
 
 import numpy as np
 import pandas as pd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
 import scanpy as sc
@@ -12,10 +13,10 @@ from stan_helpers import load_trajectories
 
 # %%
 # stan_runs = ['3']
-stan_runs = ['const-Be-eta1']
+# stan_runs = ['const-Be-eta1']
 # stan_runs = ['const-Be-eta1-mixed-1']
 # stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
-# stan_runs = ['const-Be-eta1-random-2']
+stan_runs = ['const-Be-eta1-random-1']
 # stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
 list_ranges = [(1, 500)]
 # list_ranges = [(1, 100)]
@@ -60,6 +61,10 @@ if not os.path.exists(output_root):
 output_dir = os.path.join(output_root, 'gene-clustering')
 sc.settings.figdir = output_dir
 
+# change font settings
+mpl.rcParams['font.sans-serif'] = ['Arial']
+mpl.rcParams['font.size'] = 12
+
 # %%
 # load expression data and preprocess
 print('Loading gene expression...')
@@ -78,19 +83,33 @@ sc.tl.umap(adata)
 sc.pp.neighbors(adata, n_neighbors=10, n_pcs=40)
 sc.tl.umap(adata)
 sc.tl.leiden(adata, resolution=leiden_resolution, key_added=cluster_key)
+cluster_names = adata.obs[cluster_key].cat.categories
+num_clusters = len(cluster_names)
 
-with plt.rc_context({"figure.figsize": (4, 4), "figure.dpi": (300)}):
-    sc.pl.pca(adata, color=cluster_key, use_raw=False, show=False,
-            save=f'_{cluster_key}.pdf')
-    sc.pl.umap(adata, color=cluster_key, use_raw=False, show=False,
-            save=f'_{cluster_key}.pdf')
+if num_clusters < 7:
+    adata.uns[f'{cluster_key}_colors'] = [
+        f'C{i + 3}' for i in range(num_clusters)]
+
+if 'const-Be-eta1' in stan_runs and  leiden_resolution == 0.5:
+    cluster_names = ['Ca low', 'Ca mid', 'Ca high']
+    adata.rename_categories(cluster_key, cluster_names)
 
 # %%
-marker_gene_tests = ['t-test', 'wilcoxon', 't-test_overestim_var']
+with plt.rc_context({"figure.figsize": (4, 4), "figure.dpi": (300)}):
+    sc.pl.pca(adata, color=cluster_key, use_raw=False, title='Leiden',
+              show=False, save=f'_{cluster_key}.pdf')
+    plt.close('all')
+
+    sc.pl.umap(adata, color=cluster_key, use_raw=False, title='Leiden',
+               show=False, save=f'_{cluster_key}.pdf')
+    plt.close('all')
+
+# %%
+marker_gene_tests = ['t-test']#, 'wilcoxon', 't-test_overestim_var']
 marker_genes = set()
 p_val_max = 1.1
 
-num_top_genes = 10 if len(adata.obs[cluster_key].cat.categories) < 5 else 5
+num_top_genes = 10 if num_clusters < 5 else 5
 
 for test in marker_gene_tests:
     marker_gene_key = f'{cluster_key}_{test}'
@@ -107,11 +126,20 @@ for test in marker_gene_tests:
         adata, n_genes=num_top_genes, key=marker_gene_key, use_raw=False,
         show=False, save=f'_{marker_gene_key}_marker_genes.pdf')
 
+    _ = sc.pl.rank_genes_groups_dotplot(
+        adata, n_genes=num_top_genes, key=marker_gene_key, use_raw=False,
+        show=False, save=f'_{marker_gene_key}_marker_genes.pdf')
+
+    _ = sc.pl.rank_genes_groups_matrixplot(
+        adata, n_genes=num_top_genes, key=marker_gene_key, use_raw=False,
+        dendrogram=False, show=False,
+        save=f'_{marker_gene_key}_marker_genes.pdf')
+
     _ = sc.pl.rank_genes_groups_violin(
         adata, n_genes=10, use_raw=False, key=marker_gene_key, show=False,
         save=f'_{test}.pdf')
 
-    for cluster in adata.obs[cluster_key].cat.categories:
+    for cluster in cluster_names:
         marker_gene_table = sc.get.rank_genes_groups_df(
             adata, cluster, key=marker_gene_key, pval_cutoff=0.05)
         marker_genes.update(marker_gene_table.loc[:5, 'names'])
@@ -135,8 +163,8 @@ from goatools.goea.go_enrichment_ns import GOEnrichmentStudyNS
 
 # initialize GO analysis
 marker_gene_key = f'{cluster_key}_t-test'
-filter_col = 'pvals'
-# filter_col = 'pvals_adj'
+# filter_col = 'pvals'
+filter_col = 'pvals_adj'
 marker_gene_max_pval = 0.05
 go_max_pval = 0.05
 
@@ -145,9 +173,6 @@ obo_dag = GODag(obo_path)
 gene2go_path = download_ncbi_associations()
 gene_annoation = Gene2GoReader(gene2go_path, taxids=[9606])
 ns2assoc = gene_annoation.get_ns2assc()
-go_study = GOEnrichmentStudyNS(GeneID2nt.keys(), ns2assoc, obo_dag,
-                               propagate_counts = False, alpha = go_max_pval,
-                               methods = ['fdr_bh'])
 
 # create reverse mapping from gene symbols to gene IDs
 symbol2id = {}
@@ -158,6 +183,14 @@ for gene_id, nt in GeneID2nt.items():
     for alias in nt.Aliases.split(', '):
         symbol2id[alias.upper()] = gene_id
 
+# get gene IDs for all genes in the dataset
+pop_ids = set()
+for gene in adata.var_names:
+    pop_ids.add(symbol2id[gene])
+
+go_study = GOEnrichmentStudyNS(pop_ids, ns2assoc, obo_dag,
+                               propagate_counts = False, alpha = go_max_pval,
+                               methods = ['fdr_bh'])
 marker_gene_table_path = os.path.join(
     output_dir, f'{marker_gene_key}_marker_genes.csv')
 marker_gene_table = pd.read_csv(marker_gene_table_path, index_col=0)
@@ -210,11 +243,58 @@ plt.savefig(figure_path)
 plt.close()
 
 # %%
-# plot peaks of trajectories
+# plot peaks of trajectories on PCA
 adata.obs['peak'] = np.amax(y_sessions, axis=1)
 with plt.rc_context({"figure.figsize": (4, 4), "figure.dpi": (300)}):
     sc.pl.pca(adata, color='peak', use_raw=False, show=False,
               save='_trajectory_peaks.pdf')
+
+# %%
+# plot distribution of trajectory peaks in each cluster
+plt.figure(figsize=(4, 2), dpi=300)
+for i, c in enumerate(cluster_names):
+    peaks = np.array(adata.obs['peak'][adata.obs[cluster_key] == c])
+    sns.kdeplot(data=peaks, fill=True, alpha=0.2, label=c,
+                color=adata.uns[f'{cluster_key}_colors'][i])
+plt.xlim((0, 10))
+plt.yticks(ticks=[])
+plt.legend()
+plt.title('Gene expression clustering')
+plt.tight_layout()
+figure_path = os.path.join(output_dir, f'{cluster_key}_traj_peaks.pdf')
+plt.savefig(figure_path)
+plt.close('all')
+
+# %%
+# make ribbon plot for trajectories in each cluster
+t_plot_max = 100
+num_plot_points = np.sum(ts <= t_plot_max)
+ts_plot = ts[:num_plot_points]
+
+fig, axs = plt.subplots(nrows=num_clusters, ncols=1, sharex=True,
+                        figsize=(3, num_clusters + 1), dpi=300)
+for i, cluster in enumerate(cluster_names):
+    cluster_cells = [int(c) for c in session_list
+                     if adata.obs.loc[c, cluster_key] == cluster]
+    y_cluster = y_all[cluster_cells, :]
+    y_mean = np.mean(y_cluster, axis=0)
+    y_std = np.std(y_cluster, axis=0, ddof=1)
+    y_mean = y_mean[:num_plot_points]
+    y_std = y_std[:num_plot_points]
+
+    cluster_color = adata.uns[f'{cluster_key}_colors'][i]
+    axs[i].plot(ts_plot, y_mean, color=cluster_color)
+    axs[i].fill_between(ts_plot, y_mean - y_std, y_mean + y_std,
+                        color=cluster_color, alpha=0.2)
+    if i == num_clusters - 1:
+        axs[i].set_xlabel('Time')
+    axs[i].set_ylim(bottom=0, top=4)
+    axs[i].set_title(cluster)
+
+plt.tight_layout()
+figure_path = os.path.join(output_dir, f'{cluster_key}_traj_ribbon.pdf')
+plt.savefig(figure_path)
+plt.close()
 
 # %%
 adata.write(

@@ -12,7 +12,6 @@ def main():
     result_root = args.result_root
     param_mask = args.param_mask
     tasks = args.tasks
-    show_progress = args.show_progress
 
     # get cell list
     cell_list = pd.read_csv(cell_list_path, delimiter="\t", index_col=False)
@@ -37,7 +36,7 @@ def main():
         tasks = ["plot_parameter_violin", "plot_rhat"]
     if "plot_parameter_violin" in tasks:
         print("Making violin plots for parameters...")
-        analyzer.plot_parameter_violin(show_progress=show_progress)
+        analyzer.plot_parameter_violin()
     if "plot_rhat" in tasks:
         print("Making R^hat plots for parameters and log postereior...")
         analyzer.plot_rhats()
@@ -54,8 +53,6 @@ def get_args():
     arg_parser.add_argument("--tasks", nargs="+", default="all",
                             choices=["all", "plot_parameter_violin",
                                      "plot_rhat"])
-    arg_parser.add_argument("--show_progress", default=False,
-                            action="store_true")
 
     return arg_parser.parse_args()
 

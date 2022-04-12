@@ -1,6 +1,7 @@
 # To add a new cell, type '# %%'
 # To add a new markdown cell, type '# %% [markdown]'
 # %%
+import os
 import os.path
 import math
 
@@ -15,26 +16,57 @@ import scanpy as sc
 from anndata import AnnData
 
 from stan_helpers import StanSessionAnalyzer, pdf_multi_plot
+import calcium_models
 
 # %%
-param_names = ['sigma', 'L', 'Katp', 'KoffPLC', 'Vplc', 'Kip3', 'KoffIP3',
-               'a', 'dinh', 'Ke', 'Be', 'd1', 'd5', 'epr', 'eta1', 'eta2',
-               'eta3', 'c0', 'k3']
+print('Loading chain 1...')
+chain_1 = {}
+# chain_1['cell_list_path'] = os.path.join(
+#     'cell_lists', 'dfs_feature_100_root_5106_0.000_1.8_reversed_141_1.txt')
+# chain_1['stan_output_root'] = os.path.join(
+#     '../../result', 'stan-calcium-model-100-reversed-141-1')
+chain_1['cell_list_path'] = os.path.join(
+    'cell_lists', 'random_root_5106_1.8_1.txt')
+chain_1['stan_output_root'] = os.path.join(
+    '../../result', 'stan-calcium-model-100-root-5106-const-Be-eta1-random-1')
+
+print('Loading chain 2...')
+chain_2 = {}
+# chain_2['cell_list_path'] = os.path.join(
+#     'cell_lists', 'dfs_feature_100_root_5106_0.000_1.8_reversed_141_2.txt')
+# chain_2['stan_output_root'] = os.path.join(
+#     '../../result', 'stan-calcium-model-100-reversed-141-2')
+chain_2['cell_list_path'] = os.path.join(
+    'cell_lists', 'random_root_5106_1.8_1_parallel.txt')
+chain_2['stan_output_root'] = os.path.join(
+    '../../result',
+    'stan-calcium-model-100-root-5106-const-Be-eta1-random-1-parallel')
+
+print('Loading chain 3...')
+chain_3 = {}
+chain_3['cell_list_path'] = os.path.join(
+    'cell_lists', 'dfs_feature_100_root_5106_0.000_1.8_reversed_141_1.txt')
+chain_3['stan_output_root'] = os.path.join(
+    '../../result', 'stan-calcium-model-100-reversed-141-3')
+
+output_dir = os.path.join(
+    '../../result/',
+    # 'stan-calcium-model-100-reversed-141-comparison')
+    'stan-calcium-model-100-root-5106-const-Be-eta1-random-1-comparison')
+if not os.path.exists(output_dir):
+    os.mkdir(output_dir)
+
+# param_mask = '0111111111111111111'
+param_mask = '0111111111011101111'
+param_names = [calcium_models.param_names[i + 1]
+               for i, mask in enumerate(param_mask) if mask == "1"]
+param_names = ['sigma'] + param_names
 num_params = len(param_names)
-params_on_plot = {
-    'sigma': r'$\sigma$', 'KonATP': r'$K_{\mathrm{on, ATP}}$', 'L': r'ATP',
-    'Katp': r'$K_{\mathrm{ATP}}$', 'KoffPLC': r'$K_{\mathrm{off, ATP}}$',
-    'Vplc': r'$V_{\mathrm{PLC}}$', 'Kip3': r'$K_{\mathrm{IP3}}$',
-    'KoffIP3': r'$K_{\mathrm{off, IP3}}$', 'a': r'$a$',
-    'dinh': r'$d_{\mathrm{inh}}$','Ke': r'$K_e$', 'Be': r'$B_e$',
-    'd1': r'$d_1$', 'd5': r'$d_5$', 'epr': r'$\epsilon$', 'eta1': r'$\eta_1$',
-    'eta2': r'$\eta_2$', 'eta3': r'$\eta_3$','c0': r'$c_0$', 'k3': r'$k_3$'
-}
 
 use_highly_variable_genes = False
 
 matplotlib.rcParams['font.sans-serif'] = ['Arial']
-matplotlib.rcParams['font.size'] = 12
+matplotlib.rcParams['font.size'] = 16
 
 # %%
 # load gene expression
@@ -55,31 +87,6 @@ else:
     gene_symbols = raw_data.index.to_numpy()
 
 # %%
-print('Loading chain 1...')
-chain_1 = {}
-chain_1['cell_list_path'] = os.path.join(
-    'cell_lists', 'dfs_feature_100_root_5106_0.000_1.8_reversed_141_1.txt')
-chain_1['stan_output_root'] = os.path.join(
-    '../../result', 'stan-calcium-model-100-reversed-141-1')
-
-print('Loading chain 2...')
-chain_2 = {}
-chain_2['cell_list_path'] = os.path.join(
-    'cell_lists', 'dfs_feature_100_root_5106_0.000_1.8_reversed_141_2.txt')
-chain_2['stan_output_root'] = os.path.join(
-    '../../result', 'stan-calcium-model-100-reversed-141-2')
-
-print('Loading chain 3...')
-chain_3 = {}
-chain_3['cell_list_path'] = os.path.join(
-    'cell_lists', 'dfs_feature_100_root_5106_0.000_1.8_reversed_141_1.txt')
-chain_3['stan_output_root'] = os.path.join(
-    '../../result', 'stan-calcium-model-100-reversed-141-3')
-
-output_dir = os.path.join('../../result/',
-                          'stan-calcium-model-100-reversed-141-comparison')
-
-# %%
 def get_chain_data(chain, first_cell, last_cell):
     cell_list = pd.read_csv(chain['cell_list_path'], sep='\t')
 
@@ -90,15 +97,14 @@ def get_chain_data(chain, first_cell, last_cell):
     for cell_order in trange(first_cell, last_cell + 1):
         # load samples
         cell_id = cell_list.loc[cell_order, 'Cell']
-        cell_path = os.path.join(chain['stan_output_root'],
+        cell_path = os.path.join(chain['stan_output_root'], 'samples',
                                  f'cell-{cell_id:04d}')
         analyzer = StanSessionAnalyzer(
             cell_path, sample_source='arviz_inf_data', param_names=param_names)
 
         # compute sample means for cells with mixed chains (R_hat < 4.0)
         cell_samples = analyzer.get_samples(rhat_upper_bound=4.0)
-        cell_sample_means = analyzer.get_sample_means(
-            rhat_upper_bound=4.0)
+        cell_sample_means = analyzer.get_sample_means(rhat_upper_bound=4.0)
         if cell_samples is not None:
             chain['cell_ids'].append(cell_id)
             chain['analyzers'].append(analyzer)
@@ -108,12 +114,12 @@ def get_chain_data(chain, first_cell, last_cell):
 
 get_chain_data(chain_1, 10, 109)
 get_chain_data(chain_2, 5, 104)
+# get_chain_data(chain_1, 6, 105)
+# get_chain_data(chain_2, 6, 105)
 get_chain_data(chain_3, 10, 109)
 full_chains = (chain_1, chain_2, chain_3)
 
 # %%
-# make violin plots of parameters from every NUTS chain of each cell in both
-# runs
 session_ids = [1, 2]
 chain_list = [[0, 1, 2, 3], [0, 1, 2, 3]]
 common_cell_id_set = set()
@@ -122,6 +128,8 @@ common_cell_id_set.update(chain_2['cell_ids'])
 common_cell_ids = np.intersect1d(chain_1['cell_ids'], chain_2['cell_ids'])
 
 # %%
+# make violin plots of parameters from every NUTS chain of each cell in both
+# runs
 def compare_params(analyzers, figure_name):
     """make violin plots for parameters sampled from different Stan
     sessions
@@ -160,8 +168,6 @@ for cell_id in common_cell_id_set:
 
 # %%
 # make scatter plots of parameter means vs expression of every gene
-from matplotlib.backends.backend_pdf import PdfPages
-
 def scatter_multi_plot(X_data, chains, output_path, num_rows=4, num_cols=2):
     """Make multiple scatter plots in a PDF"""
     num_subplots_per_page = num_rows * num_cols
@@ -200,7 +206,7 @@ for i, gene in enumerate(tqdm(gene_symbols)):
 
 # %%
 # filter cells mixed in all chains
-common_cell_id_set.update(chain_3['cell_ids'])
+# common_cell_id_set.update(chain_3['cell_ids'])
 
 def filter_cells(chain):
     filtered_chain = {}
@@ -227,14 +233,14 @@ filtered_chain_3 = filter_cells(chain_3)
 common_cell_ids = [i for i in chain_1['cell_ids'] if i in common_cell_id_set]
 
 # %%
-# make violin plots for each parameter of both chains in terms of chain
+# make box plots for each parameter of both chains in terms of chain
 # progression
 # only mixed samples are used
 def param_distribution_multi_plot(chains, output_path, num_rows=4, num_cols=1,
                                   quantile_min=0.1, quantile_max=0.9,
                                   page_size=(8.5, 11), dpi=100, ylims=None,
                                   chain_colors=None):
-    """Make multiple violin plots in a PDF"""
+    """Plot distribution of all cells in a chain and save to PDF"""
     if not isinstance(chains, list) and not isinstance(chains, tuple):
         chains = [chains]
     num_subplots_per_page = num_rows * num_cols
@@ -290,18 +296,19 @@ def param_distribution_multi_plot(chains, output_path, num_rows=4, num_cols=1,
                         r, g, b, _ = patch.get_facecolor()
                         patch.set_facecolor((r, g, b, 0.5))
                     plt.xticks(ticks=xtick_locs, labels=xtick_labels)
+                    plt.yticks(ticks=[])
 
                 # plt.xticks(xtick_pos, common_cell_ids, rotation='vertical')
                 if ylims is not None:
                     plt.ylim(ylims[param])
-                plt.title(params_on_plot[param])
+                plt.title(calcium_models.params_on_plot[param])
 
             plt.tight_layout()
             pdf.savefig()
             plt.close()
 
 # %%
-param_page_size = (6, 1.6)
+param_page_size = (8, 2)
 num_xticks = int(np.round(len(common_cell_ids) / 20)) + 1
 xtick_locs = np.arange(num_xticks) * 20 - 1
 xtick_locs[0] += 1
@@ -314,7 +321,7 @@ violin_ylims = {'sigma': (0, 0.2), 'L': (0, 0.04), 'Katp': (0, 0.08),
                 'eta3': (0, 5), 'c0': (0, 100), 'k3': (0, 0.8)}
 
 param_distribution_multi_plot([filtered_chain_1, filtered_chain_2],
-                  os.path.join(output_dir, 'param_violin_full.pdf'), num_rows=1,
+                  os.path.join(output_dir, 'param_box_full.pdf'), num_rows=1,
                   page_size=param_page_size, dpi=300)
 
 # violin_multi_plot([filtered_chain_1, filtered_chain_2],
@@ -344,6 +351,8 @@ def fold_change_multi_plot(chains, output_path, page_size=(8.5, 11),
     num_subplots_per_page = num_rows * num_cols
     num_plots = num_params
     num_pages = math.ceil(num_plots / num_subplots_per_page)
+    num_cells = len(chains[0]['cell_ids'])
+    cell_x_locs = np.arange(1, num_cells)
     progress_bar = tqdm(total=num_params, position=0, leave=True)
 
     with PdfPages(output_path) as pdf:
@@ -368,21 +377,24 @@ def fold_change_multi_plot(chains, output_path, page_size=(8.5, 11),
                 for chain in chains:
                     param_mean = chain['sample_means'][param].to_numpy()
                     fold_changes = param_mean[1:] / param_mean[:-1]
-                    plt.plot(fold_changes, '-', alpha=0.5)
+                    plt.plot(cell_x_locs, fold_changes, '-', alpha=0.5)
 
                 plt.xticks(ticks=xtick_locs, labels=xtick_labels)
-                plt.title(params_on_plot[param])
+                plt.title(calcium_models.params_on_plot[param])
+                plt.xlim(0, num_cells)
+                plt.yticks(ticks=[])
 
             plt.tight_layout()
             pdf.savefig()
             plt.close()
 
-xtick_locs[-1] -= 1
-xtick_labels[-1] -= 1
-fold_change_multi_plot(
-    (filtered_chain_1, filtered_chain_2, filtered_chain_3),
-    os.path.join(output_dir, 'param_mean_fold_changes_all.pdf'),
-    page_size=param_page_size, num_rows=1)
+xtick_locs = np.arange(num_xticks) * 20 - 1
+xtick_locs[0] += 2
+xtick_labels = xtick_locs + 1
+# fold_change_multi_plot(
+#     (filtered_chain_1, filtered_chain_2, filtered_chain_3),
+#     os.path.join(output_dir, 'param_mean_fold_changes_all.pdf'),
+#     page_size=param_page_size, num_rows=1)
 fold_change_multi_plot(
     (filtered_chain_1, filtered_chain_2),
     os.path.join(output_dir, 'param_mean_fold_changes.pdf'),

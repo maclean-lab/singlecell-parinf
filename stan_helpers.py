@@ -1316,6 +1316,8 @@ class StanMultiSessionAnalyzer:
                   + 'calculated')
             return
 
+        from matplotlib.ticker import FormatStrFormatter
+
         num_subplots_per_page = num_rows * num_cols
         num_plots = 1
         if sessions:
@@ -1350,15 +1352,26 @@ class StanMultiSessionAnalyzer:
                     if page == 0 and plot_idx == 0:
                         # plot sample mean vs sample mean
                         session_orders = list(range(self.num_sessions))
-                        ax.scatter(self.sample_means[param_pairs[0]],
-                                   self.sample_means[param_pairs[1]],
+                        sample_means_x = self.sample_means[param_pairs[0]]
+                        sample_means_y = self.sample_means[param_pairs[1]]
+
+                        ax.scatter(sample_means_x, sample_means_y,
                                    c=session_orders)
+
+                        # set ticks to min and max on axes
+                        ax.set_xticks([np.amin(sample_means_x),
+                                       np.amax(sample_means_x)])
+                        ax.set_yticks([np.amin(sample_means_y),
+                                       np.amax(sample_means_y)])
+
                         ax.set_xlabel(param_0_label)
                         ax.set_ylabel(param_1_label)
+
                         if titles:
                             ax.set_title(titles[0])
                         else:
-                            ax.set_title('Sample means')
+                            ax.set_title('MAP values')
+
                         # plt.colorbar(sc, ax=ax, label='Cell positions')
                     else:
                         # plot sample vs sample in a session
@@ -1370,10 +1383,15 @@ class StanMultiSessionAnalyzer:
                             continue
                         analyzer = self.session_analyzers[session_idx[0][0]]
                         samples = analyzer.get_samples()
-                        ax.scatter(samples[param_pairs[0]],
-                                   samples[param_pairs[1]], s=3, alpha=0.3)
-                        ax.set_xlabel(param_0_label)
-                        ax.set_ylabel(param_1_label)
+                        sample_x = samples[param_pairs[0]]
+                        sample_y = samples[param_pairs[1]]
+
+                        ax.scatter(sample_x, sample_y, s=3, alpha=0.3)
+
+                        # set ticks to min and max on axes
+                        ax.set_xticks([np.amin(sample_x), np.amax(sample_x)])
+                        ax.set_yticks([np.amin(sample_y), np.amax(sample_y)])
+
                         if titles:
                             ax.set_title(titles[plot_idx_all])
                         else:
@@ -1700,7 +1718,7 @@ class StanMultiSessionAnalyzer:
     def run_sensitivity_test(self, ode, t0, ts, y0, y_ref, target_var_idx,
                              test_params, method='default', method_kwargs=None,
                              plot_traj=False, figure_size=(3, 2), dpi=300,
-                             figure_path_prefixes=None,
+                             plot_legend=False, figure_path_prefixes=None,
                              param_names_on_plot=None):
         '''Test sensitivity of parameters'''
         if method_kwargs is None:
@@ -1784,12 +1802,13 @@ class StanMultiSessionAnalyzer:
                             label=f'{pct:.1f}')
 
                 ax.plot(ts, y_ref[idx, :], 'ko', fillstyle='none')
-                if param_names_on_plot:
-                    param_name = param_names_on_plot[param]
-                else:
-                    param_name = param
-                ax.set_title(f'{param_name}, {q}')
-                ax.legend()
+                # if param_names_on_plot:
+                #     param_name = param_names_on_plot[param]
+                # else:
+                #     param_name = param
+                # ax.set_title(f'{param_name}, {q}')
+                if plot_legend:
+                    ax.legend()
                 fig.savefig(figure_path)
                 plt.close(fig)
 

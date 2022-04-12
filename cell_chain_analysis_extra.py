@@ -33,16 +33,18 @@ os.chdir(working_dir)
 # stan_run = 'simple-prior'
 # stan_run = 'const-eta1'
 # stan_run = 'const-Be'
-# stan_run = 'const-Be-eta1'
+stan_runs = ['const-Be-eta1']
 # stan_run = 'const-Be-eta1-mixed-2'
-stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
+# stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
 # stan_run = 'lemon-prior-1000'
 # stan_run = 'lemon-prior-500'
 
 # additional flags
-list_ranges = [(1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
-sensitive_params = ['L', 'Katp', 'KoffPLC', 'Vplc', 'Kip3', 'KoffIP3', 'a',
-                    'dinh', 'd1', 'epr', 'eta2']
+list_ranges = [(1, 500)]
+# list_ranges = [(1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
+sensitive_params = calcium_models.param_names[2:]
+sensitive_params.remove('Be')
+sensitive_params.remove('eta1')
 pca_sampled_only = False
 use_custom_xticks = True
 
@@ -232,6 +234,7 @@ plot_trajectories_pdf(y_mode, mode_traj_path, titles=mixed_cells)
 # %%
 # sensitivity test
 use_mode = False
+plot_traj = True
 sensitivity_dir = 'sensitivity-test'
 if use_mode:
     sensitivity_dir += '-mode'
@@ -254,13 +257,15 @@ y_run = y_all[mixed_cells, :]
 if use_mode:
     analyzer.run_sensitivity_test(
         calcium_ode, 0, ts, y0_run, y_run, 3, sensitive_params, method='mode',
-        figure_size=(4, 4), figure_path_prefixes=figure_paths,
+        plot_traj=plot_traj, figure_size=(5, 3), plot_legend=False,
+        figure_path_prefixes=figure_paths,
         param_names_on_plot=calcium_models.params_on_plot,
         method_kwargs={'method': 'histogram'})
 else:
     analyzer.run_sensitivity_test(
         calcium_ode, 0, ts, y0_run, y_run, 3, sensitive_params,
-        figure_size=(4, 4), figure_path_prefixes=figure_paths,
+        plot_traj=plot_traj, figure_size=(5, 3), plot_legend=False,
+        figure_path_prefixes=figure_paths,
         param_names_on_plot=calcium_models.params_on_plot)
 
 # reset output directory
@@ -362,7 +367,7 @@ for param, qt in itertools.product(sensitive_params, test_quantiles):
 
 figure_path = os.path.join(sensitivity_dir,
                            'sensitivity_dist_modes_heatmap.pdf')
-plt.figure(figsize=(2.5, 7), dpi=300)
+plt.figure(figsize=(5, 12), dpi=300)
 ax = plt.gca()
 heatmap = ax.imshow(sensitivity_dist_modes, vmin=0)
 ax.set_xticks(np.arange(2))
@@ -376,10 +381,30 @@ for i, j in itertools.product(range(len(sensitive_params)), range(2)):
     pct75 = sensitivity_dist_pct75.iloc[i, j]
     ax.text(j, i, f'{mode:.2f}\n({pct75:.2f})', ha='center',
             va='center', color='w')
-# plt.colorbar(heatmap, shrink=0.3)
+ax.set_aspect(0.6)
+plt.colorbar(heatmap, shrink=0.3)
 plt.tight_layout()
 plt.savefig(figure_path)
 plt.close()
+
+# %%
+# plot legend for perturbed trajectories in sensitivity test
+import matplotlib.patches as mpatches
+
+plt.figure(figsize=(1.8, 4.05), dpi=300)
+test_percentiles = np.arange(0.1, 1, 0.1)
+jet_cmap = plt.get_cmap('jet')
+sensitivity_colors = jet_cmap(test_percentiles)
+plt.axis('off')
+legend_patches = [mpatches.Patch(color=c, label=p)
+                  for c, p in zip(sensitivity_colors, test_percentiles)]
+plt.legend(legend_patches, [f'{p:.1f}' for p in test_percentiles],
+           title='Sample\nquantile', loc='upper left',
+           bbox_to_anchor=(0.0, 0.0))
+plt.tight_layout()
+figure_path = os.path.join(sensitivity_dir, 'sensitivity_legend.pdf')
+plt.savefig(figure_path)
+plt.close('all')
 
 # %%
 # simulate trajectories using posterior of previous cell

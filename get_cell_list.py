@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import sys
 import collections
 from argparse import ArgumentParser
 import random

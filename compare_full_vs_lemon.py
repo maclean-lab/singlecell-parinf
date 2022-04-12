@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
-import seaborn as sns
+# import seaborn as sns
 
 from stan_helpers import StanMultiSessionAnalyzer
 
@@ -29,7 +29,7 @@ analyzer_dirs['lemon-1000'] = 'stan-calcium-model-equiv_2-lemon-prior-1000'
 analyzer_dirs['lemon-500'] = 'stan-calcium-model-equiv_2-lemon-prior-500'
 
 # load cell list
-cell_list_path = f'cell_lists/dfs_feature_100_root_5106_0.000_1.8.txt'
+cell_list_path = 'cell_lists/dfs_feature_100_root_5106_0.000_1.8.txt'
 cell_list = pd.read_csv(cell_list_path, sep='\t')
 cell_list = cell_list.iloc[first_cell_order:last_cell_order + 1, :]
 session_list = [str(c) for c in cell_list['Cell']]
@@ -66,17 +66,22 @@ def make_heatmap(data, figure_name, max_value=500, colorbar_ticks=None,
     # set tick labels
     ax.xaxis.tick_top()
     ax.set_xticks(np.arange(num_runs))
-    ax.set_xticklabels(labels=['Full-3', 'Idv-cells-500', 'Idv-cells-1000'],
-                       rotation=45)
+    ax.set_xticklabels(
+        labels=['Similar-r1', 'Idv-cells-1000', 'Idv-cells-500'],
+        rotation=90, fontsize=20)
     # ax.set_yticks(np.arange(num_cells))
     ax.set_yticks([])
     # ax.set_yticklabels(labels=cell_list['Cell'])
     ax.set_yticklabels([])
 
     # draw an arrow along y-axis
-    ax.set_ylabel('Cell position', labelpad=20)
-    ax.arrow(-0.75, -0, 0, 9, head_width=0.1, head_length=0.1,
-            length_includes_head=True, clip_on=False, color='k')
+    ax.set_ylabel('Cell position', labelpad=20, fontsize=20)
+    ax.arrow(-0.75, 0, 0, 9, head_width=0.1, head_length=0.1,
+             length_includes_head=True, clip_on=False, color='k')
+
+    # set bounding box for the heatmap portion
+    ax.set_xlim(-0.5, 2.5)
+    ax.set_ylim(9.5, -0.5)
 
     # show values on each block
     for i, j in itertools.product(range(num_cells), range(num_runs)):

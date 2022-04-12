@@ -2,7 +2,7 @@
     "1": {
         "param_mask": "0111111111111111111",
         "ode_variant": "equiv_2",
-        "pub_name": "Full-2",
+        "pub_name": "Similar-r3",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
         "output_dir": "stan-calcium-model-100-root-5106-1",
         "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
@@ -11,7 +11,7 @@
     "2": {
         "param_mask": "0111111111111111111",
         "ode_variant": "equiv_2",
-        "pub_name": "Full-1",
+        "pub_name": "Similar-r2",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
         "output_dir": "stan-calcium-model-100-root-5106-2",
         "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
@@ -20,7 +20,7 @@
     "3": {
         "param_mask": "0111111111111111111",
         "ode_variant": "equiv_2",
-        "pub_name": "Full-3",
+        "pub_name": "Similar-r1",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
         "output_dir": "stan-calcium-model-100-root-5106-3",
         "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
@@ -55,7 +55,8 @@
     "const-eta1": {
         "param_mask": "0111111111111101111",
         "ode_variant": "equiv_2_const_eta1",
-        "pub_name": "Red-\\$\\eta_1\\$",
+        "pub_name": "Reduced-1",
+        "alt_pub_name": "Red-\\$\\eta_1\\$",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-eta1",
         "root_cell_dir": "stan-calcium-model-const-eta1/cell-5106-local",
@@ -64,7 +65,7 @@
     "const-Be": {
         "param_mask": "0111111111011111111",
         "ode_variant": "equiv_2_const_Be",
-        "pub_name": "Red-\\$B_e\\$",
+        "pub_name": "Reduced-2",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be",
         "root_cell_dir": "stan-calcium-model-const-Be/cell-5106-local",
@@ -73,7 +74,7 @@
     "const-Be-eta1": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",
-        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$",
+        "pub_name": "Reduced-3",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
@@ -82,7 +83,7 @@
     "const-Be-eta1-mixed-0": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",
-        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-mixed_0",
+        "pub_name": "Reduced-3-mixed_0",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8_mixed_0.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-mixed-0",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
@@ -91,7 +92,7 @@
     "const-Be-eta1-mixed-1": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",
-        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-mixed_1",
+        "pub_name": "Reduced-3-mixed_1",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8_mixed_1.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-mixed-1",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
@@ -100,7 +101,7 @@
     "const-Be-eta1-mixed-2": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",
-        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-mixed_2",
+        "pub_name": "Reduced-3-mixed_2",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8_mixed_2.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-mixed-2",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
@@ -109,7 +110,7 @@
     "const-Be-eta1-mixed-3": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",
-        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-mixed_3",
+        "pub_name": "Reduced-3-mixed_3",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8_mixed_3.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-mixed-3",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
@@ -118,16 +119,24 @@
     "const-Be-eta1-mixed-4": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",
-        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-mixed_4",
+        "pub_name": "Reduced-3-mixed_4",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8_mixed_4.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-mixed-4",
+        "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
+        "color": "C1"
+    },
+    "const-Be-eta1-mixed-all": {
+        "param_mask": "0111111111011101111",
+        "ode_variant": "equiv_2_const_Be_eta1",
+        "pub_name": "Random-1",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-mixed-all",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
         "color": "C1"
     },
     "const-Be-eta1-random-1": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",
-        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-random-1",
+        "pub_name": "Random-2",
         "cell_list": "random_root_5106_1.8_1.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-random-1",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
@@ -136,7 +145,7 @@
     "const-Be-eta1-random-2": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",
-        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-random-2",
+        "pub_name": "Random-2",
         "cell_list": "random_root_5106_1.8_2.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-random-2",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
@@ -145,7 +154,7 @@
     "const-Be-eta1-random-3": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",
-        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-random-3",
+        "pub_name": "Random-2",
         "cell_list": "random_root_5106_1.8_3.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-random-3",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
@@ -154,7 +163,7 @@
     "const-Be-eta1-random-4": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",
-        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-random-4",
+        "pub_name": "Random-2",
         "cell_list": "random_root_5106_1.8_4.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-random-4",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
@@ -163,7 +172,7 @@
     "const-Be-eta1-random-5": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",
-        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-random-5",
+        "pub_name": "Reduced-3-random-5",
         "cell_list": "random_root_5106_1.8_5.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-random-5",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
@@ -172,18 +181,26 @@
     "const-Be-eta1-random-6": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",
-        "pub_name": "Red-\\$B_e\\$-\\$\\eta_1\\$-random-6",
+        "pub_name": "Random-2",
         "cell_list": "random_root_5106_1.8_6.txt",
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-random-6",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
         "color": "C5"
+    },
+    "const-Be-eta1-random-all": {
+        "param_mask": "0111111111011101111",
+        "ode_variant": "equiv_2_const_Be_eta1",
+        "pub_name": "Random-2",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-random-all",
+        "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
+        "color": "C1"
     },
     "lemon-prior-1000": {
         "param_mask": "0111111111111111111",
         "ode_variant": "equiv_2",
         "pub_name": "Idv-cells-1000",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
-        "output_dir": "stan-calcium-model-equiv_2-lemon-prior-500",
+        "output_dir": "stan-calcium-model-equiv_2-lemon-prior-1000",
         "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
         "color": "C1"
     },
@@ -192,7 +209,7 @@
         "ode_variant": "equiv_2",
         "pub_name": "Idv-cells-500",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
-        "output_dir": "stan-calcium-model-equiv_2-lemon-prior-1000",
+        "output_dir": "stan-calcium-model-equiv_2-lemon-prior-500",
         "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
         "color": "C2"
     }
