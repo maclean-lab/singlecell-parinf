@@ -1,0 +1,28 @@
+Inference for Stan model: calcium_model_equiv_36034cf53192a09040f9171b4f8e599c.
+4 chains, each with iter=1000; warmup=500; thin=1; 
+post-warmup draws per chain=500, total post-warmup draws=2000.
+
+            mean se_mean     sd   2.5%    25%    50%    75%  97.5%  n_eff   Rhat
+sigma       0.03  1.1e-4 2.2e-3   0.03   0.03   0.03   0.04   0.04    386   1.01
+theta[1]    0.02  5.2e-4 6.3e-3 7.4e-3   0.02   0.02   0.02   0.03    147    1.0
+theta[2]    0.05  2.3e-4 3.9e-3   0.05   0.05   0.05   0.06   0.06    287   1.02
+theta[3]    0.05  2.2e-4 4.0e-3   0.05   0.05   0.05   0.06   0.06    340   1.02
+theta[4]   21.83    0.24    4.7  13.22  18.45  21.73  25.03   31.3    381    1.0
+theta[5]    0.99    0.02   0.39   0.29    0.7   0.97   1.26    1.8    366    1.0
+theta[6]    0.11  4.7e-4 9.3e-3   0.09    0.1    0.1   0.11   0.13    386    1.0
+theta[7]  2.3e-3  2.2e-5 4.4e-4 1.5e-3 2.0e-3 2.3e-3 2.6e-3 3.2e-3    387   1.01
+theta[8]   27.39    0.23   4.23  19.91  24.37  27.18  30.19  36.12    342   1.01
+theta[9]  1.7e-4  6.0e-6 1.5e-4 6.6e-6 5.5e-5 1.2e-4 2.4e-4 5.7e-4    639    1.0
+theta[10]    7.7    0.23   3.59   1.56   5.15   7.33   9.93  15.68    237   1.01
+theta[11]   3.94    0.02   0.37   3.23   3.68   3.94    4.2   4.68    370   1.01
+theta[12]    0.2  6.8e-4   0.01   0.18   0.19    0.2   0.21   0.23    296   1.01
+theta[13]   0.31  1.3e-3   0.02   0.27   0.29   0.31   0.32   0.35    237   1.02
+theta[14]    0.2  2.9e-4 5.2e-3   0.19   0.19    0.2    0.2   0.21    310    1.0
+theta[15]   4.21  5.5e-3   0.09   4.05   4.15    4.2   4.27    4.4    271   1.02
+theta[16]   0.07  4.8e-4   0.01   0.05   0.06   0.07   0.07   0.09    484   1.01
+lp__      424.27    0.15   3.02 417.57 422.47 424.63 426.44 429.35    417    1.0
+
+Samples were drawn using NUTS at Mon Nov 23 02:54:51 2020.
+For each parameter, n_eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor on split chains (at 
+convergence, Rhat=1).

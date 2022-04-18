@@ -935,11 +935,13 @@ class StanSessionAnalyzer:
             include_warmup (bool, optional): Flag for including warmup
                 iterations in return log posterior densities. Defaults to True.
         """
+        print('Plotting log posterior likelihoods of all chains...', flush=True)
         lps = self.get_log_posteriors(include_warmup=include_warmup)
 
         plt.figure(figsize=(6, 4), dpi=300)
         plt.plot(lps.T)
         plt.ylim((0, np.amax(lps)))
+        plt.tight_layout()
         figure_path = os.path.join(self.output_dir, 'log_posterior_trace.png')
         plt.savefig(figure_path)
         plt.close()

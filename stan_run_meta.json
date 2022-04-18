@@ -80,6 +80,15 @@
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
         "color": "C8"
     },
+    "cell-chain-example": {
+        "param_mask": "0111111111011101111",
+        "ode_variant": "equiv_2_const_Be_eta1",
+        "pub_name": "Example-cell-chain",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
+        "output_dir": "cell_chain_example",
+        "root_cell_dir": "cell_chain_example/samples/cell-5106",
+        "color": "C0"
+    },
     "const-Be-eta1-mixed-0": {
         "param_mask": "0111111111011101111",
         "ode_variant": "equiv_2_const_Be_eta1",

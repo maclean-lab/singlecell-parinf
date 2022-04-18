@@ -1,6 +1,7 @@
 *~
 *.csv
 *.png
+*.pdf
 *.pkl
 slurm-*
 run_*.sh
