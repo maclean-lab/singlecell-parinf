@@ -25,9 +25,9 @@ cell.
 - `cell_chain_analysis.ipynb`: analysis for a cell chain.
 
 ### Modules
-- `stan_helper.py`: classes for sampling parameters for single cells and
+- `stan_helpers.py`: classes for sampling parameters for single cells and
 analyzing sampled cells, as well as helper functions.
-- `calcium_model.py`: ordinary differerential equations (ODEs) of each
+- `calcium_models.py`: ordinary differerential equations (ODEs) of each
 Ca<sup>2+</sup> model variant, which are used when simulating Ca<sup>2+</sup>
 trajectories during post-sampling analysis, as well as parameter names in the
 models.
