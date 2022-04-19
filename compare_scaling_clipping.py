@@ -24,5 +24,3 @@ output_dir = os.path.join(
 if not os.path.exists(output_dir):
     os.mkdir(output_dir)
 num_runs = len(analyzer_dirs)
-
-# %%
