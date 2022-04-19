@@ -20,9 +20,9 @@ required:
 
 ## Project content
 ### Code demos
-The `stan_calcium_mdoel_analysis.ipynb` notebook contains code for performing
-post-sampling analysis for a single cell. The `cell_chain_analysis.ipynb`
-notebook contains code for analyzing a cell chain.
+- `stan_calcium_mdoel_analysis.ipynb`" post-sampling analysis for a single
+cell.
+- `cell_chain_analysis.ipynb`: analysis for a cell chain.
 
 ### Modules
 - `stan_helper.py`: classes for sampling parameters for single cells and
@@ -33,14 +33,15 @@ trajectories during post-sampling analysis, as well as parameter names in the
 models.
 
 ### Executable scripts
-There are two types of Python scripts.
+All Python scripts for generating data and results presented in our manuscript
+in preparation are in the root folder.
 
 If a script has a `main()` function, it is to be executed in command line. See
 help using `python [script_name].py -h`.
 
-If a script has no `main()` function, it is usually divided into code cells
-by `# %%`. In Visual Studio Code or PyCharm (or any editor/IDE that supports
-this feature), each code cell can be executed separately.
+If a script has no `main()` function, it is divided into code cells by `# %%`.
+In Visual Studio Code or PyCharm (or any editor/IDE that supports this
+feature), each code cell can be executed separately.
 
 ### Data
 - `stan_models`: folder for Stan model specifications. Each subfolder contains
