@@ -105,7 +105,7 @@ soptsc_vars = scipy.io.loadmat(
         '../../result/SoptSC/SoptSC_feature_100/workspace.mat')
 similarity_matrix = soptsc_vars['W']
 
-# change font settings
+# change matplotlib font settings
 matplotlib.rcParams['font.sans-serif'] = ['Arial']
 matplotlib.rcParams['font.size'] = 16
 
@@ -142,7 +142,7 @@ print('Plotting R^hat of posterior')
 analyzer.plot_posterior_rhats(xticks=xticks)
 
 # %%
-# make pair plots for basic stats
+# make scatter plots for comparing basic stats
 print('Plotting mean distances between true and simulated trajectories...')
 analyzer.plot_mean_trajectory_distances(
     calcium_ode, 0, ts, y0_sessions, y_sessions, dist_min=0, dist_max=50,
@@ -207,8 +207,7 @@ gradient = gradient[np.newaxis, :]
 plt.imshow(gradient, aspect=3.0, cmap=plt.get_cmap('viridis'))
 plt.axis('off')
 plt.title('Cell positions', fontdict={'fontsize': 'medium'})
-figure_path = os.path.join(
-    output_dir, 'param_pair_scatters_legend.pdf')
+figure_path = os.path.join(output_dir, 'param_pair_scatters_legend.pdf')
 plt.tight_layout()
 plt.savefig(figure_path)
 plt.close()
@@ -285,7 +284,7 @@ for i, row in analyzer.sorted_gene_vs_param_pairs.iterrows():
 from statsmodels.stats.multitest import multipletests
 
 sorted_gene_vs_param_corrs_path = os.path.join(
-    analyzer.output_dir, 'genes-vs-params', 'pearson_corrs_sorted.csv')
+    output_dir, 'genes-vs-params', 'pearson_corrs_sorted.csv')
 
 sorted_gene_vs_param_corrs = pd.read_csv(sorted_gene_vs_param_corrs_path,
                                          index_col=0)
@@ -310,18 +309,18 @@ plt.legend(legend_patches,
            ['Adjusted\np-value<0.05', 'Adjusted\np-value≥0.05'],
            fontsize='small')
 plt.tight_layout()
-figure_path = os.path.join(analyzer.output_dir, 'genes-vs-params',
+figure_path = os.path.join(output_dir, 'genes-vs-params',
                            'pearson_corrs_hist.pdf')
 plt.savefig(figure_path)
 plt.close('all')
 
 # %%
 # analyze warmup
-warmup_time = pd.DataFrame(index=analyzer.session_list,
+warmup_time = pd.DataFrame(index=session_list,
                            columns=range(analyzer.num_chains))
 warmup_iters = 500
 
-for idx, a in zip(analyzer.session_list, analyzer.session_analyzers):
+for idx, a in zip(session_list, analyzer.session_analyzers):
     # compute mean and standard deviation of log posteriors
     lps = a.get_log_posteriors(include_warmup=True)
     mixed_chains = a.get_mixed_chains()
@@ -345,13 +344,15 @@ if warmup_time.shape[0] > 100:
     warmup_time_sample = warmup_time.sample(n=100)
 else:
     warmup_time_sample = warmup_time
+
 plt.hist(warmup_time_sample.to_numpy().flatten(), bins=50,
          range=(0, warmup_iters))
 plt.ylim((0, 200))
 plt.xlabel('Warmup time')
 plt.ylabel('Number of chains')
 plt.tight_layout()
-figure_path = os.path.join(analyzer.output_dir, 'warmup_time_hist.pdf')
+
+figure_path = os.path.join(output_dir, 'warmup_time_hist.pdf')
 plt.savefig(figure_path)
 plt.close()
 

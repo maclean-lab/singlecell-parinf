@@ -1595,6 +1595,8 @@ class StanMultiSessionAnalyzer:
         output_path = os.path.join(self.output_dir, 'sampling_time_hist.pdf')
         plt.figure(figsize=(11, 8.5), dpi=dpi)
         plt.hist(sampling_time.flatten(), bins=20, range=hist_range)
+        plt.xlabel(f'Time ({time_unit_text[time_unit]})')
+        plt.ylabel('Count')
         plt.savefig(output_path)
         plt.close()
 
