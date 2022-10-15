@@ -207,7 +207,7 @@
     "lemon-prior-1000": {
         "param_mask": "0111111111111111111",
         "ode_variant": "equiv_2",
-        "pub_name": "Idv-cells-1000",
+        "pub_name": "Indiv. cells run 2",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
         "output_dir": "stan-calcium-model-equiv_2-lemon-prior-1000",
         "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
@@ -216,7 +216,7 @@
     "lemon-prior-500": {
         "param_mask": "0111111111111111111",
         "ode_variant": "equiv_2",
-        "pub_name": "Idv-cells-500",
+        "pub_name": "Indiv. cells run 1",
         "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
         "output_dir": "stan-calcium-model-equiv_2-lemon-prior-500",
         "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",

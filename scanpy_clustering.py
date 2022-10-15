@@ -13,10 +13,10 @@ from stan_helpers import load_trajectories
 
 # %%
 # stan_runs = ['3']
-# stan_runs = ['const-Be-eta1']
+stan_runs = ['const-Be-eta1']
 # stan_runs = ['const-Be-eta1-mixed-1']
 # stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
-stan_runs = ['const-Be-eta1-random-1']
+# stan_runs = ['const-Be-eta1-random-1']
 # stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
 list_ranges = [(1, 500)]
 # list_ranges = [(1, 100)]
@@ -132,7 +132,7 @@ for test in marker_gene_tests:
 
     _ = sc.pl.rank_genes_groups_matrixplot(
         adata, n_genes=num_top_genes, key=marker_gene_key, use_raw=False,
-        dendrogram=False, show=False,
+        dendrogram=False, var_group_rotation=0, show=False,
         save=f'_{marker_gene_key}_marker_genes.pdf')
 
     _ = sc.pl.rank_genes_groups_violin(

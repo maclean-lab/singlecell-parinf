@@ -83,7 +83,7 @@ axs['upper'].set_axis_off()
 legend_patches = [mpatches.Patch(color=gene_colormap(0.75)),
                   mpatches.Patch(color=gene_colormap(0.25))]
 axs['upper'].legend(
-    legend_patches, ['Marker', 'Unassociated'],
+    legend_patches, ['Present', 'Absent'],
     frameon=False)
 
 # plot Leiden marker genes

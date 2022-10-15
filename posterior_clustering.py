@@ -15,6 +15,7 @@ import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.patches as mpatches
 import seaborn as sns
 import scanpy as sc
 
@@ -29,13 +30,13 @@ import calcium_models
 # stan_runs = ['const-Be-eta1']
 # stan_runs = ['const-Be-eta1-mixed-1']
 # stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
-stan_runs = ['const-Be-eta1-random-1']
-# stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
-list_ranges = [(1, 500)]
+# stan_runs = ['const-Be-eta1-random-1']
+stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
+# list_ranges = [(1, 500)]
 # list_ranges = [(1, 100)]
 # list_ranges = [(1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
 # list_ranges = [(1, 359)]
-# list_ranges = [(1, 571), (1, 372), (1, 359), (1, 341), (1, 335), (1, 370)]
+list_ranges = [(1, 571), (1, 372), (1, 359), (1, 341), (1, 335), (1, 370)]
 log_transform_samples = False
 scale_samples = False
 max_num_clusters = 3
@@ -581,8 +582,8 @@ for cluster_key, test in itertools.product(computed_cluster_keys,
 
     g = sc.pl.rank_genes_groups_matrixplot(
         adata, n_genes=min(10, 50 // max_num_clusters), groupby=cluster_key,
-        key=marker_gene_key, dendrogram=False, use_raw=False, show=False,
-        save=f'_{test}_marker_genes.pdf')
+        key=marker_gene_key, dendrogram=False, var_group_rotation=0,
+        use_raw=False, show=False, save=f'_{test}_marker_genes.pdf')
     plt.close('all')
 
     g = sc.pl.rank_genes_groups_violin(
@@ -872,16 +873,28 @@ for cluster_key in computed_cluster_keys:
             axs[0][i].plot(
                 ts, plc_trajs[cluster][traj_start_idx:traj_stop_idx, :].T,
                 color=traj_colors[j], alpha=0.2)
-            axs[0][i].set_title(f'{cluster}, PLC')
+            axs[0][i].set_title(cluster)
+            axs[0][i].set_xticks([])
+            axs[0][i].set_ylim(bottom=0, top=1)
+            if i == 0:
+                axs[0][i].set_ylabel("PLC")
+
             axs[1][i].plot(
                 ts, ip3_trajs[cluster][traj_start_idx:traj_stop_idx, :].T,
                 color=traj_colors[j], alpha=0.2)
-            axs[1][i].set_ylim(top=2)
-            axs[1][i].set_title(f'{cluster}, IP3')
+            axs[1][i].set_xticks([])
+            axs[1][i].set_ylim(bottom=0, top=20)
+            if i == 0:
+                axs[1][i].set_ylabel("IP3")
+
             axs[2][i].plot(
                 ts, h_trajs[cluster][traj_start_idx:traj_stop_idx, :].T,
                 color=traj_colors[j], alpha=0.2)
-            axs[2][i].set_title(f'{cluster}, h')
+            axs[2][i].set_xticks([])
+            axs[2][i].set_xlabel("Time")
+            axs[2][i].set_ylim(bottom=0, top=1)
+            if i == 0:
+                axs[2][i].set_ylabel("h")
 
     fig.tight_layout()
     figure_path = os.path.join(result_dir, 'trajs_other_vars.png')
@@ -899,19 +912,29 @@ for cluster_key in computed_cluster_keys:
         axs[0][i].plot(ts, plc_mean, color=f'C{i}')
         axs[0][i].fill_between(ts, plc_mean - plc_std, plc_mean + plc_std,
                                color=f'C{i}', alpha=0.2)
-        axs[0][i].set_title(f'Cluster {cluster}, PLC')
+        axs[0][i].set_title(cluster)
+        axs[0][i].set_xticks([])
+        if i == 0:
+            axs[0][i].set_ylabel("PLC")
+
         ip3_mean = np.mean(ip3_trajs[cluster], axis=0)
         ip3_std = np.std(ip3_trajs[cluster], axis=0, ddof=1)
         axs[1][i].plot(ts, ip3_mean, color=f'C{i}')
         axs[1][i].fill_between(ts, ip3_mean - ip3_std, ip3_mean + plc_std,
                                color=f'C{i}', alpha=0.2)
-        axs[1][i].set_title(f'Cluster {cluster}, IP3')
+        axs[1][i].set_xticks([])
+        if i == 0:
+            axs[1][i].set_ylabel("IP3")
+
         h_mean = np.mean(h_trajs[cluster], axis=0)
         h_std = np.std(h_trajs[cluster], axis=0, ddof=1)
         axs[2][i].plot(ts, h_mean, color=f'C{i}')
         axs[2][i].fill_between(ts, h_mean - h_std, h_mean + h_std,
                                color=f'C{i}', alpha=0.2)
-        axs[2][i].set_title(f'Cluster {cluster}, h')
+        axs[2][i].set_xticks([])
+        axs[2][i].set_xlabel("Time")
+        if i == 0:
+            axs[2][i].set_ylabel("h")
 
     fig.tight_layout()
     figure_path = os.path.join(result_dir, 'trajs_other_vars_ribbon.pdf')
@@ -1011,7 +1034,7 @@ plt.close()
 
 # %%
 # compare parameters between samples
-num_samples = 1000
+num_samples = 5000
 random_seed = 0
 bit_generator = np.random.MT19937(random_seed)
 rng = np.random.default_rng(bit_generator)
@@ -1019,13 +1042,18 @@ rng = np.random.default_rng(bit_generator)
 for cluster_key in computed_cluster_keys:
     cluster_names = adata.obs[cluster_key].cat.categories
     cluster_samples = {}
-    result_dir = os.path.join(sample_cluster_dir,
-                              cluster_key.replace('_', '-'))
+    cluster_sample_stats = pd.DataFrame(index=cluster_names)
+    metric, method = cluster_key.split('_')
+    result_dir = f'{metric}-{method}'
+    if metric in ('mean', 'mode'):
+        result_dir = 'posterior-' + result_dir
+    result_dir = os.path.join(sample_cluster_dir, result_dir)
 
     # sample from posterior
     for cluster in cluster_names:
-        print(f'Sampling from cluster {cluster} of {len(cluster_names)}...')
-        cluster_cells = np.argwhere(adata.obs[cluster_key] == cluster)
+        print(f'Sampling from cluster {cluster}...')
+        cluster_cells = np.argwhere(
+            (adata.obs[cluster_key] == cluster).to_numpy())
         cluster_samples[cluster] = pd.DataFrame(index=range(num_samples),
                                                 columns=param_names)
 
@@ -1034,11 +1062,39 @@ for cluster_key in computed_cluster_keys:
             cell_samples = analyzer.session_analyzers[cell_idx].get_samples(
                     excluded_params=excluded_params)
             cluster_samples[cluster].loc[i, :] = \
-                cell_samples.sample(1, random_seed=bit_generator).values
+                cell_samples.sample(1, random_state=bit_generator).values
+
+        for param in param_names:
+            cluster_sample_stats.loc[cluster, f'{param}_mean'] = \
+                cluster_samples[cluster][param].mean()
+            cluster_sample_stats.loc[cluster, f'{param}_std'] = \
+                cluster_samples[cluster][param].std()
+
+# %%
+    output_path = os.path.join(result_dir, 'sample_stats.csv')
+    cluster_sample_stats.to_csv(output_path)
+
+    # compare samples between clusters by KS test
+    ks_results = pd.DataFrame(
+        columns=['Cluster_1', 'Cluster_2', 'Parameter', 'H_1', 'KS', 'p_val'])
+
+    for param in param_names:
+        for c1, c2 in itertools.combinations(cluster_names, 2):
+            for h1 in ['two-sided', 'less', 'greater']:
+                ks_stat, ks_pval = ks_2samp(
+                    cluster_samples[c1][param], cluster_samples[c2][param],
+                    alternative=h1)
+
+                row = {'Cluster_1': c1, 'Cluster_2': c2, 'Parameter': param,
+                       'H_1': h1, 'KS': ks_stat, 'p_val': ks_pval}
+                ks_results.loc[len(ks_results)] = row
+
+    output_path = os.path.join(result_dir, 'sample_ks_test.csv')
+    ks_results.to_csv(output_path)
 
     # plot sampled parameters
-    print('Plotting samples...')
-    figure_path = os.path.join( result_dir, 'sample_hist.pdf')
+    print(f'Plotting histogram of samples for {cluster_key}...')
+    figure_path = os.path.join(result_dir, 'sample_hist.pdf')
     with PdfPages(figure_path) as pdf:
         for param in param_names:
             plt.figure(figsize=(11, 8.5), dpi=300)
@@ -1060,6 +1116,69 @@ for cluster_key in computed_cluster_keys:
 
             plt.title(param)
             plt.legend()
+            pdf.savefig()
+            plt.close()
+
+    # make box plots for parameter in the same figure
+    print(f'Plotting box plot of samples for {cluster_key}...')
+    num_cols = 4
+    num_rows = (num_params - 1) // num_cols + 1
+    fig, axs = plt.subplots(nrows=num_rows, ncols=num_cols,
+                            figsize=(6, num_rows * 1.5))
+
+    for param_idx, param in enumerate(param_names):
+        row = param_idx % num_cols
+        col = param_idx // num_cols
+
+        boxplot_data = pd.DataFrame(
+            {c: cluster_samples[c][param] for c in cluster_names})
+        sns.boxplot(data=boxplot_data, orient='h', fliersize=1, linewidth=0.5,
+                    ax=axs[col, row])
+        axs[col, row].set_xticks([])
+        axs[col, row].set_yticks([])
+        axs[col, row].set_title(calcium_models.params_on_plot[param])
+
+    fig.tight_layout()
+    figure_path = os.path.join(result_dir, 'sample_box_grid.pdf')
+    plt.savefig(figure_path)
+    plt.close('all')
+
+    # make a standalone legend for clusters in box plots
+    plt.figure(figsize=(4, 0.8), dpi=300)
+    plt.axis('off')
+    legend_patches = [mpatches.Patch(color=cc)
+                      for cc in sns.color_palette(
+                          palette='deep', n_colors=len(cluster_names))]
+    plt.legend(legend_patches, cluster_names, loc='upper center',
+               ncol=len(cluster_names), frameon=False,
+               bbox_to_anchor=(0.0, 0.0))
+    figure_path = os.path.join(result_dir, 'sample_box_grid_legend.pdf')
+    plt.tight_layout()
+    plt.savefig(figure_path)
+    plt.close('all')
+
+    # make box plots for parameters on separate pages
+    figure_path = os.path.join(result_dir, 'sample_box.pdf')
+    with PdfPages(figure_path) as pdf:
+        for param in param_names:
+            plt.figure(figsize=(11, 8.5), dpi=300)
+            boxplot_data = pd.DataFrame(
+                {c: cluster_samples[c][param] for c in cluster_names})
+            sns.boxplot(data=boxplot_data)
+            plt.title(param)
+            pdf.savefig()
+            plt.close()
+
+    # make violin plots for parameters on separate pages
+    print(f'Plotting violin plot of samples for {cluster_key}...')
+    figure_path = os.path.join(result_dir, 'sample_violin.pdf')
+    with PdfPages(figure_path) as pdf:
+        for param in param_names:
+            plt.figure(figsize=(11, 8.5), dpi=300)
+            violin_data = pd.DataFrame(
+                {c: cluster_samples[c][param] for c in cluster_names})
+            sns.violinplot(data=violin_data)
+            plt.title(param)
             pdf.savefig()
             plt.close()
 

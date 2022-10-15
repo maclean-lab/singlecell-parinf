@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from stan_helpers import moving_average, pdf_multi_plot
+from stan_helpers import load_trajectories, pdf_multi_plot
 
 def main():
     # get filter option from command line
@@ -14,23 +14,22 @@ def main():
                             default=None)
     arg_parser.add_argument('--output', dest='output', type=str,
                             default='trajecotries.pdf')
+    arg_parser.add_argument('--page_width', dest='page_width', type=float,
+                            default=8.5)
+    arg_parser.add_argument('--page_height', dest='page_height', type=float,
+                            default=11.0)
+    arg_parser.add_argument('--num_rows', dest='num_rows', type=int,
+                            default=4)
+    arg_parser.add_argument('--num_cols', dest='num_cols', type=int,
+                            default=2)
+    arg_parser.add_argument('--plot_fmt', dest='plot_fmt', type=str,
+                            default='')
     args = arg_parser.parse_args()
 
     # load trajectories
     print('Loading trajectories')
-    y_raw = np.loadtxt('canorm_tracjectories.csv', delimiter=',')
-
-    # apply filter
-    if args.filter_type == 'moving_average':
-        y = moving_average(y_raw)
-    elif args.filter_type == 'savitzky_golay':
-        from scipy.signal import savgol_filter
-        y = savgol_filter(y_raw, 51, 2)
-    else:
-        print('No filter specified or unknown type of filter. Using raw '
-              + 'trajectories')
-
-        y = y_raw
+    y, _, ts = load_trajectories(200, filter_type=args.filter_type,
+                                downsample_offset=300)
 
     # reorder cells if given a list of cells
     if args.cell_list:
@@ -40,9 +39,18 @@ def main():
     else:
         cell_names = [f'cell {cell_id}' for cell_id in range(y.shape[0])]
 
+    traj_data = [(ts, y[i, :]) for i in range(y.shape[0])]
+
     # make the trajectory plot
-    pdf_multi_plot(plt.plot, y, args.output, titles=cell_names,
-                   show_progress=True)
+    plot_kwargs = {}
+    if 'o' in args.plot_fmt:
+        # when plotting as dicrete circles, do not fill inside the circles
+        plot_kwargs['fillstyle'] = 'none'
+
+    pdf_multi_plot(plt.plot, traj_data, args.output, args.plot_fmt,
+                   num_rows=args.num_rows, num_cols=args.num_cols,
+                   page_size=(args.page_width, args.page_height),
+                   titles=cell_names, show_progress=True, **plot_kwargs)
     print('Trajectory plot saved')
 
 if __name__ == '__main__':

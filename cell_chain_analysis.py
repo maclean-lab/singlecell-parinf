@@ -17,25 +17,26 @@ os.chdir(working_dir)
 # %%
 # initialize cell chain analysis
 # specify a cell chain
-# stan_run = '1'
-# stan_run = '2'
-# stan_run = '3'
-# stan_run = '3-1.0'
-# stan_run = '3-2.0'
-# stan_run = 'simple-prior'
-# stan_run = 'const-eta1'
-# stan_run = 'const-Be'
-stan_runs = ['const-Be-eta1']
+# stan_runs= '1'
+# stan_runs= '2'
+stan_runs = ['3']
+# stan_runs= '3-1.0'
+# stan_runs= '3-2.0'
+# stan_runs= 'simple-prior'
+# stan_runs= 'const-eta1'
+# stan_runs= 'const-Be'
+# stan_runs = ['const-Be-eta1']
 # stan_runs = ['const-Be-eta1-mixed-4']
 # stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
 # stan_runs = ['const-Be-eta1-random-1']
 # stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
-# stan_run = 'lemon-prior-1000'
-# stan_run = 'lemon-prior-500'
+# stan_runs= 'lemon-prior-1000'
+# stan_runs= 'lemon-prior-500'
 
 # additional flags
 num_runs = len(stan_runs)
-list_ranges = [(1, 500)]
+list_ranges = [(1, 36)]
+# list_ranges = [(1, 500)]
 # list_ranges = [(1, 100)] * num_runs
 # list_ranges = [(1, 571)]
 # list_ranges = [(1, 571), (1, 372), (1, 359), (1, 341), (1, 335), (1, 370)]

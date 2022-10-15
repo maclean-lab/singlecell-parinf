@@ -1318,7 +1318,20 @@ class StanMultiSessionAnalyzer:
                   + 'calculated')
             return
 
-        from matplotlib.ticker import FormatStrFormatter
+        def set_ticks_on_axis(target_axis, tick_values):
+            tick_texts = []
+            for v in tick_values:
+                if v < 1:
+                    tick_texts.append(f'{v:.1g}')
+                else:
+                    tick_texts.append(f'{v:.1f}')
+
+            if target_axis == 'x':
+                ax.set_xticks(tick_values)
+                ax.set_xticklabels(tick_texts)
+            else:
+                ax.set_yticks(tick_values)
+                ax.set_yticklabels(tick_texts)
 
         num_subplots_per_page = num_rows * num_cols
         num_plots = 1
@@ -1361,13 +1374,13 @@ class StanMultiSessionAnalyzer:
                                    c=session_orders)
 
                         # set ticks to min and max on axes
-                        ax.set_xticks([np.amin(sample_means_x),
-                                       np.amax(sample_means_x)])
-                        ax.set_yticks([np.amin(sample_means_y),
-                                       np.amax(sample_means_y)])
+                        set_ticks_on_axis('x', [np.amin(sample_means_x),
+                                                np.amax(sample_means_x)])
+                        set_ticks_on_axis('y', [np.amin(sample_means_y),
+                                                np.amax(sample_means_y)])
 
-                        ax.set_xlabel(param_0_label)
-                        ax.set_ylabel(param_1_label)
+                        ax.set_xlabel(param_0_label, fontsize='large')
+                        ax.set_ylabel(param_1_label, fontsize='large')
 
                         if titles:
                             ax.set_title(titles[0])
@@ -1391,8 +1404,12 @@ class StanMultiSessionAnalyzer:
                         ax.scatter(sample_x, sample_y, s=3, alpha=0.3)
 
                         # set ticks to min and max on axes
-                        ax.set_xticks([np.amin(sample_x), np.amax(sample_x)])
-                        ax.set_yticks([np.amin(sample_y), np.amax(sample_y)])
+                        set_ticks_on_axis('x', [np.amin(sample_x),
+                                                np.amax(sample_x)])
+                        set_ticks_on_axis('y', [np.amin(sample_y),
+                                                np.amax(sample_y)])
+
+                        ax.set_xlabel(param_0_label, fontsize='large')
 
                         if titles:
                             ax.set_title(titles[plot_idx_all])
@@ -1722,8 +1739,7 @@ class StanMultiSessionAnalyzer:
     def run_sensitivity_test(self, ode, t0, ts, y0, y_ref, target_var_idx,
                              test_params, method='default', method_kwargs=None,
                              plot_traj=False, figure_size=(3, 2), dpi=300,
-                             plot_legend=False, figure_path_prefixes=None,
-                             param_names_on_plot=None):
+                             plot_legend=False, figure_path_prefixes=None):
         '''Test sensitivity of parameters'''
         if method_kwargs is None:
             method_kwargs = {}
@@ -2377,7 +2393,7 @@ def simulate_trajectory(ode, theta, t0, ts, y0, integrator='dopri5',
 def pdf_multi_plot(plot_func, plot_data, output_path, *args, num_rows=4,
                    num_cols=2, page_size=(8.5, 11), dpi=300, titles=None,
                    xticks=None, xtick_pos=None, xtick_rotation=0,
-                   show_progress=False):
+                   show_progress=False, **kwargs):
     """make multiple plots in a PDF"""
     num_subplots_per_page = num_rows * num_cols
     num_plots = len(plot_data)
@@ -2401,7 +2417,11 @@ def pdf_multi_plot(plot_func, plot_data, output_path, *args, num_rows=4,
             for plot_idx in range(num_subplots):
                 data_idx = page * num_subplots_per_page + plot_idx
                 plt.subplot(num_rows, num_cols, plot_idx + 1)
-                plot_func(plot_data[data_idx], *args)
+                if isinstance(plot_data[data_idx], tuple):
+                    plot_func(plot_data[data_idx][0], plot_data[data_idx][1],
+                              *args, **kwargs)
+                else:
+                    plot_func(plot_data[data_idx], *args, **kwargs)
 
                 if xticks is not None:
                     plt.xticks(xtick_pos, xticks, rotation=xtick_rotation)

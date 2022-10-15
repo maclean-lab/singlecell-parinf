@@ -1,5 +1,3 @@
-# To add a new cell, type '# %%'
-# To add a new markdown cell, type '# %% [markdown]'
 # %%
 import os
 import os.path
@@ -238,7 +236,7 @@ common_cell_ids = [i for i in chain_1['cell_ids'] if i in common_cell_id_set]
 # only mixed samples are used
 def param_distribution_multi_plot(chains, output_path, num_rows=4, num_cols=1,
                                   quantile_min=0.1, quantile_max=0.9,
-                                  page_size=(8.5, 11), dpi=100, ylims=None,
+                                  page_size=(8.5, 11), dpi=100,
                                   chain_colors=None):
     """Plot distribution of all cells in a chain and save to PDF"""
     if not isinstance(chains, list) and not isinstance(chains, tuple):
@@ -295,12 +293,12 @@ def param_distribution_multi_plot(chains, output_path, num_rows=4, num_cols=1,
                     for patch in ax.artists:
                         r, g, b, _ = patch.get_facecolor()
                         patch.set_facecolor((r, g, b, 0.5))
-                    plt.xticks(ticks=xtick_locs, labels=xtick_labels)
-                    plt.yticks(ticks=[])
 
                 # plt.xticks(xtick_pos, common_cell_ids, rotation='vertical')
-                if ylims is not None:
-                    plt.ylim(ylims[param])
+                plt.xticks(ticks=xtick_locs, labels=xtick_labels)
+                y_min, y_max = plt.ylim()
+                print(param, y_min, y_max)
+                plt.yticks(ticks=[y_min, y_max], labels=['', ''])
                 plt.title(calcium_models.params_on_plot[param])
 
             plt.tight_layout()
@@ -313,12 +311,6 @@ num_xticks = int(np.round(len(common_cell_ids) / 20)) + 1
 xtick_locs = np.arange(num_xticks) * 20 - 1
 xtick_locs[0] += 1
 xtick_labels = xtick_locs + 1
-violin_ylims = {'sigma': (0, 0.2), 'L': (0, 0.04), 'Katp': (0, 0.08),
-                'KoffPLC': (0, 0.08), 'Vplc': (0, 0.65), 'Kip3': (0, 0.15),
-                'KoffIP3': (0, 0.14), 'a': (0, 0.04), 'dinh': (0, 1),
-                'Ke': (0, 0.05), 'Be': (0, 160), 'd1': (0, 10), 'd5': (0, 4),
-                'epr': (0, 1.2), 'eta1': (570, 600), 'eta2': (0, 1),
-                'eta3': (0, 5), 'c0': (0, 100), 'k3': (0, 0.8)}
 
 param_distribution_multi_plot([filtered_chain_1, filtered_chain_2],
                   os.path.join(output_dir, 'param_box_full.pdf'), num_rows=1,
@@ -326,22 +318,19 @@ param_distribution_multi_plot([filtered_chain_1, filtered_chain_2],
 
 # violin_multi_plot([filtered_chain_1, filtered_chain_2],
 #                   os.path.join(output_dir, 'param_violin.pdf'), num_rows=1,
-#                   page_size=violin_page_size, dpi=300, ylims=violin_ylims)
+#                   page_size=violin_page_size, dpi=300)
 
 # violin_multi_plot(filtered_chain_1,
 #                   os.path.join(output_dir, 'param_violin_1.pdf'), num_rows=1,
-#                   page_size=violin_page_size, dpi=300, chain_colors='C0',
-#                   ylims=violin_ylims)
+#                   page_size=violin_page_size, dpi=300, chain_colors='C0')
 
 # violin_multi_plot(filtered_chain_2,
 #                   os.path.join(output_dir, 'param_violin_2.pdf'), num_rows=1,
-#                   page_size=violin_page_size, dpi=300, chain_colors='C1',
-#                   ylims=violin_ylims)
+#                   page_size=violin_page_size, dpi=300, chain_colors='C1')
 
 # violin_multi_plot(filtered_chain_3,
 #                   os.path.join(output_dir, 'param_violin_3.pdf'), num_rows=1,
-#                   page_size=violin_page_size, dpi=300, chain_colors='C2',
-#                   ylims=violin_ylims)
+#                   page_size=violin_page_size, dpi=300, chain_colors='C2')
 
 # %%
 # plot fold changes in means for each parameter
@@ -353,7 +342,6 @@ def fold_change_multi_plot(chains, output_path, page_size=(8.5, 11),
     num_pages = math.ceil(num_plots / num_subplots_per_page)
     num_cells = len(chains[0]['cell_ids'])
     cell_x_locs = np.arange(1, num_cells)
-    progress_bar = tqdm(total=num_params, position=0, leave=True)
 
     with PdfPages(output_path) as pdf:
         # generate each page
@@ -371,18 +359,21 @@ def fold_change_multi_plot(chains, output_path, page_size=(8.5, 11),
             for plot_idx in range(num_subplots):
                 plt.subplot(num_rows, num_cols, plot_idx + 1)
                 param = param_names[page * num_subplots_per_page + plot_idx]
-                progress_bar.update(1)
 
                 # get fold changes of sample means in each chain
+                max_fold_change = -np.inf
                 for chain in chains:
                     param_mean = chain['sample_means'][param].to_numpy()
                     fold_changes = param_mean[1:] / param_mean[:-1]
                     plt.plot(cell_x_locs, fold_changes, '-', alpha=0.5)
+                    max_fold_change = max(max_fold_change,
+                                          np.amax(fold_changes))
 
                 plt.xticks(ticks=xtick_locs, labels=xtick_labels)
                 plt.title(calcium_models.params_on_plot[param])
                 plt.xlim(0, num_cells)
-                plt.yticks(ticks=[])
+                plt.yticks(ticks=[1, max_fold_change], labels=['', ''])
+                print(param, max_fold_change)
 
             plt.tight_layout()
             pdf.savefig()

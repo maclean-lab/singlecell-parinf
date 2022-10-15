@@ -120,7 +120,7 @@ root_analyzer = StanSessionAnalyzer(root_output_dir, param_names=param_names)
 
 # change font settings
 matplotlib.rcParams['font.sans-serif'] = ['Arial']
-matplotlib.rcParams['font.size'] = 16
+matplotlib.rcParams['font.size'] = 20
 
 # set ticks on x-axis for plots
 if use_custom_xticks:
@@ -367,7 +367,7 @@ for param, qt in itertools.product(sensitive_params, test_quantiles):
 
 figure_path = os.path.join(sensitivity_dir,
                            'sensitivity_dist_modes_heatmap.pdf')
-plt.figure(figsize=(5, 12), dpi=300)
+plt.figure(figsize=(7, 10), dpi=300)
 ax = plt.gca()
 heatmap = ax.imshow(sensitivity_dist_modes, vmin=0)
 ax.set_xticks(np.arange(2))
@@ -379,10 +379,57 @@ ax.set_yticklabels(
 for i, j in itertools.product(range(len(sensitive_params)), range(2)):
     mode = sensitivity_dist_modes.iloc[i, j]
     pct75 = sensitivity_dist_pct75.iloc[i, j]
-    ax.text(j, i, f'{mode:.2f}\n({pct75:.2f})', ha='center',
+    ax.text(j, i, f'{mode:.2f} ({pct75:.2f})', ha='center',
             va='center', color='w')
-ax.set_aspect(0.6)
-plt.colorbar(heatmap, shrink=0.3)
+ax.set_aspect(0.3)
+ax.set_title("Distance [mode (75%-tile)]", pad=12)
+plt.colorbar(heatmap, shrink=0.5)
+plt.tight_layout()
+plt.savefig(figure_path)
+plt.close()
+
+# %%
+# make a heatmap for means of trajectory distances
+sensitivity_dist_stats = pd.read_csv(
+    os.path.join(sensitivity_dir, 'sensitivity_dist_stats.csv'), index_col=0)
+test_quantiles = [0.01, 0.99]
+sensitivity_dist_means = pd.DataFrame(index=sensitive_params,
+                                      columns=test_quantiles, dtype=float)
+sensitivity_dist_stds = pd.DataFrame(index=sensitive_params,
+                                      columns=test_quantiles, dtype=float)
+for param, qt in itertools.product(sensitive_params, test_quantiles):
+    sensitivity_dist_means.loc[param, qt] = \
+        sensitivity_dist_stats.loc[f'{param}_{qt}', 'Mean']
+    sensitivity_dist_stds.loc[param, qt] = \
+        sensitivity_dist_stats.loc[f'{param}_{qt}', 'Std']
+
+sensitivity_dist_means_capped = np.clip(sensitivity_dist_means.values, None, 30)
+
+figure_path = os.path.join(sensitivity_dir,
+                           'sensitivity_dist_means_heatmap.pdf')
+plt.figure(figsize=(7, 10), dpi=300)
+ax = plt.gca()
+heatmap = ax.imshow(sensitivity_dist_means_capped, vmin=0)
+ax.set_xticks(np.arange(2))
+ax.set_xticklabels(test_quantiles)
+ax.set_yticks(np.arange(len(sensitive_params)))
+ax.set_yticklabels(
+    [calcium_models.params_on_plot[p] for p in sensitive_params])
+# draw text on each block
+for i, j in itertools.product(range(len(sensitive_params)), range(2)):
+    mean = sensitivity_dist_means.iloc[i, j]
+    std = sensitivity_dist_stds.iloc[i, j]
+
+    mean_str = f'{mean:.2f}' if mean < 10 else f'{mean:.1f}'
+    std_str = f'{std:.1f}'
+
+    ax.text(j, i, f'{mean_str} ± {std_str}', ha='center', va='center',
+            color='w')
+ax.set_aspect(0.3)
+ax.set_title("Distance [mean ± std]", pad=12)
+cb = plt.colorbar(heatmap, shrink=0.5)
+cb.set_ticks([0, 10, 20, 30])
+cb.set_ticklabels(['0', '10', '20', '≥30'])
 plt.tight_layout()
 plt.savefig(figure_path)
 plt.close()

@@ -11,7 +11,7 @@ required:
 - NumPy
 - SciPy
 - statsmodels
-- Pandas
+- pandas
 - scikit-learn
 - ArviZ
 - Matplotlib 3.4 or newer
@@ -20,7 +20,7 @@ required:
 
 ## Project content
 ### Code demos
-- `stan_calcium_mdoel_analysis.ipynb`" post-sampling analysis for a single
+- `stan_calcium_mdoel_analysis.ipynb`: post-sampling analysis for a single
 cell.
 - `cell_chain_analysis.ipynb`: analysis for a cell chain.
 

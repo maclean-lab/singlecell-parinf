@@ -10,69 +10,57 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # %%
-root_cell_id = 5106
-first_cell_order = 1
-last_cell_order = 200
-
 # define directories for results produced by MultiSessionAnalyzers
-run_group = 'full-models'
+# run_group = 'full-models'
 # run_group = '3-vs-const'
 # run_group = 'scaling'
 # run_group = '3-vs-lemon'
-# run_group = 'similar-vs-mixed'
+run_group = 'similar-vs-random'
+root_cell_id = 5106
+first_cell_order = 1
+last_cell_order = 500
 
 with open('stan_run_meta.json', 'r') as f:
     stan_run_meta = json.load(f)
 with open('stan_run_comparison_meta.json', 'r') as f:
     stan_run_comparison_meta = json.load(f)
 
-runs = stan_run_comparison_meta[run_group]['runs']
-num_runs = len(runs)
+stan_runs = stan_run_comparison_meta[run_group]['runs']
+num_runs = len(stan_runs)
+cell_order_type = stan_run_comparison_meta[run_group]['order_by']
 
 output_root = '../../result'
-run_dirs = [stan_run_meta[r]['output_dir'] for r in runs]
-analyzer_dirs = [
-    os.path.join(
-        output_root, d,
-        f'multi-sample-analysis-{first_cell_order:04d}-{last_cell_order:04d}')
-    for d in run_dirs
-]
-
-cell_plot_order_type = stan_run_comparison_meta[run_group]['order_by']
+run_dirs = [stan_run_meta[r]['output_dir'] for r in stan_runs]
+analyzer_dirs = [os.path.join(output_root, d, f'multi-sample-analysis')
+                 for d in run_dirs ]
+for i, run in enumerate(stan_runs):
+    if 'mixed' not in run and 'random' not in run:
+        analyzer_dirs[i] += f'-{first_cell_order:04d}-{last_cell_order:04d}'
 
 output_dir = os.path.join(
     output_root,
-    f'stan-calcium-model-100-root-{root_cell_id}-comparison-{run_group}',
-    f'cell-{first_cell_order:04d}-{last_cell_order:04d}')
+    f'stan-calcium-model-100-root-{root_cell_id}-comparison-{run_group}')
+if cell_order_type == 'cell_id':
+    output_dir = os.path.join(
+        output_dir, f'cell-{first_cell_order:04d}-{last_cell_order:04d}')
 if not os.path.exists(output_dir):
     os.mkdir(output_dir)
 
 # get cell list
-if cell_plot_order_type == 'cell_id':
+if cell_order_type == 'cell_id':
     # assume same list for all runs
     cell_list_path = os.path.join(
-        'cell_lists', stan_run_meta[runs[0]]['cell_list'])
+        'cell_lists', stan_run_meta[stan_runs[0]]['cell_list'])
     cell_list = pd.read_csv(cell_list_path, sep='\t')
     cell_plot_order = cell_list.iloc[first_cell_order:last_cell_order + 1, 0]
-else:
-    cell_plot_order = list(range(first_cell_order, last_cell_order + 1))
 
-    cell_lists = {}
-    for run in runs:
-        cell_list_path = os.path.join(
-            'cell_lists', stan_run_meta[run]['cell_list'])
-        cell_lists[run] = pd.read_csv(cell_list_path, sep='\t')
-        cell_lists[run] = cell_lists[run].iloc[
-            first_cell_order:last_cell_order + 1, 0]
-        cell_lists[run] = cell_lists[run].to_list()
-
-pub_names = [stan_run_meta[r]['pub_name'] for r in runs]
+pub_names = [stan_run_meta[r]['pub_name'] for r in stan_runs]
 pub_names = [n.replace('\\$', '$') for n in pub_names]
 
 # define plot parameters
 dpi = 300
 figure_size = (6, 4)
-run_colors = [stan_run_meta[r]['color'] for r in runs]
+run_colors = [stan_run_meta[r]['color'] for r in stan_runs]
 
 # change font settings
 matplotlib.rcParams['font.sans-serif'] = ['Arial']
@@ -155,7 +143,7 @@ print(stats)
 stats.to_csv(os.path.join(output_dir, 'stats.csv'))
 
 # print to latex code
-for row, run in enumerate(runs):
+for row, run in enumerate(stan_runs):
     line = pub_names[row]
     for i in range(0, stats.shape[1], 2):
         line += f' & ${stats.iloc[row, i]:.2f} \pm {stats.iloc[row, i+1]:.2f}$'
@@ -166,30 +154,20 @@ for row, run in enumerate(runs):
 # convert tables for mean log posteriors to one table in long form
 mean_log_posteriors_long = pd.DataFrame(columns=['Run', 'Cell', 'Chain', 'LP'])
 num_rows = 0
-for run, run_lp in zip(runs, log_posteriors):
+for run, run_lp in zip(stan_runs, log_posteriors):
     for cell_id, row in run_lp.iterrows():
         for chain, lp in row.items():
-            if stan_run_comparison_meta[run_group]['order_by'] == 'cell_id':
-                cell = cell_id
-            else:
-                cell = cell_lists[run].index(cell_id)
-
-            long_row = {'Run': run, 'Cell': cell, 'Chain': chain, 'LP': lp}
+            long_row = {'Run': run, 'Cell': cell_id, 'Chain': chain, 'LP': lp}
             mean_log_posteriors_long.loc[num_rows] = long_row
             num_rows += 1
 
 # convert tables for sampling time to one table in long form
 sampling_time_long = pd.DataFrame(columns=['Run', 'Cell', 'Chain', 'Time'])
 num_rows = 0
-for run, run_st in zip(runs, sampling_time):
+for run, run_st in zip(stan_runs, sampling_time):
     for cell_id, row in run_st.iterrows():
         for chain, t in row.items():
-            if stan_run_comparison_meta[run_group]['order_by'] == 'cell_id':
-                cell = cell_id
-            else:
-                cell = cell_lists[run].index(cell_id)
-
-            long_row = {'Run': run, 'Cell': cell, 'Chain': chain, 'Time': t}
+            long_row = {'Run': run, 'Cell': cell_id, 'Chain': chain, 'Time': t}
             sampling_time_long.loc[num_rows] = long_row
             num_rows += 1
 
@@ -305,7 +283,7 @@ time_violins['cmeans'].set_color('k')
 time_violins['cmins'].set_color('k')
 time_violins['cmaxes'].set_color('k')
 time_violins['cbars'].set_color('k')
-plt.xticks(ticks=violin_xticks, labels=violin_xticklabels, rotation=45)
+plt.xticks(ticks=violin_xticks, labels=violin_xticklabels)
 plt.ylim((0, 1000))
 plt.ylabel('Time (minutes)')
 plt.title('NUTS runtime comparison')
