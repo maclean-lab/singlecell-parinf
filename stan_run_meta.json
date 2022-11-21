@@ -221,5 +221,14 @@
         "output_dir": "stan-calcium-model-equiv_2-lemon-prior-500",
         "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
         "color": "C2"
+    },
+    "single-repeat": {
+        "param_mask": "0111111111111111111",
+        "ode_variant": "equiv_2",
+        "pub_name": "Single cell repeat",
+        "cell_list": "dfs_feature_100_root_5106_0.000_1.8.txt",
+        "output_dir": "stan-calcium-model-single-repeat",
+        "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
+        "color": "C1"
     }
 }

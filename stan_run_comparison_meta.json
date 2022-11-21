@@ -1,6 +1,6 @@
 {
     "full-models": {
-        "runs": ["2", "1", "3"],
+        "runs": ["3", "2", "1"],
         "order_by": "cell_id"
     },
     "3-vs-const": {
@@ -13,6 +13,10 @@
     },
     "3-vs-lemon": {
         "runs": ["3", "lemon-prior-500", "lemon-prior-1000"],
+        "order_by": "cell_id"
+    },
+    "3-vs-repeat": {
+        "runs": ["3", "single-repeat"],
         "order_by": "cell_id"
     },
     "similar-vs-random": {

@@ -1386,8 +1386,6 @@ class StanMultiSessionAnalyzer:
                             ax.set_title(titles[0])
                         else:
                             ax.set_title('MAP values')
-
-                        # plt.colorbar(sc, ax=ax, label='Cell positions')
                     else:
                         # plot sample vs sample in a session
                         plot_idx_all = page * num_subplots_per_page + plot_idx

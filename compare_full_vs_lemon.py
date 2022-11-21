@@ -61,7 +61,8 @@ for run in stan_runs:
 
 # %%
 def make_heatmap(data, figure_name, max_value=500, xlabel=None,
-                 colorbar_ticks=None, colorbar_ticklabels=None):
+                 colorbar_ticks=None, colorbar_ticklabels=None,
+                 plot_cell_ids=False):
     plt.figure(figsize=(4, 9), dpi=300)
     ax = plt.gca()
     capped_data = np.clip(data, None, max_value)
@@ -70,13 +71,17 @@ def make_heatmap(data, figure_name, max_value=500, xlabel=None,
     # set tick labels
     ax.xaxis.tick_top()
     ax.set_xticks(np.arange(num_runs))
-    ax.set_xticklabels(labels=pub_names, rotation=90, fontsize=20)
+    ax.set_xticklabels(labels=pub_names, rotation=90, fontsize=24)
     if xlabel:
-        ax.set_xlabel(xlabel, fontsize=20)
-    ax.set_yticks(np.arange(num_cells))
-    # ax.set_yticks([])
-    ax.set_yticklabels(labels=cell_list['Cell'])
-    # ax.set_yticklabels([])
+        ax.set_xlabel(xlabel, fontsize=24)
+    if plot_cell_ids:
+        ax.text(-1.5, -1, 'Cell ID', ha='center', va='center', color='k',
+                fontsize=16)
+        ax.set_yticks(np.arange(num_cells))
+        ax.set_yticklabels(labels=cell_list['Cell'], fontsize=16)
+    else:
+        ax.set_yticks(np.arange(num_cells))
+        ax.set_yticklabels([''] * num_cells)
 
     # draw an arrow along y-axis
     # ax.set_ylabel('Cell position', labelpad=20, fontsize=20)
@@ -92,7 +97,7 @@ def make_heatmap(data, figure_name, max_value=500, xlabel=None,
         ax.text(j, i, f'{data[i, j]:.0f}', ha='center', va='center', color='w')
 
     # add a color bar
-    cb = plt.colorbar(heatmap, shrink=0.3)
+    cb = plt.colorbar(heatmap, shrink=0.75)
     if colorbar_ticks is not None:
         cb.set_ticks(colorbar_ticks)
     if colorbar_ticklabels is not None:
@@ -135,7 +140,8 @@ for cell in cell_list['Cell']:
 # make a heatmap for log posterior means
 lp_means = lp_stats.values[:, ::2].astype(np.double)
 make_heatmap(lp_means, 'mean_log_posterior_heatmap.pdf',
-             xlabel='Mean log posterior', colorbar_ticks=[250, 300, 350, 400])
+             xlabel='Mean log posterior', colorbar_ticks=[250, 300, 350, 400],
+             plot_cell_ids=True)
 
 # %%
 # compute stats for sampling time
@@ -153,7 +159,7 @@ for run in stan_runs:
         sampling_time_stats.loc[cell, f'{run} std'] = st.std()
 
 # %%
-# make a heatmap for sampling_time
+# make a heatmap for sampling time
 sampling_time_means = sampling_time_stats.values[:, ::2].astype(np.double)
 make_heatmap(sampling_time_means, 'sampling_time_heatmap.pdf',
              xlabel='Time (minutes)', colorbar_ticks=[100, 300, 500],

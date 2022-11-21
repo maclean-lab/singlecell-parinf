@@ -11,14 +11,14 @@ import seaborn as sns
 
 # %%
 # define directories for results produced by MultiSessionAnalyzers
-# run_group = 'full-models'
+run_group = 'full-models'
 # run_group = '3-vs-const'
 # run_group = 'scaling'
 # run_group = '3-vs-lemon'
-run_group = 'similar-vs-random'
+# run_group = 'similar-vs-random'
 root_cell_id = 5106
 first_cell_order = 1
-last_cell_order = 500
+last_cell_order = 200
 
 with open('stan_run_meta.json', 'r') as f:
     stan_run_meta = json.load(f)
@@ -287,6 +287,20 @@ plt.xticks(ticks=violin_xticks, labels=violin_xticklabels)
 plt.ylim((0, 1000))
 plt.ylabel('Time (minutes)')
 plt.title('NUTS runtime comparison')
+plt.tight_layout()
+plt.savefig(figure_path)
+plt.close()
+
+# %%
+# make histogram for sampling time
+plt.figure(figsize=(4, 6), dpi=dpi)
+figure_path = os.path.join(output_dir, 'sampling_time_hist.pdf')
+plt.hist([np.mean(t.values, axis=1) for t in sampling_time], color=run_colors,
+         label=pub_names)
+plt.xlabel('Time (minutes)')
+plt.ylabel('Number of cells')
+plt.title('Runtime comparison')
+plt.legend()
 plt.tight_layout()
 plt.savefig(figure_path)
 plt.close()

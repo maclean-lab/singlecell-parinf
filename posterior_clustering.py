@@ -27,16 +27,16 @@ import calcium_models
 # %%
 # initialize computation of distances between posterior samples
 # stan_runs = ['3']
-# stan_runs = ['const-Be-eta1']
+stan_runs = ['const-Be-eta1']
 # stan_runs = ['const-Be-eta1-mixed-1']
 # stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
 # stan_runs = ['const-Be-eta1-random-1']
-stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
-# list_ranges = [(1, 500)]
+# stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
+list_ranges = [(1, 500)]
 # list_ranges = [(1, 100)]
 # list_ranges = [(1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
 # list_ranges = [(1, 359)]
-list_ranges = [(1, 571), (1, 372), (1, 359), (1, 341), (1, 335), (1, 370)]
+# list_ranges = [(1, 571), (1, 372), (1, 359), (1, 341), (1, 335), (1, 370)]
 log_transform_samples = False
 scale_samples = False
 max_num_clusters = 3
@@ -354,7 +354,7 @@ def cluster_by_sample_distances(dist_metric, cluster_method, plot=False):
     g = sns.clustermap(sample_means, row_linkage=Z,
                        col_cluster=False, xticklabels=param_names,
                        yticklabels=False, row_colors=cluster_colors,
-                       figsize=(4, 6), cbar_pos=None)
+                       figsize=(4, 6))#, cbar_pos=None)
     g.ax_heatmap.set_ylabel('Cells')
     plt.tight_layout()
     figure_path = os.path.join(result_dir, 'clustered_posterior_means.pdf')
@@ -480,10 +480,13 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
         g = sns.clustermap(sample_means, row_linkage=Z, col_cluster=False,
                            xticklabels=param_names_on_plot, yticklabels=False,
                            row_colors=cluster_colors, figsize=(4, 6),
-                           cbar_pos=None)
+                           cbar_kws={'orientation': 'horizontal',
+                                     'label': 'Normalized expression'},
+                           cbar_pos=(0.27, 0.88, 0.64, 0.02))
         g.ax_heatmap.set_ylabel('Cells')
+        g.cax.xaxis.set_label_position('top')
         plt.xticks(fontsize=10)
-        plt.title(figure_title)
+        # plt.title(figure_title)
         plt.tight_layout()
         figure_path = os.path.join(result_dir, 'clustered_posterior_means.pdf')
         g.savefig(figure_path, dpi=300)
@@ -521,7 +524,7 @@ for st, method in itertools.product(stat_types, cluster_methods):
     else:
         print(f'Clustering posterior {st} using k-means...')
 
-    cluster_by_sample_stats(st, method, plot=False)
+    cluster_by_sample_stats(st, method, plot=True)
 
     # rename cluster names for plotting
     if 'const-Be-eta1' in stan_runs and st == 'mean' and method == 'ward':
@@ -958,12 +961,12 @@ for cluster_key in computed_cluster_keys:
 # sample distance vs similarity
 soptsc_vars = scipy.io.loadmat(
     '../../result/SoptSC/SoptSC_feature_100/workspace.mat')
-similary_mat = soptsc_vars['W'][np.ix_(session_list_int, session_list_int)]
+similarity_mat = soptsc_vars['W'][np.ix_(session_list_int, session_list_int)]
 similary_mat_1d = []
 sampled_dists_1d = {d: [] for d in sample_dists}
 for i in range(num_sessions):
     for j in range(i, num_sessions):
-        similary_mat_1d.append(similary_mat[i, j])
+        similary_mat_1d.append(similarity_mat[i, j])
 
         for metric in sample_dists:
             sampled_dists_1d[metric].append(sample_dists[metric][i, j])
@@ -986,6 +989,43 @@ for metric in sample_dists:
     plt.tight_layout()
     figure_path = os.path.join(sample_cluster_root, f'{metric}_hist.pdf')
     plt.savefig(figure_path)
+    plt.close()
+
+# %%
+# plot cell-cell similarity matrix after clustering
+soptsc_vars = scipy.io.loadmat(
+    '../../result/SoptSC/SoptSC_feature_100/workspace.mat')
+similarity_mat = soptsc_vars['W'][np.ix_(session_list_int, session_list_int)]
+similarity_mat = np.ceil(similarity_mat)
+
+for cluster_key in computed_cluster_keys:
+    cell_order = adata.obs[cluster_key].argsort(kind='mergesort').to_numpy()
+    cluster_labels = adata.obs[cluster_key].to_numpy()[cell_order]
+    cluster_names = adata.obs[cluster_key].cat.categories
+    axis_ticks = np.cumsum(
+        [0] + [np.sum(cluster_labels == cn) for cn in cluster_names])
+    axis_tick_labels = [''] * len(axis_ticks)
+
+    plt.figure(figsize=(4, 4), dpi=300)
+    cluster_similarity_mat = similarity_mat[np.ix_(cell_order, cell_order)]
+    for i, j in itertools.combinations(range(num_sessions), 2):
+        cluster_similarity_mat[i, j] = 0.5
+    plt.imshow(cluster_similarity_mat, cmap=plt.get_cmap('binary'))
+    # plt.xticks(ticks=np.arange(len(cluster_labels)), labels=cluster_labels,
+    #            rotation=90)
+    plt.xticks(ticks=axis_ticks, labels=axis_tick_labels)
+    # plt.yticks(ticks=np.arange(len(cluster_labels)), labels=cluster_labels)
+    plt.yticks(ticks=axis_ticks, labels=axis_tick_labels)
+    plt.tight_layout()
+
+    metric, method = cluster_key.split('_')
+    result_dir = f'{metric}-{method}'
+    if metric in ('mean', 'mode'):
+        result_dir = 'posterior-' + result_dir
+    result_dir = os.path.join(sample_cluster_dir, result_dir)
+    figure_path = os.path.join(result_dir, 'clustered_similarity.pdf')
+    plt.savefig(figure_path)
+
     plt.close()
 
 # %%

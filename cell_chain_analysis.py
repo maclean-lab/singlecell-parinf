@@ -19,13 +19,13 @@ os.chdir(working_dir)
 # specify a cell chain
 # stan_runs= '1'
 # stan_runs= '2'
-stan_runs = ['3']
+# stan_runs = ['3']
 # stan_runs= '3-1.0'
 # stan_runs= '3-2.0'
 # stan_runs= 'simple-prior'
 # stan_runs= 'const-eta1'
 # stan_runs= 'const-Be'
-# stan_runs = ['const-Be-eta1']
+stan_runs = ['const-Be-eta1']
 # stan_runs = ['const-Be-eta1-mixed-4']
 # stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
 # stan_runs = ['const-Be-eta1-random-1']
@@ -35,8 +35,8 @@ stan_runs = ['3']
 
 # additional flags
 num_runs = len(stan_runs)
-list_ranges = [(1, 36)]
-# list_ranges = [(1, 500)]
+# list_ranges = [(1, 36)]
+list_ranges = [(1, 500)]
 # list_ranges = [(1, 100)] * num_runs
 # list_ranges = [(1, 571)]
 # list_ranges = [(1, 571), (1, 372), (1, 359), (1, 341), (1, 335), (1, 370)]
@@ -207,7 +207,7 @@ gradient = np.linspace(0, 1, 100)
 gradient = gradient[np.newaxis, :]
 plt.imshow(gradient, aspect=3.0, cmap=plt.get_cmap('viridis'))
 plt.axis('off')
-plt.title('Cell positions', fontdict={'fontsize': 'medium'})
+plt.title('Positions in cell chain', fontdict={'fontsize': 'medium'})
 figure_path = os.path.join(output_dir, 'param_pair_scatters_legend.pdf')
 plt.tight_layout()
 plt.savefig(figure_path)

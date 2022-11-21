@@ -12,6 +12,11 @@ def main():
                             default=None)
     arg_parser.add_argument('--cell_list', dest='cell_list', type=str,
                             default=None)
+    arg_parser.add_argument('--first_cell_order', dest='first_cell_order',
+                            type=int, default=0)
+    arg_parser.add_argument('--last_cell_order', dest='last_cell_order',
+                            type=int, default=-1)
+    arg_parser.add_argument('--t0', dest='t0', type=int, default=200)
     arg_parser.add_argument('--output', dest='output', type=str,
                             default='trajecotries.pdf')
     arg_parser.add_argument('--page_width', dest='page_width', type=float,
@@ -24,12 +29,14 @@ def main():
                             default=2)
     arg_parser.add_argument('--plot_fmt', dest='plot_fmt', type=str,
                             default='')
+    arg_parser.add_argument('--multi_plot', dest='multi_plot',
+                            action='store_true')
     args = arg_parser.parse_args()
 
     # load trajectories
     print('Loading trajectories')
-    y, _, ts = load_trajectories(200, filter_type=args.filter_type,
-                                downsample_offset=300)
+    y, _, ts = load_trajectories(args.t0, filter_type=args.filter_type,
+                                 downsample_offset=300)
 
     # reorder cells if given a list of cells
     if args.cell_list:
@@ -39,18 +46,33 @@ def main():
     else:
         cell_names = [f'cell {cell_id}' for cell_id in range(y.shape[0])]
 
-    traj_data = [(ts, y[i, :]) for i in range(y.shape[0])]
+    if args.last_cell_order == -1:
+        y = y[args.first_cell_order:, :]
+    else:
+        y = y[args.first_cell_order:args.last_cell_order + 1, :]
 
     # make the trajectory plot
-    plot_kwargs = {}
-    if 'o' in args.plot_fmt:
-        # when plotting as dicrete circles, do not fill inside the circles
-        plot_kwargs['fillstyle'] = 'none'
+    if args.multi_plot:
+        # plot trajectories on separate subplots
+        plot_kwargs = {}
+        if 'o' in args.plot_fmt:
+            # when plotting as dicrete circles, do not fill inside the circles
+            plot_kwargs['fillstyle'] = 'none'
 
-    pdf_multi_plot(plt.plot, traj_data, args.output, args.plot_fmt,
-                   num_rows=args.num_rows, num_cols=args.num_cols,
-                   page_size=(args.page_width, args.page_height),
-                   titles=cell_names, show_progress=True, **plot_kwargs)
+        traj_data = [(ts, y[i, :]) for i in range(y.shape[0])]
+        pdf_multi_plot(plt.plot, traj_data, args.output, args.plot_fmt,
+                    num_rows=args.num_rows, num_cols=args.num_cols,
+                    page_size=(args.page_width, args.page_height),
+                    titles=cell_names, show_progress=True, **plot_kwargs)
+    else:
+        plt.figure(figsize=(args.page_width, args.page_height))
+        plt.plot(ts, y.T, args.plot_fmt, alpha=0.3)
+        plt.xlabel('Time (seconds)')
+        plt.ylabel(r'Ca${}^{2+}$ response (AU)')
+        plt.tight_layout()
+        plt.savefig(args.output)
+        plt.close()
+
     print('Trajectory plot saved')
 
 if __name__ == '__main__':

@@ -1,8 +1,10 @@
 # %%
 import os.path
+import itertools
 import json
 
 import numpy as np
+import scipy.io
 import pandas as pd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -40,6 +42,7 @@ for run, lr in zip(stan_runs, list_ranges):
     session_list.extend([str(c) for c in cell_list['Cell']])
 
 session_list_int = [int(s) for s in session_list]
+num_sessions = len(session_list)
 
 # get calcium response
 t0 = 200
@@ -297,7 +300,36 @@ plt.savefig(figure_path)
 plt.close()
 
 # %%
-adata.write(
-    os.path.join(output_dir, f'leiden_{leiden_resolution:.2f}_adata.h5ad'))
+# plot cell-cell similarity matrix after clustering
+soptsc_vars = scipy.io.loadmat(
+    '../../result/SoptSC/SoptSC_feature_100/workspace.mat')
+similarity_mat = soptsc_vars['W'][np.ix_(session_list_int, session_list_int)]
+similarity_mat = np.ceil(similarity_mat)
+
+sorted_cell_order = adata.obs[cluster_key].argsort(kind='mergesort').to_numpy()
+sorted_cluster_labels = adata.obs[cluster_key].to_numpy()[sorted_cell_order]
+cluster_names = adata.obs[cluster_key].cat.categories
+axis_ticks = np.cumsum(
+    [0] + [np.sum(sorted_cluster_labels == cn) for cn in cluster_names])
+axis_tick_labels = [''] * len(axis_ticks)
+
+plt.figure(figsize=(4, 4), dpi=300)
+cluster_similarity_mat = similarity_mat[
+    np.ix_(sorted_cell_order, sorted_cell_order)]
+for i, j in itertools.combinations(range(num_sessions), 2):
+    cluster_similarity_mat[i, j] = 0.5
+plt.imshow(cluster_similarity_mat, cmap=plt.get_cmap('binary'))
+# plt.xticks(ticks=np.arange(len(sorted_cluster_labels)),
+#            labels=sorted_cluster_labels, rotation=90)
+plt.xticks(ticks=axis_ticks, labels=axis_tick_labels)
+# plt.yticks(ticks=np.arange(len(sorted_cluster_labels)),
+#            labels=sorted_cluster_labels)
+plt.yticks(ticks=axis_ticks, labels=axis_tick_labels)
+plt.tight_layout()
+figure_path = os.path.join(output_dir, f'{cluster_key}_similarity.pdf')
+plt.savefig(figure_path)
+plt.close()
 
 # %%
+adata.write(
+    os.path.join(output_dir, f'leiden_{leiden_resolution:.2f}_adata.h5ad'))
