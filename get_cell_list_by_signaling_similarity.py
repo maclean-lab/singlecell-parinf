@@ -1,4 +1,6 @@
 # %%
+# generate a list cell such that two consecutive cells have similar Ca2+
+# response
 import os.path
 import collections
 import itertools
@@ -164,9 +166,7 @@ shortest_path = list(reversed(shortest_path))
 
 # %%
 # get cell list using depth-first search
-# connect two cells only when the distance is below 2.0. the induced graph has
-# similar sparsity as the one constructed by connecting cells with positive
-# cell-cell similarity
+# the generated list is a tree with very few branches near the bottom
 cell_dist_upper_bound = 5.0
 
 # initialize DFS
