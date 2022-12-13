@@ -22,10 +22,12 @@ os.chdir(working_dir)
 # stan_runs = ['3']
 # stan_runs= '3-1.0'
 # stan_runs= '3-2.0'
+# stan_runs = ['3-signaling-similarity']
 # stan_runs= 'simple-prior'
 # stan_runs= 'const-eta1'
 # stan_runs= 'const-Be'
 stan_runs = ['const-Be-eta1']
+# stan_runs = ['const-Be-eta1-signaling-similarity']
 # stan_runs = ['const-Be-eta1-mixed-4']
 # stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
 # stan_runs = ['const-Be-eta1-random-1']
@@ -36,6 +38,7 @@ stan_runs = ['const-Be-eta1']
 # additional flags
 num_runs = len(stan_runs)
 # list_ranges = [(1, 36)]
+# list_ranges = [(1, 100)]
 list_ranges = [(1, 500)]
 # list_ranges = [(1, 100)] * num_runs
 # list_ranges = [(1, 571)]
@@ -108,7 +111,7 @@ similarity_matrix = soptsc_vars['W']
 
 # change matplotlib font settings
 matplotlib.rcParams['font.sans-serif'] = ['Arial']
-matplotlib.rcParams['font.size'] = 16
+matplotlib.rcParams['font.size'] = 12
 
 # set ticks on x-axis for plots
 if use_custom_xticks:
@@ -175,7 +178,7 @@ analyzer.plot_parameter_box(
 
 # %%
 print('Plotting select pairs of parameters...', flush=True)
-session_param_pairs_dir = os.path.join(output_root, 'param-pairs')
+session_param_pairs_dir = os.path.join(output_dir, 'param-pairs')
 if not os.path.exists(session_param_pairs_dir):
     os.mkdir(session_param_pairs_dir)
 
@@ -216,7 +219,7 @@ plt.close()
 # %%
 # gene-parameter correlations
 print('Loading gene expression data and preprocessing...')
-analyzer.load_expression_data('../../data/vol_adjusted_genes_transpose.txt')
+analyzer.load_expression_data('vol_adjusted_genes_transpose.txt')
 print('Filtering sessions with extreme samples...')
 analyzer.filter_sessions(z_score_max=3.0)
 print('Plotting correlation between sampled parameters...')
@@ -242,7 +245,7 @@ print('Plotting select pairs of genes and parameters...')
 scatter_kwargs = {'s': 3.0}
 analyzer.plot_select_genes_vs_params(
     high_corr_pairs, regressors_trained, 'high_corr_pairs_scatter_huber.pdf',
-    figure_size=(2.5, 2.5), num_rows=1, num_cols=1, show_corrs=False,
+    figure_size=(2.5, 2.5), num_rows=1, num_cols=1,
     param_names_on_plot=calcium_models.params_on_plot, **scatter_kwargs)
 
 # %%

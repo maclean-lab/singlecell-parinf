@@ -71,7 +71,7 @@ mpl.rcParams['font.size'] = 12
 # %%
 # load expression data and preprocess
 print('Loading gene expression...')
-adata = sc.read_csv('../../data/vol_adjusted_genes.csv')
+adata = sc.read_csv('vol_adjusted_genes.csv')
 adata = adata[session_list, :]
 adata.raw = adata
 sc.pp.normalize_total(adata)

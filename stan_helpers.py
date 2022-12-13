@@ -2132,8 +2132,8 @@ class StanMultiSessionAnalyzer:
     def plot_select_genes_vs_params(self, select_pairs, regressors_trained,
                                     figure_name, figure_size=(8.5, 11),
                                     num_rows=4, num_cols=2, degree=1,
-                                    show_corrs=True, param_names_on_plot=None,
-                                    **scatter_kwargs):
+                                    show_title=False, show_corrs=False,
+                                    param_names_on_plot=None, **scatter_kwargs):
         """Plot select gene-parameter pairs with regression line/curve"""
         num_subplots_per_page = num_rows * num_cols
         num_plots = len(select_pairs)
@@ -2171,11 +2171,12 @@ class StanMultiSessionAnalyzer:
                         param_name = param_names_on_plot[param]
                     else:
                         param_name = param
-                    if show_corrs:
-                        corr = self.gene_vs_param_corrs.loc[gene, param]
-                        plt.title(f'{gene} vs {param_name}: {corr:.6f}')
-                    else:
-                        plt.title(f'{gene} vs {param_name}')
+                    if show_title:
+                        if show_corrs:
+                            corr = self.gene_vs_param_corrs.loc[gene, param]
+                            plt.title(f'{gene} vs {param_name}: {corr:.6f}')
+                        else:
+                            plt.title(f'{gene} vs {param_name}')
 
                     # plot regression line/curve
                     if degree == 1:

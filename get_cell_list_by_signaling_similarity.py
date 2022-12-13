@@ -76,15 +76,12 @@ mpl.rcParams['font.size'] = 16
 # %%
 # load expression data and preprocess
 print('Loading gene expression...')
-adata = sc.read_csv('../../data/vol_adjusted_genes.csv')
-adata = adata[session_list, :]
+adata = sc.read_csv('vol_adjusted_genes.csv')
+# adata = adata[session_list, :]
 adata.raw = adata
 sc.pp.normalize_total(adata)
 sc.pp.log1p(adata)
 sc.pp.scale(adata)
-sc.tl.pca(adata, svd_solver='arpack')
-sc.pp.neighbors(adata)
-sc.tl.umap(adata)
 
 # %%
 # compute signaling similarity between cells
@@ -216,3 +213,6 @@ full_cell_list.to_csv(output_path, sep='\t', index=False)
 cell_list_dists = [np.linalg.norm(y_all[i, :] - y_all[j, :])
                    for i, j in zip(cell_list[1:], parent_list[1:])]
 plt.hist([cell_list_dists, signaling_dists], density=True)
+
+# %%
+# plot gene expression of cells as ordered by the generated cell list

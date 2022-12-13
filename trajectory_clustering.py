@@ -1,11 +1,12 @@
 # %%
+import os
 import os.path
 import json
 
 import numpy as np
 import scipy.io
-from sklearn.cluster import KMeans
 import pandas as pd
+from tslearn.clustering import TimeSeriesKMeans
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -15,13 +16,14 @@ from stan_helpers import load_trajectories
 
 # %%
 # stan_runs = ['3']
-stan_runs = ['const-Be-eta1']
+# stan_runs = ['const-Be-eta1']
 # stan_runs = ['const-Be-eta1-mixed-1']
 # stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
 # stan_runs = ['const-Be-eta1-random-1']
 # stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
-list_ranges = [(1, 500)]
-# list_ranges = [(1, 100)]
+stan_runs = ['const-Be-eta1-signaling-similarity']
+# list_ranges = [(1, 500)]
+list_ranges = [(1, 100)]
 # list_ranges = [(1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
 # list_ranges = [(1, 372)]
 # list_ranges = [(1, 571), (1, 372), (1, 359), (1, 341), (1, 335), (1, 370)]
@@ -62,6 +64,8 @@ output_root = os.path.join('../../result', output_root)
 if not os.path.exists(output_root):
     os.mkdir(output_root)
 output_dir = os.path.join(output_root, 'trajectory-clustering')
+if not os.path.exists(output_dir):
+    os.mkdir(output_dir)
 sc.settings.figdir = output_dir
 
 # change font settings
@@ -71,7 +75,7 @@ mpl.rcParams['font.size'] = 12
 # %%
 # load expression data and preprocess
 print('Loading gene expression...')
-adata = sc.read_csv('../../data/vol_adjusted_genes.csv')
+adata = sc.read_csv('vol_adjusted_genes.csv')
 adata = adata[session_list, :]
 adata.raw = adata
 sc.pp.normalize_total(adata)
@@ -83,11 +87,17 @@ sc.tl.umap(adata)
 
 # %%
 # run clustering on trajectories
-kmeans = KMeans(n_clusters=num_clusters, random_state=0)
+kmeans = TimeSeriesKMeans(n_clusters=num_clusters, metric='euclidean',
+                          random_state=0)
 adata.obs[cluster_key] = pd.Series(kmeans.fit_predict(y_sessions),
                                    index=adata.obs_names, dtype='category')
+if cluster_key == 'k_means_3':
+    adata.rename_categories(cluster_key, ['Low', 'High', 'Medium'])
 cluster_names = adata.obs[cluster_key].cat.categories
 adata.uns[f'{cluster_key}_colors'] = [f'C{i + 3}' for i in range(num_clusters)]
+
+# find marker genes of each cluster
+sc.tl.rank_genes_groups(adata, cluster_key)
 
 # %%
 # plot trajectories
@@ -100,6 +110,8 @@ plt.xlabel('Time')
 plt.ylabel('Ca2+ response')
 plt.tight_layout()
 figure_path = os.path.join(output_dir, f'{cluster_key}_trajectories.pdf')
+plt.savefig(figure_path)
+figure_path = os.path.join(output_dir, f'{cluster_key}_trajectories.png')
 plt.savefig(figure_path)
 plt.close()
 
@@ -120,9 +132,11 @@ for i, c in enumerate(cluster_names):
 plt.xlim((0, 10))
 plt.yticks(ticks=[])
 plt.legend()
-plt.title('Gene expression clustering')
+plt.title(r'Ca${}^{2+}$ response clustering')
 plt.tight_layout()
 figure_path = os.path.join(output_dir, f'{cluster_key}_traj_peaks.pdf')
+plt.savefig(figure_path)
+figure_path = os.path.join(output_dir, f'{cluster_key}_traj_peaks.png')
 plt.savefig(figure_path)
 plt.close('all')
 
@@ -132,8 +146,8 @@ t_plot_max = 100
 num_plot_points = np.sum(ts <= t_plot_max)
 ts_plot = ts[:num_plot_points]
 
-fig, axs = plt.subplots(nrows=num_clusters, ncols=1, sharex=True,
-                        figsize=(3, num_clusters + 1), dpi=300)
+fig, axs = plt.subplots(nrows=1, ncols=num_clusters, sharex=True,
+                        figsize=(3 * num_clusters, 1.5), dpi=300)
 for i, cluster in enumerate(cluster_names):
     cluster_cells = [int(c) for c in session_list
                      if adata.obs.loc[c, cluster_key] == cluster]
@@ -147,13 +161,14 @@ for i, cluster in enumerate(cluster_names):
     axs[i].plot(ts_plot, y_mean, color=cluster_color)
     axs[i].fill_between(ts_plot, y_mean - y_std, y_mean + y_std,
                         color=cluster_color, alpha=0.2)
-    if i == num_clusters - 1:
-        axs[i].set_xlabel('Time')
+    axs[i].set_xlabel('Time')
     axs[i].set_ylim(bottom=0, top=4)
     axs[i].set_title(cluster)
 
 plt.tight_layout()
 figure_path = os.path.join(output_dir, f'{cluster_key}_traj_ribbon.pdf')
+plt.savefig(figure_path)
+figure_path = os.path.join(output_dir, f'{cluster_key}_traj_ribbon.png')
 plt.savefig(figure_path)
 plt.close()
 
@@ -173,7 +188,68 @@ plt.savefig(figure_path)
 plt.close()
 
 # %%
-adata.write(
-    os.path.join(output_dir, f'{cluster_key}_adata.h5ad'))
+# plot gene expression after clustering
+# sc.settings.figdir = output_dir
+mpl.rcParams['font.size'] = 18
+
+# plot all genes
+axes = sc.pl.heatmap(adata, var_names=adata.var_names, groupby=cluster_key,
+                     use_raw=False, figsize=(4, 3), show=False, save=False)
+axes['groupby_ax'].set_yticklabels(axes['groupby_ax'].get_yticklabels(),
+                                   fontdict={'verticalalignment': 'center'},
+                                   rotation=90)
+axes['heatmap_ax'].set_xlabel('Genes')
+axes['groupby_ax'].set_ylabel('')
+figure_basename = os.path.join(output_dir, f'{cluster_key}_genes_all')
+plt.savefig(figure_basename + '.pdf')
+plt.savefig(figure_basename + '.png')
+plt.close()
+
+# plot select genes
+axes = sc.pl.heatmap(adata, var_names=['PPP1CC', 'CCDC47'], groupby=cluster_key,
+                     use_raw=False, figsize=(4, 3), show=False, save=False)
+axes['heatmap_ax'].set_xticklabels(axes['heatmap_ax'].get_xticklabels(),
+                                   rotation=0)
+axes['groupby_ax'].set_yticklabels(axes['groupby_ax'].get_yticklabels(),
+                                   fontdict={'verticalalignment': 'center'},
+                                   rotation=90)
+plt.ylabel('')
+figure_basename = os.path.join(output_dir, f'{cluster_key}_genes_select')
+plt.savefig(figure_basename + '.pdf')
+plt.savefig(figure_basename + '.png')
+plt.close()
 
 # %%
+# make heatmap for marker genes
+mpl.rcParams['font.size'] = 18
+axes = sc.pl.rank_genes_groups_heatmap(adata, n_genes=5, use_raw=False,
+                                       figsize=(5, 3), dendrogram=False,
+                                       show_gene_labels=True, show=False,
+                                       save=False)
+axes['heatmap_ax'].set_xticklabels(axes['heatmap_ax'].get_xticklabels(),
+                                   rotation=90)
+axes['groupby_ax'].set_yticklabels(axes['groupby_ax'].get_yticklabels(),
+                                   fontdict={'verticalalignment': 'center'},
+                                   rotation=90)
+axes['groupby_ax'].set_ylabel('')
+for t in axes['gene_groups_ax'].texts:
+    t.set(rotation=0)
+figure_basename = os.path.join(output_dir, f'{cluster_key}_genes_marker')
+plt.savefig(figure_basename + '.pdf', bbox_inches='tight')
+plt.savefig(figure_basename + '.png', bbox_inches='tight')
+plt.close()
+
+# %%
+# make matrix plot for marker genes
+mpl.rcParams['font.size'] = 18
+_ = sc.pl.rank_genes_groups_matrixplot(
+    adata, n_genes=10, use_raw=False, dendrogram=False, var_group_rotation=0,
+    show=False, save=False)
+figure_basename = os.path.join(output_dir, f'{cluster_key}_genes_marker_matrix')
+plt.savefig(figure_basename + '.pdf', bbox_inches='tight')
+plt.savefig(figure_basename + '.png', bbox_inches='tight')
+plt.close()
+
+# %%
+adata.write(
+    os.path.join(output_dir, f'{cluster_key}_adata.h5ad'))

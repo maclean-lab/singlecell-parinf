@@ -48,6 +48,9 @@ feature), each code cell can be executed separately.
 a model. Some models have associated prior specifications. If a model is
 compiled by `compile_stan_model.py`, the compiled model will also be saved in
 the same subfolder.
+- `canorm_tracjectories.csv`: Ca<sup>2+</sup> response trajectories
+- `vol_adjusted_genes.csv`: MERFISH data (comma delimited)
+- `vol_adjusted_genes_transpose.txt`: MERFISH data (tab delimited, transposed)
 - `cell_lists`: folder for cell lists generated according to different
 criteria.
 - `cell_chain_example`: folder used by [code demos](#code-demos). The `samples`

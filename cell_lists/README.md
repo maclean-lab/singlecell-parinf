@@ -27,6 +27,9 @@ list.
     the same tail starting from the cell with numeric ID `branch_cell_id` but
     may have different heads before that cell.
 
+One exception is `signaling_similarity.txt`, which is a cell list based on
+similarity of Ca<sup>2+</sup> response between cells.
+
 ### File content
 Each file contains a tab-delimited table.
 

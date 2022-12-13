@@ -1,5 +1,4 @@
 *~
-*.csv
 *.png
 *.pdf
 *.pkl
@@ -18,7 +17,3 @@ multi-sample-analysis
 
 gene2go
 go-basic.obo
-
-!chain_*.csv
-!stan_fit_samples.csv
-!stan_fit_summary.csv

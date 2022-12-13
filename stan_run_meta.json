@@ -44,6 +44,15 @@
         "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
         "color": "C2"
     },
+    "3-signaling-similarity": {
+        "param_mask": "0111111111111111111",
+        "ode_variant": "equiv_2",
+        "pub_name": "Similar-Ca",
+        "cell_list": "signaling_similarity.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-3-signaling-similarity",
+        "root_cell_dir": "stan-calcium-model-equiv_2-lemon-prior-1000/samples/cell-5106",
+        "color": "C0"
+    },
     "simple-prior": {
         "param_mask": "0111111111111111111",
         "ode_variant": "equiv_2",
@@ -203,6 +212,15 @@
         "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-random-all",
         "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
         "color": "C1"
+    },
+    "const-Be-eta1-signaling-similarity": {
+        "param_mask": "0111111111011101111",
+        "ode_variant": "equiv_2_const_Be_eta1",
+        "pub_name": "Reduced-Ca",
+        "cell_list": "signaling_similarity.txt",
+        "output_dir": "stan-calcium-model-100-root-5106-const-Be-eta1-signaling-similarity",
+        "root_cell_dir": "stan-calcium-model-const-Be-eta1/cell-5106",
+        "color": "C8"
     },
     "lemon-prior-1000": {
         "param_mask": "0111111111111111111",

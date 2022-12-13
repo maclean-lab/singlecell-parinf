@@ -293,14 +293,29 @@ plt.close()
 
 # %%
 # make histogram for sampling time
-plt.figure(figsize=(4, 6), dpi=dpi)
+plt.figure(figsize=(4, 5), dpi=dpi)
 figure_path = os.path.join(output_dir, 'sampling_time_hist.pdf')
 plt.hist([np.mean(t.values, axis=1) for t in sampling_time], color=run_colors,
          label=pub_names)
 plt.xlabel('Time (minutes)')
 plt.ylabel('Number of cells')
-plt.title('Runtime comparison')
-plt.legend()
+plt.legend(prop={'size': 12})
+plt.tight_layout()
+plt.savefig(figure_path)
+plt.close()
+
+# %%
+# make KDE plot for sampling time
+plt.figure(figsize=(4, 5), dpi=dpi)
+figure_path = os.path.join(output_dir, 'sampling_time_kde.pdf')
+kde_ax = sns.kdeplot(data=[np.mean(t.values, axis=1) for t in sampling_time],
+                     fill=True, legend=True)
+plt.xlabel('Time (minutes)')
+plt.ylabel('Density')
+kde_legend = kde_ax.get_legend()
+for t, pn in zip(kde_legend.get_texts(), pub_names):
+    t.set_text(pn)
+    t.set_fontsize(12)
 plt.tight_layout()
 plt.savefig(figure_path)
 plt.close()

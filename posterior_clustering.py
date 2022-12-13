@@ -28,6 +28,7 @@ import calcium_models
 # initialize computation of distances between posterior samples
 # stan_runs = ['3']
 stan_runs = ['const-Be-eta1']
+# stan_runs = ['const-Be-eta1-signaling-similarity']
 # stan_runs = ['const-Be-eta1-mixed-1']
 # stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
 # stan_runs = ['const-Be-eta1-random-1']
@@ -481,8 +482,8 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
                            xticklabels=param_names_on_plot, yticklabels=False,
                            row_colors=cluster_colors, figsize=(4, 6),
                            cbar_kws={'orientation': 'horizontal',
-                                     'label': 'Normalized expression'},
-                           cbar_pos=(0.27, 0.88, 0.64, 0.02))
+                                     'label': 'Normalized posterior mean'},
+                           cbar_pos=(0.45, 0.88, 0.3, 0.02))
         g.ax_heatmap.set_ylabel('Cells')
         g.cax.xaxis.set_label_position('top')
         plt.xticks(fontsize=10)
@@ -532,12 +533,20 @@ for st, method in itertools.product(stat_types, cluster_methods):
         cluster_names = ['Early', 'Low', 'Late-high']
         adata.rename_categories(cluster_key, cluster_names)
         cluster_colors = ['C0', 'C1', 'C2']
-    if 'const-Be-eta1-random-1' in stan_runs and st == 'mean' \
+    elif 'const-Be-eta1-random-1' in stan_runs and st == 'mean' \
             and method == 'ward':
         cluster_key = 'mean_ward'
         cluster_names = ['C1', 'C2', 'C3']
         adata.rename_categories(cluster_key, cluster_names)
         cluster_colors = ['C6', 'C7', 'C8']
+    elif 'const-Be-eta1-signaling-similarity' in stan_runs and st == 'mean' \
+            and method == 'ward':
+        cluster_key = 'mean_ward'
+        cluster_names = ['Medium', 'High', 'Low']
+        adata.rename_categories(cluster_key, cluster_names)
+        cluster_colors = ['C6', 'C7', 'C8']
+    else:
+        cluster_colors = [f'C{i}' for i in range(len(cluster_names))]
 
 # %%
 # find differential genes in each cluster

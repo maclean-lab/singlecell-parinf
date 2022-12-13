@@ -57,7 +57,7 @@ for d in sub_output_dirs:
 
 # %%
 # load gene expression
-raw_data = pd.read_csv('../../data/vol_adjusted_genes_transpose.txt', sep='\t')
+raw_data = pd.read_csv('vol_adjusted_genes_transpose.txt', sep='\t')
 
 # perform log normalization
 if use_highly_variable_genes:

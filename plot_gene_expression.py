@@ -14,7 +14,7 @@ def main():
     add_dendrogram = args.add_dendrogram
 
     # load gene expression
-    raw_data = pd.read_csv('../../data/vol_adjusted_genes_transpose.txt',
+    raw_data = pd.read_csv('vol_adjusted_genes_transpose.txt',
                            sep='\t')
     log_data = np.log1p(raw_data.to_numpy())
 
