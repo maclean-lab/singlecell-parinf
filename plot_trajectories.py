@@ -18,7 +18,7 @@ def main():
                             type=int, default=-1)
     arg_parser.add_argument('--t0', dest='t0', type=int, default=200)
     arg_parser.add_argument('--output', dest='output', type=str,
-                            default='trajecotries.pdf')
+                            default='trajectories.pdf')
     arg_parser.add_argument('--page_width', dest='page_width', type=float,
                             default=8.5)
     arg_parser.add_argument('--page_height', dest='page_height', type=float,
@@ -37,6 +37,7 @@ def main():
     print('Loading trajectories')
     y, _, ts = load_trajectories(args.t0, filter_type=args.filter_type,
                                  downsample_offset=300)
+    ts += args.t0
 
     # reorder cells if given a list of cells
     if args.cell_list:
@@ -56,7 +57,7 @@ def main():
         # plot trajectories on separate subplots
         plot_kwargs = {}
         if 'o' in args.plot_fmt:
-            # when plotting as dicrete circles, do not fill inside the circles
+            # when plotting as discrete circles, do not fill inside the circles
             plot_kwargs['fillstyle'] = 'none'
 
         traj_data = [(ts, y[i, :]) for i in range(y.shape[0])]

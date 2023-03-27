@@ -24,7 +24,7 @@ def main():
     # prepare data for Stan model
     # get trajectory and time
     print("Loading trajectories...")
-    y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
+    y = np.loadtxt("canorm_trajectories.csv", delimiter=",")
     if not num_cells:
         num_cells = y.shape[0]
     t_end = y.shape[1] - 1

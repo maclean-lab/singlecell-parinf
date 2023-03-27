@@ -22,7 +22,7 @@ def main():
 
     # load trajectories
     print("Loading trajectories")
-    y_raw = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
+    y_raw = np.loadtxt("canorm_trajectories.csv", delimiter=",")
 
     # apply filter
     if args.filter_type == "moving_average":

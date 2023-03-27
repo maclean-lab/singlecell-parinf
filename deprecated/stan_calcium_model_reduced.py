@@ -34,7 +34,7 @@ def main():
     print("Initializing data for cell {}...".format(cell_id))
     # get trajectory and time
     # print("Loading trajectories...")
-    # y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
+    # y = np.loadtxt("canorm_trajectories.csv", delimiter=",")
     # y = y[cell_id, :]
     # t_end = y.size - 1
     # # apply preprocessing to the trajectory if specified

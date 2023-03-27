@@ -1,6 +1,6 @@
 # Single-cell parameter inference for Ca<sup>2+</sup> pathway model
 
-This repository contains code for Bayesian paramater inference for
+This repository contains code for Bayesian parameter inference for
 Ca<sup>2+</sup> pathway model using No-U-Turn Sampler (NUTS) and post-sampling
 analyses.
 
@@ -27,7 +27,7 @@ cell.
 ### Modules
 - `stan_helpers.py`: classes for sampling parameters for single cells and
 analyzing sampled cells, as well as helper functions.
-- `calcium_models.py`: ordinary differerential equations (ODEs) of each
+- `calcium_models.py`: ordinary differential equations (ODEs) of each
 Ca<sup>2+</sup> model variant, which are used when simulating Ca<sup>2+</sup>
 trajectories during post-sampling analysis, as well as parameter names in the
 models.
@@ -48,7 +48,7 @@ feature), each code cell can be executed separately.
 a model. Some models have associated prior specifications. If a model is
 compiled by `compile_stan_model.py`, the compiled model will also be saved in
 the same subfolder.
-- `canorm_tracjectories.csv`: Ca<sup>2+</sup> response trajectories
+- `canorm_trajectories.csv`: Ca<sup>2+</sup> response trajectories
 - `vol_adjusted_genes.csv`: MERFISH data (comma delimited)
 - `vol_adjusted_genes_transpose.txt`: MERFISH data (tab delimited, transposed)
 - `cell_lists`: folder for cell lists generated according to different

@@ -26,8 +26,8 @@ os.chdir(working_dir)
 # stan_runs= 'simple-prior'
 # stan_runs= 'const-eta1'
 # stan_runs= 'const-Be'
-stan_runs = ['const-Be-eta1']
-# stan_runs = ['const-Be-eta1-signaling-similarity']
+# stan_runs = ['const-Be-eta1']
+stan_runs = ['const-Be-eta1-signaling-similarity']
 # stan_runs = ['const-Be-eta1-mixed-4']
 # stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
 # stan_runs = ['const-Be-eta1-random-1']
@@ -38,8 +38,8 @@ stan_runs = ['const-Be-eta1']
 # additional flags
 num_runs = len(stan_runs)
 # list_ranges = [(1, 36)]
-# list_ranges = [(1, 100)]
-list_ranges = [(1, 500)]
+list_ranges = [(1, 250)]
+# list_ranges = [(1, 500)]
 # list_ranges = [(1, 100)] * num_runs
 # list_ranges = [(1, 571)]
 # list_ranges = [(1, 571), (1, 372), (1, 359), (1, 341), (1, 335), (1, 370)]
@@ -193,7 +193,7 @@ analyzer.plot_param_pairs_all_sessions(
 analyzer.get_sample_means()
 
 # %%
-print('Plotting select pairs of parameters...')
+print('Plotting select pairs of parameters...', flush=True)
 param_pair_sessions = analyzer.session_list[::50].tolist()
 param_plot_titles = ['MAP values'] \
     + [f'Cell {c}' for c in param_pair_sessions]
@@ -362,16 +362,17 @@ plt.close()
 
 # %%
 # plot positions of similar cells
-plt.figure(figsize=(6, 6), dpi=300)
-session_list_int.insert(0, 5106)  # add root cell
-similar_cells = similarity_matrix[np.ix_(session_list_int, session_list_int)]
+plt.figure(figsize=(4, 4), dpi=300)
+cells_to_plot = session_list_int.copy()
+cells_to_plot.insert(0, 5106)  # add root cell
+similar_cells = similarity_matrix[np.ix_(cells_to_plot, cells_to_plot)]
 similar_cells = np.ceil(similar_cells)
 
 plt.imshow(similar_cells, cmap='binary', interpolation='none')
+plt.xlabel('Position in cell chain')
+plt.ylabel('Position in cell chain')
 plt.tight_layout()
 
 figure_path = os.path.join(output_dir, 'similar_cell_positions.pdf')
 plt.savefig(figure_path)
 plt.close()
-
-session_list_int = session_list_int[1:]  # remove root cell

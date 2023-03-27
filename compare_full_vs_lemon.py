@@ -62,7 +62,7 @@ for run in stan_runs:
 # %%
 def make_heatmap(data, figure_name, max_value=500, xlabel=None,
                  colorbar_ticks=None, colorbar_ticklabels=None,
-                 plot_cell_ids=False):
+                 plot_cell_ids=False, plot_yaxis_arrow=False):
     plt.figure(figsize=(4, 9), dpi=300)
     ax = plt.gca()
     capped_data = np.clip(data, None, max_value)
@@ -71,9 +71,9 @@ def make_heatmap(data, figure_name, max_value=500, xlabel=None,
     # set tick labels
     ax.xaxis.tick_top()
     ax.set_xticks(np.arange(num_runs))
-    ax.set_xticklabels(labels=pub_names, rotation=90, fontsize=24)
+    ax.set_xticklabels(labels=pub_names, rotation=90, fontsize=20)
     if xlabel:
-        ax.set_xlabel(xlabel, fontsize=24)
+        ax.set_xlabel(xlabel, fontsize=20)
     if plot_cell_ids:
         ax.text(-1.5, -1, 'Cell ID', ha='center', va='center', color='k',
                 fontsize=16)
@@ -84,9 +84,10 @@ def make_heatmap(data, figure_name, max_value=500, xlabel=None,
         ax.set_yticklabels([''] * num_cells)
 
     # draw an arrow along y-axis
-    # ax.set_ylabel('Cell position', labelpad=20, fontsize=20)
-    # ax.arrow(-0.75, 0, 0, 9, head_width=0.1, head_length=0.1,
-    #          length_includes_head=True, clip_on=False, color='k')
+    if plot_yaxis_arrow:
+        ax.set_ylabel('Cell position', labelpad=20, fontsize=20)
+        ax.arrow(-0.75, 0, 0, 9, head_width=0.1, head_length=0.1,
+                 length_includes_head=True, clip_on=False, color='k')
 
     # set bounding box for the heatmap portion
     ax.set_xlim(-0.5, 2.5)

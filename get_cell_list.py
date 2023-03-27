@@ -183,7 +183,7 @@ def get_cells_dfs(similarity_matrix, output_file, root=0, stochastic=False,
     dfs_result.to_csv(output_file, sep='\t', index=False)
 
 def select_cells(min_peak=0.0):
-    y = np.loadtxt('canorm_tracjectories.csv', delimiter=',')
+    y = np.loadtxt('canorm_trajectories.csv', delimiter=',')
     selected = np.where(np.max(y, axis=1) >= min_peak)
     selected = set(selected[0])
 

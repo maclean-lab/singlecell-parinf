@@ -20,8 +20,8 @@ os.chdir(working_dir)
 # initialize cell chain analysis
 # specify a cell chain
 stan_run = 'single-repeat'
-cell_id = 5082
-num_rounds = 10
+cell_id = 5121
+num_epochs = 10
 ref_stan_run = '3'
 ref_list_range = (1, 10)
 
@@ -38,7 +38,7 @@ num_params = len(param_names)
 
 # get directories for sampled cells, as well as output of analysis
 run_root = os.path.join('../../result', stan_run_meta[stan_run]['output_dir'])
-session_list = [f'round-{i:02d}' for i in range(num_rounds)]
+session_list = [f'round-{i:02d}' for i in range(num_epochs)]
 session_dirs = [os.path.join(run_root, 'samples', f'cell-{cell_id:04d}', s)
                 for s in session_list]
 output_dir = os.path.join(run_root, 'multi-sample-analysis')
@@ -47,7 +47,7 @@ output_dir = os.path.join(run_root, 'multi-sample-analysis')
 analyzer = StanMultiSessionAnalyzer(session_list, output_dir, session_dirs,
                                     param_names=param_names)
 session_list = analyzer.session_list
-num_rounds = analyzer.num_sessions
+num_epochs = analyzer.num_sessions
 
 ref_run_root = os.path.join('../../result',
                                stan_run_meta[ref_stan_run]['output_dir'])
@@ -91,9 +91,31 @@ matplotlib.rcParams['font.size'] = 16
 # %%
 # get mean log posterior and standard deviation
 mean_lps = [np.mean(analyzer.session_analyzers[i].log_posterior)
-            for i in range(num_rounds)]
-print('Log posterior stats of all rounds (mean ± std): ', end='')
-print(f'{np.mean(mean_lps):.2f} ± {np.std(mean_lps, ddof=1):.2f}')
+            for i in range(num_epochs)]
+# print('Log posterior stats of all epochs (mean ± std): ', end='')
+# print(f'{np.mean(mean_lps):.2f} ± {np.std(mean_lps, ddof=1):.2f}')
+ref_mixed_chains = ref_analyzer.session_analyzers[cell_order].get_mixed_chains()
+ref_mean_lps = \
+    ref_analyzer.session_analyzers[cell_order].get_mean_log_posteriors()
+ref_mean_lps = np.mean(
+    [lp for i, lp in enumerate(ref_mean_lps) if i in ref_mixed_chains]
+)
+
+plt.figure(figsize=(5, 3), dpi=300)
+plot_markersize = 10
+plt.plot(mean_lps, '.', color='C0', markersize=plot_markersize)
+plt.axhline(y=ref_mean_lps, color='C1')
+plt.title(f'Cell {cell_id:04d}')
+plt.xlabel('Epoch')
+plt.xticks(ticks=np.arange(num_epochs),
+           labels=[i + 1 for i in range(num_epochs)])
+plt.ylabel('Mean log posterior')
+plt.tight_layout()
+figure_path = os.path.join(output_dir, f'cell_{cell_id:04d}_lps.pdf')
+plt.savefig(figure_path)
+figure_path = os.path.join(output_dir, f'cell_{cell_id:04d}_lps.png')
+plt.savefig(figure_path)
+plt.close()
 
 # %%
 # plot mean distances between true and simulated trajectories
@@ -107,21 +129,16 @@ ref_traj_dists_path = os.path.join(ref_output_dir,
 ref_traj_dists = pd.read_csv(ref_traj_dists_path, index_col=0, header=None)
 ref_traj_dists = ref_traj_dists.to_numpy().squeeze()
 
-plt.figure(figsize=(6, 4), dpi=300)
+plt.figure(figsize=(5, 3), dpi=300)
 plot_markersize = 10
-plt.plot(traj_dists, '.', markersize=plot_markersize,
-         label='Current cell (self repeat)')
-plt.plot(ref_traj_dists, '.', markersize=plot_markersize,
-         label=f'Other cells in {stan_run_meta[ref_stan_run]["pub_name"]}')
-plt.plot(cell_order, ref_traj_dists[cell_order], '.',
-         markersize=plot_markersize,
-         label=f'Current cell in {stan_run_meta[ref_stan_run]["pub_name"]}')
-plt.xlabel('Round')
-plt.xticks(ticks=np.arange(num_rounds),
-           labels=[i + 1 for i in range(num_rounds)])
-plt.ylabel('Mean trajectory distance')
-plt.ylim((0.0, 1.5))
-plt.legend()
+plt.plot(traj_dists, '.', color='C0', markersize=plot_markersize)
+plt.axhline(y=ref_traj_dists[cell_order], color='C1')
+plt.title(f'Cell {cell_id:04d}')
+plt.xlabel('Epoch')
+plt.xticks(ticks=np.arange(num_epochs),
+           labels=[i + 1 for i in range(num_epochs)])
+plt.ylabel('Mean error')
+plt.ylim((0.0, 1.0))
 plt.tight_layout()
 figure_path = os.path.join(output_dir, f'cell_{cell_id:04d}_traj_dists.pdf')
 plt.savefig(figure_path)
@@ -130,26 +147,61 @@ plt.savefig(figure_path)
 plt.close()
 
 # %%
-# plot marginal distribution of all rounds vs from cell chain
+# make a separate legend for plot of mean trajectory distances
+import matplotlib.patches as mpatches
+
+plt.figure(figsize=(5, 0.5), dpi=300)
+plt.axis('off')
+legend_patches = [
+    mpatches.Patch(color='C0', label='Multiple epochs'),
+    mpatches.Patch(color='C1', label=stan_run_meta[ref_stan_run]['pub_name'])
+]
+plt.legend(
+    legend_patches,
+    ['Multiple epochs', stan_run_meta[ref_stan_run]['pub_name']],
+    loc='center', frameon=False, bbox_to_anchor=(0.5, 0.5), ncol=2
+)
+plt.tight_layout()
+figure_path = os.path.join(output_dir, 'traj_dist_legend.pdf')
+plt.savefig(figure_path)
+plt.close()
+
+# %%
+# plot trajectory distance for reference run
+plt.figure(figsize=(5, 4))
+plt.plot(ref_traj_dists, '.', color='C0', markersize=plot_markersize)
+plt.title(stan_run_meta[ref_stan_run]['pub_name'])
+plt.xlabel('Cells')
+plt.xticks(ticks=np.arange(num_epochs), labels=ref_cell_ids, rotation=90)
+plt.ylabel('Mean error')
+plt.ylim((0.0, 1.5))
+plt.tight_layout()
+figure_path = os.path.join(output_dir, 'ref_traj_dists.pdf')
+plt.savefig(figure_path)
+plt.close()
+
+# %%
+# plot marginal distribution of all epochs vs from cell chain
 sample_list = [ref_analyzer.session_analyzers[cell_order].get_samples()] + \
     [al.get_samples() for al in analyzer.session_analyzers]
 for i, sample in enumerate(sample_list):
     sample.columns = param_names
     if i == 0:
-        sample.insert(0, 'Round', 'Similar')
+        sample.insert(0, 'Epoch', 'Similar')
     else:
-        sample.insert(0, 'Round', i - 1)
+        sample.insert(0, 'Epoch', i - 1)
 all_samples = pd.concat(sample_list, ignore_index=True)
 
 xtick_locs = np.arange(len(sample_list))
-xtick_labels = ['Similar'] + [i + 1 for i in range(num_rounds)]
+xtick_labels = ['Similar'] + [i + 1 for i in range(num_epochs)]
 figure_path = os.path.join(output_dir, f'cell_{cell_id:04d}_params.pdf')
 with PdfPages(figure_path) as pdf:
     for param in param_names:
-        plt.figure(figsize=(6, 4), dpi=300)
-        sns.boxplot(data=all_samples, x='Round', y=param)
+        plt.figure(figsize=(5, 3), dpi=300)
+        sns.boxplot(data=all_samples, x='Epoch', y=param)
         plt.xticks(ticks=xtick_locs, labels=xtick_labels, rotation=90)
-        plt.ylabel(param)
+        plt.ylabel(calcium_models.params_on_plot[param])
+        plt.title(f'Cell {cell_id:04d}')
         plt.tight_layout()
         pdf.savefig()
         plt.close()

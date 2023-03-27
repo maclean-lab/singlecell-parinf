@@ -21,8 +21,8 @@ import calcium_models
 # %%
 # load samples
 # stan_run = '3'
-stan_run = 'const-Be-eta1'
-# stan_run = 'const-Be-eta1-random-1'
+# stan_run = 'const-Be-eta1'
+stan_run = 'const-Be-eta1-random-1'
 first_cell_order = 1
 last_cell_order = 500
 analysis_param_mask = '0111111111011101111'
@@ -192,6 +192,7 @@ def project_on_cell(method, base_cell_idx, plot_lemon_prior, norm_func,
 
     # initialize
     bit_generator = np.random.MT19937(random_seed)
+    mpl.rcParams['font.size'] = 14
 
     if base_cell_idx == 0:
         base_cell_id = root_cell_id
@@ -208,7 +209,8 @@ def project_on_cell(method, base_cell_idx, plot_lemon_prior, norm_func,
     similarity_matrix /= np.amax(similarity_matrix[base_cell_id, sampled_cells])
 
     # set up plotting
-    fig, ax = plt.subplots(figsize=(5, 4), dpi=dpi)
+    # fig, ax = plt.subplots(figsize=(5, 4), dpi=dpi)
+    fig, ax = plt.subplots(figsize=(4, 3.2), dpi=dpi)
     ax.set_aspect('equal', adjustable='datalim')
     ax.set_box_aspect(1)
     colormap = plt.get_cmap('YlOrRd')
@@ -327,17 +329,18 @@ def project_on_cell(method, base_cell_idx, plot_lemon_prior, norm_func,
     ax.set_title(f'Cell {base_cell_id:04d}')
 
     # add legend
-    legend_handles = [Line2D([0], [0], linestyle='', color='C0', marker='.',
-                             label='Focal cell', markersize=10),
-                      Line2D([0], [0], linestyle='', color='0.5', marker='.',
-                             label='Dissimilar cell', markersize=10)]
-    ax.legend(handles=legend_handles, loc='upper right')
+    # legend_handles = [Line2D([0], [0], linestyle='', color='C0', marker='.',
+    #                          label='Focal', markersize=10),
+    #                   Line2D([0], [0], linestyle='', color='0.5', marker='.',
+    #                          label='Dissimilar', markersize=10)]
+    # ax.legend(handles=legend_handles, loc='upper right', fontsize=12)
 
     # add colorbar
     colormap_norm = mpl.colors.Normalize(vmin=0, vmax=1)
     fig.colorbar(mpl.cm.ScalarMappable(norm=colormap_norm, cmap=colormap),
-                 ax=ax, label='Similarity')
+                 ax=ax, label='Cell-cell similarity')
 
+    plt.tight_layout()
     fig.savefig(figure_path, transparent=True)
     plt.close()
 
@@ -374,7 +377,31 @@ for m, idx, show, func in itertools.product(
         proj_stats_all[(m, idx, func)] = stats
 
 # %%
+mpl.rcParams['font.size'] = 14
+
+for m, idx, show, func in itertools.product(
+        projection_methods, base_cell_indices, show_lemon_prior, norm_funcs):
+    # plot standalone legend
+    plt.figure(figsize=(3.2, 0.5), dpi=300)
+    plt.axis('off')
+    legend_handles = [
+        Line2D([0], [0], linestyle='', color='C0', marker='.',label='Focal',
+               markersize=10),
+        Line2D([0], [0], linestyle='', color='0.5', marker='.',
+               label='Dissimilar', markersize=10)
+    ]
+    plt.legend(legend_handles, ['Focal', 'Dissimilar'], loc='center',
+               frameon=False, bbox_to_anchor=(0.5, 0.5), ncol=2,
+               markerscale=1.6)
+    plt.tight_layout()
+    figure_path = os.path.join(proj_dir[m], 'sample_proj_legend.pdf')
+    plt.savefig(figure_path)
+    plt.close()
+
+# %%
 # plot stats from projection
+mpl.rcParams['font.size'] = 14
+
 for (m, idx, func), stats in proj_stats_all.items():
     dists_similar = stats['Distance'][stats['Similarity'] > 0]
     num_similar = dists_similar.size
@@ -382,7 +409,7 @@ for (m, idx, func), stats in proj_stats_all.items():
     # dists_dissimilar = dists_dissimilar.sample(n=num_similar, random_state=0)
     x_max = max(dists_similar.max(), dists_dissimilar.max())
 
-    plt.figure(figsize=(4, 4), dpi=300)
+    plt.figure(figsize=(3.2, 3.2), dpi=300)
     plt.hist(dists_similar, bins=10, range=(0, x_max), density=True, alpha=0.5,
              label='Similar')
     plt.hist(dists_dissimilar, bins=10, range=(0, x_max), density=True,
@@ -396,6 +423,7 @@ for (m, idx, func), stats in proj_stats_all.items():
     else:
         cell_id = cell_list.loc[idx, 'Cell']
     plt.title(f'Cell {cell_id:04d}')
+    plt.tight_layout()
     figure_path = os.path.join(proj_dir[m],
                                f'samples_on_{idx:04d}_{func}_dists.pdf')
     plt.savefig(figure_path, transparent=True)
@@ -413,6 +441,7 @@ num_plot_cells = plot_cells.size
 for i, j in itertools.combinations(range(num_plot_cells), 2):
     similarity_matrix[i, j] = 0.5
 
+mpl.rcParams['font.size'] = 14
 plt.figure(figsize=(4, 4), dpi=300)
 plt.imshow(similarity_matrix, cmap=plt.get_cmap('binary'))
 
@@ -651,5 +680,3 @@ def project_on_cell_mean(base_cell_idx, norm_func, output_dir, random_seed=0):
 for focal_cell_id in range(0, 501, 50):
     project_on_cell_mean(
         focal_cell_id, 'gaussian', os.path.join(run_dir, 'PCA-projection'))
-
-# %%

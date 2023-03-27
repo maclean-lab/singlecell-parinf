@@ -25,7 +25,7 @@ def main():
     integrator_method = args.integrator_method
 
     # initialize Stan analyzer
-    y = np.loadtxt("canorm_tracjectories.csv", delimiter=",")
+    y = np.loadtxt("canorm_trajectories.csv", delimiter=",")
     y = y[cell_id, :]
     t_end = y.size - 1
     # apply preprocessing to the trajectory if specified

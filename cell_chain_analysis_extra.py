@@ -23,17 +23,16 @@ os.chdir(working_dir)
 
 # %%
 # initialize cell chain analysis
-
 # specify a cell chain
 # stan_run = '1'
 # stan_run = '2'
-# stan_run = '3'
+stan_runs = ['3']
 # stan_run = '3-1.0'
 # stan_run = '3-2.0'
 # stan_run = 'simple-prior'
 # stan_run = 'const-eta1'
 # stan_run = 'const-Be'
-stan_runs = ['const-Be-eta1']
+# stan_runs = ['const-Be-eta1']
 # stan_run = 'const-Be-eta1-mixed-2'
 # stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
 # stan_run = 'lemon-prior-1000'
@@ -58,9 +57,6 @@ param_names = [calcium_models.param_names[i + 1]
                for i, mask in enumerate(param_mask) if mask == "1"]
 param_names = ['sigma'] + param_names
 num_params = len(param_names)
-# select_params = 'd5', 'eta2', 'KoffIP3', 'k3', 'epr', 'KoffPLC', 'Katp'
-select_param_pairs = [('KoffPLC', 'Katp'), ('eta3', 'c0'), ('epr', 'eta2'),
-                      ('a', 'dinh'), ('KoffPLC', 'a')]
 
 # get cell list
 num_runs = len(stan_runs)
@@ -109,7 +105,8 @@ similarity_matrix = soptsc_vars['W']
 print('Initializing the analyzer for the cell chain...')
 analyzer = StanMultiSessionAnalyzer(session_list, output_dir, session_dirs,
                                     param_names=param_names)
-mixed_cells = [int(c) for c in analyzer.session_list]
+session_list_int = mixed_cells = [int(c) for c in analyzer.session_list]
+unsampled_session_list_int = [int(c) for c in unsampled_session_list]
 num_mixed_cells = analyzer.num_sessions
 
 # initialize the analyzer for root cell
@@ -234,8 +231,12 @@ plot_trajectories_pdf(y_mode, mode_traj_path, titles=mixed_cells)
 # %%
 # sensitivity test
 use_mode = False
-plot_traj = True
+compare_to_sampled_trajs = False
+plot_traj = False
+
 sensitivity_dir = 'sensitivity-test'
+if compare_to_sampled_trajs:
+    sensitivity_dir += '-ref-sampled'
 if use_mode:
     sensitivity_dir += '-mode'
 sensitivity_dir = os.path.join(output_root, sensitivity_dir)
@@ -256,17 +257,20 @@ y_run = y_all[mixed_cells, :]
 
 if use_mode:
     analyzer.run_sensitivity_test(
-        calcium_ode, 0, ts, y0_run, y_run, 3, sensitive_params, method='mode',
-        plot_traj=plot_traj, figure_size=(5, 3), plot_legend=False,
-        figure_path_prefixes=figure_paths,
-        param_names_on_plot=calcium_models.params_on_plot,
-        method_kwargs={'method': 'histogram'})
+        calcium_ode, 0, ts, y0_run, y_run, 3, sensitive_params,
+        test_value='mode', plot_traj=plot_traj, figure_size=(5, 3),
+        plot_legend=False, figure_path_prefixes=figure_paths,
+        sample_mode_kwargs={'method': 'histogram'})
+elif compare_to_sampled_trajs:
+    analyzer.run_sensitivity_test(
+        calcium_ode, 0, ts, y0_run, y_run, 3, sensitive_params,
+        ref_traj_type='sampled', plot_traj=plot_traj, figure_size=(5, 3),
+        plot_legend=False, figure_path_prefixes=figure_paths)
 else:
     analyzer.run_sensitivity_test(
         calcium_ode, 0, ts, y0_run, y_run, 3, sensitive_params,
         plot_traj=plot_traj, figure_size=(5, 3), plot_legend=False,
-        figure_path_prefixes=figure_paths,
-        param_names_on_plot=calcium_models.params_on_plot)
+        figure_path_prefixes=figure_paths)
 
 # reset output directory
 analyzer.output_dir = output_dir
@@ -382,7 +386,7 @@ for i, j in itertools.product(range(len(sensitive_params)), range(2)):
     ax.text(j, i, f'{mode:.2f} ({pct75:.2f})', ha='center',
             va='center', color='w')
 ax.set_aspect(0.3)
-ax.set_title("Distance [mode (75%-tile)]", pad=12)
+ax.set_title("Sensitivity [mode (75%-tile)]", pad=12)
 plt.colorbar(heatmap, shrink=0.5)
 plt.tight_layout()
 plt.savefig(figure_path)
@@ -426,7 +430,7 @@ for i, j in itertools.product(range(len(sensitive_params)), range(2)):
     ax.text(j, i, f'{mean_str} ± {std_str}', ha='center', va='center',
             color='w')
 ax.set_aspect(0.3)
-ax.set_title("Distance [mean ± std]", pad=12)
+ax.set_title("Sensitivity [mean ± std]", pad=12)
 cb = plt.colorbar(heatmap, shrink=0.5)
 cb.set_ticks([0, 10, 20, 30])
 cb.set_ticklabels(['0', '10', '20', '≥30'])
@@ -443,9 +447,9 @@ test_percentiles = np.arange(0.1, 1, 0.1)
 jet_cmap = plt.get_cmap('jet')
 sensitivity_colors = jet_cmap(test_percentiles)
 plt.axis('off')
-legend_patches = [mpatches.Patch(color=c, label=p)
+legend_placeholders = [mpatches.Patch(color=c, label=p)
                   for c, p in zip(sensitivity_colors, test_percentiles)]
-plt.legend(legend_patches, [f'{p:.1f}' for p in test_percentiles],
+plt.legend(legend_placeholders, [f'{p:.1f}' for p in test_percentiles],
            title='Sample\nquantile', loc='upper left',
            bbox_to_anchor=(0.0, 0.0))
 plt.tight_layout()
@@ -574,8 +578,8 @@ def predict_unsampled(num_unsampled, num_sampled, figure_dir,
                       random_seed=0, plot_traj=False):
     bit_generator = np.random.MT19937(random_seed)
     rng = np.random.default_rng(bit_generator)
-    unsampled_cells = rng.choice(unsampled_session_list, size=num_unsampled,
-                                 replace=False)
+    unsampled_cells = rng.choice(unsampled_session_list_int,
+                                 size=num_unsampled, replace=False)
     sampled_cell_list = mixed_cells
     traj_stats_table = pd.DataFrame(
         index=range(num_unsampled),
@@ -594,7 +598,7 @@ def predict_unsampled(num_unsampled, num_sampled, figure_dir,
             sampled_cell = rng.choice(sampled_cell_list)
 
         # predict using the selected cell
-        sampled_cell_order = analyzer.session_list.index(sampled_cell)
+        sampled_cell_order = session_list_int.index(sampled_cell)
         sampled_cell_analyzer = analyzer.session_analyzers[sampled_cell_order]
         mixed_chains = sampled_cell_analyzer.get_mixed_chains()
         y0_cell = np.array([0, 0, 0.7, y0_all[cell]])
@@ -630,7 +634,7 @@ def predict_unsampled(num_unsampled, num_sampled, figure_dir,
                 calcium_ode, 0, ts, y0_cell, subsample_step_size=50,
                 plot=False, verbose=False)
             traj_pred = np.concatenate(
-                [traj_pred[c][:, : ,3] for c in mixed_chains])
+                [traj_pred[c][:, :, 3] for c in mixed_chains])
 
         # plot predicted trajectories
         if plot_traj:
@@ -728,7 +732,7 @@ for n in num_sampled_for_prediction:
 def predict_unsampled_lemon(num_unsampled, random_seed=0):
     bit_generator = np.random.MT19937(random_seed)
     rng = np.random.default_rng(bit_generator)
-    unsampled_cells = rng.choice(unsampled_session_list, size=num_unsampled,
+    unsampled_cells = rng.choice(unsampled_session_list_int, size=num_unsampled,
                                  replace=False)
     traj_stats_table = pd.DataFrame(
         index=range(num_unsampled),
@@ -793,8 +797,8 @@ unsampled_pred_dir = os.path.join(
 unsampled_traj_stats = {}
 unsampled_traj_stats['similar'] = {}
 unsampled_traj_stats['random'] = {}
-unsampled_traj_stats['marginal'] = {}
-num_sampled_for_prediction = [500, 400, 300, 200, 100]
+# unsampled_traj_stats['marginal'] = {}
+num_sampled_for_prediction = [500]#, 400, 300, 200, 100]
 
 # load distances from 'similar', 'random', 'marginal'
 for n in num_sampled_for_prediction:
@@ -809,19 +813,20 @@ unsampled_traj_stats['lemon'] = pd.read_csv(table_path)
 
 # %%
 # plot stats for predictions
-prediction_methods = ['similar', 'random', 'marginal', 'lemon']
+prediction_methods = list(unsampled_traj_stats.keys())
 stats_names = ['Distance', 'PeakDiff', 'PeakFoldChange', 'PeakTimeDiff',
                'SteadyDiff', 'SteadyFoldChange', 'DerivativeDist']
 stats_fig_names = ['mean_trajectory_distances', 'mean_peak_diffs',
                    'mean_peak_fold_changes', 'peak_time_diff',
                    'mean_steady_diffs', 'mean_steady_fold_changes',
                    'mean_derivative_distances']
-stats_xlabels = ['Mean trajectory distance', 'Mean peak difference',
+stats_xlabels = ['Mean prediction error', 'Mean peak difference',
                  'Mean peak fold change', 'Man peak time difference',
                  'Mean steady state difference',
                  'Mean steady state fold change',
                  'Mean first derivative distance']
 
+# %%
 prediction_stats_summary = {}
 for method in prediction_methods[:-1]:
     prediction_stats_summary[method] = {}
@@ -884,125 +889,42 @@ for method, traj_stat_tables in unsampled_traj_stats.items():
             plt.savefig(figure_path)
             plt.close()
 
+# %%
 # make histogram for multiple stats in the same figure
 for n in num_sampled_for_prediction:
     for i in range(len(stats_names)):
         # plot all methods together
         if stats_names[i] not in ['PeakTimeDiff', 'DerivativeDist']:
-            figure_path = os.path.join(
-                unsampled_pred_dir,
-                f'{stats_fig_names[i]}_prediction_unsampled_{n}.pdf')
             plt.figure(figsize=(6, 4), dpi=300)
-            # gather data
             traj_plot_stats = [unsampled_traj_stats[method][n][stats_names[i]]
-                            for method in prediction_methods[:-1]]
+                               for method in prediction_methods
+                               if method != 'lemon']
             traj_plot_stats = np.vstack(traj_plot_stats)
             traj_plot_stats = np.vstack([
                 traj_plot_stats, unsampled_traj_stats['lemon'][stats_names[i]]])
             traj_plot_stats = traj_plot_stats.T
-            plt.hist(traj_plot_stats, label=prediction_methods, bins=20)
-            # for method, traj_stat_tables in unsampled_traj_stats.items():
-            #     if method == 'similar':
-            #         zorder = 3
-            #     elif method == 'random':
-            #         zorder = 2
-            #     else:
-            #         zorder = 1
-
-            #     if method == 'lemon':
-            #         plt.hist(traj_stat_tables[stats_names[i]], bins=20, alpha=0.5,
-            #                  label=method.capitalize())
-            #     else:
-            #         plt.hist(traj_stat_tables[n][stats_names[i]],bins=20,
-            #                  alpha=0.5, label=method.capitalize(),
-            #                  zorder=zorder)
-            plt.legend()
+            traj_hist_labels = []
+            for method in prediction_methods:
+                if method == 'lemon':
+                    traj_hist_labels.append('Lemon value')
+                else:
+                    traj_hist_labels.append(f'{method.capitalize()} cells')
+            plt.hist(
+                traj_plot_stats, bins=10,
+                label=traj_hist_labels
+            )
+            plt.legend(title='Prediction from', fontsize='small')
+            if stats_names[i] == 'Distance':
+                plt.xlim((0, 50))
             plt.xlabel(stats_xlabels[i])
             plt.ylabel('Number of cells')
             plt.tight_layout()
-            plt.savefig(figure_path)
-            plt.close()
-
-        # plot similar vs random
-        figure_path = os.path.join(
-            unsampled_pred_dir,
-            f'{stats_fig_names[i]}_prediction_unsampled_similar_vs_' +
-            f'random_{n}.pdf')
-        plt.figure(figsize=(6, 4), dpi=300)
-        traj_plot_stats = [unsampled_traj_stats[method][n][stats_names[i]]
-                           for method in prediction_methods[:2]]
-        traj_plot_stats = np.vstack(traj_plot_stats)
-        traj_plot_stats = traj_plot_stats.T
-        plt.hist(traj_plot_stats, label=prediction_methods[:2], bins=20)
-        # for method in ['similar', 'random']:
-        #     traj_stat_tables = unsampled_traj_stats[method]
-        #     if method == 'similar':
-        #         zorder = 3
-        #     else:
-        #         zorder = 2
-
-        #     plt.hist(traj_stat_tables[n][stats_names[i]], bins=20, alpha=0.5,
-        #              label=method.capitalize(), zorder=zorder)
-        plt.legend()
-        plt.xlabel(stats_xlabels[i])
-        plt.ylabel('Number of cells')
-        plt.tight_layout()
-        plt.savefig(figure_path)
-        plt.close()
-
-        # plot similar vs marginal and lemon
-        if stats_names[i] not in ['PeakTimeDiff', 'DerivativeDist']:
             figure_path = os.path.join(
                 unsampled_pred_dir,
-                f'{stats_fig_names[i]}_prediction_unsampled_similar_vs_' +
-                f'others_{n}.pdf')
-            plt.figure(figsize=(6, 4), dpi=300)
-            traj_plot_stats = [unsampled_traj_stats[method][n][stats_names[i]]
-                               for method in ['similar', 'marginal']]
-            traj_plot_stats = np.vstack(traj_plot_stats)
-            traj_plot_stats = np.vstack([
-                traj_plot_stats, unsampled_traj_stats['lemon'][stats_names[i]]])
-            traj_plot_stats = traj_plot_stats.T
-            plt.hist(traj_plot_stats, label=['similar', 'marginal', 'lemon'],
-                    bins=20)
-            # for method in ['similar', 'marginal', 'lemon']:
-            #     traj_stat_tables = unsampled_traj_stats[method]
-
-            #     if method == 'similar':
-            #         zorder = 3
-            #     else:
-            #         zorder = 2
-
-            #     if method == 'lemon':
-            #         plt.hist(traj_stat_tables[stats_names[i]], bins=20, alpha=0.5,
-            #                  label=method.capitalize())
-            #     else:
-            #         plt.hist(traj_stat_tables[n][stats_names[i]], bins=20,
-            #                  alpha=0.5, label=method.capitalize(),
-            #                  zorder=zorder)
-            plt.legend()
-            plt.xlabel(stats_xlabels[i])
-            plt.ylabel('Number of cells')
-            plt.tight_layout()
+                f'{stats_fig_names[i]}_prediction_unsampled_{n}.pdf'
+            )
             plt.savefig(figure_path)
             plt.close()
-
-    # make scatter plots for similarity vs trajectory distances
-    # figure_path = os.path.join(unsampled_pred_dir,
-    #                         f'similarity_vs_traj_dists_{n}.pdf')
-    # plt.figure(figsize=(6, 4))
-    # for method, traj_dist_tables in unsampled_traj_dists.items():
-    #     if method == 'lemon':
-    #         continue
-
-    #     similarity = [similarity_matrix[row.Cell, row.SampledCell]
-    #                 for row in traj_dist_tables[n].itertuples()]
-    #     plt.scatter(similarity, traj_dist_tables[n]['Distance'],
-    #                 alpha=0.5, label=method.capitalize())
-    # plt.legend()
-    # plt.tight_layout()
-    # plt.savefig(figure_path)
-    # plt.close()
 
 # %%
 # get K-S stats
@@ -1096,3 +1018,165 @@ for cell in traj_dist_unsampled_batch['Cell'].unique():
     plt.hist(traj_stat_tables, range=(0, 30))
     plt.savefig(figure_path)
     plt.close()
+
+# %%
+# simualte trajectories by BDF solver and compare to those by dopri5
+import time
+
+random_seed = 0
+bit_generator = np.random.MT19937(random_seed)
+rng = np.random.default_rng(bit_generator)
+num_cells_to_simulate = 50
+plot_trajs = False
+rk_dists = []
+bdf_dists = []
+rk_bdf_msd = []
+rk_time = []
+bdf_time = []
+matplotlib.rcParams['font.size'] = 12
+
+rk_bdf_dir = os.path.join(output_root, 'rk_vs_bdf')
+if not os.path.exists(rk_bdf_dir):
+    os.mkdir(rk_bdf_dir)
+
+for cell_order in rng.choice(num_mixed_cells, size=num_cells_to_simulate,
+                             replace=False):
+    cell_id = mixed_cells[cell_order]
+    cell_analyzer = analyzer.session_analyzers[cell_order]
+    mixed_chains = cell_analyzer.get_mixed_chains()
+    y0_cell = np.array([0, 0, 0.7, y0_all[cell_id]])
+    y_cell = y_all[cell_id, :]
+
+    # simulate trajectories on a sample using dopri5
+    tic = time.process_time()
+    y_rk = cell_analyzer.simulate_chains(
+        calcium_ode, 0, ts, y0_cell, subsample_step_size=50, plot=False,
+        verbose=False,
+    )
+    toc = time.process_time()
+    rk_time.append(toc - tic)
+    y_rk = np.concatenate([y_rk[c][:, :, 3] for c in mixed_chains])
+
+    # simulate trajectories on a sample using BDF
+    tic = time.process_time()
+    y_bdf = cell_analyzer.simulate_chains(
+        calcium_ode, 0, ts, y0_cell, integrator='vode', subsample_step_size=50,
+        plot=False, verbose=False, method='bdf'
+    )
+    toc = time.process_time()
+    bdf_time.append(toc - tic)
+    y_bdf = np.concatenate([y_bdf[c][:, :, 3] for c in mixed_chains])
+
+    # compute distances between trajectories
+    rk_dists.append(np.mean(np.linalg.norm(y_rk - y_cell, axis=1)))
+    bdf_dists.append(np.mean(np.linalg.norm(y_bdf - y_cell, axis=1)))
+    rk_bdf_msd.append(np.mean(np.linalg.norm(y_bdf - y_rk, axis=1)))
+
+    if plot_trajs:
+        # add initial condition to each trajectory
+        ts_all = np.insert(ts, 0, 0)
+        ts_ticks = [ts_all[0], ts_all[-1]]
+        y_cell = np.insert(y_cell, 0, y0_cell[3])
+        y_rk = np.concatenate(
+            [np.full((y_rk.shape[0], 1), y0_cell[3]), y_rk],
+            axis=1
+        )
+        y_bdf = np.concatenate(
+            [np.full((y_bdf.shape[0], 1), y0_cell[3]), y_bdf],
+            axis=1
+        )
+
+        # plot trajectories simulated by dopri5
+        plt.figure(figsize=(3, 2), dpi=300)
+        plt.plot(ts_all, y_cell, 'ko', fillstyle='none')
+        plt.plot(ts_all, y_rk.T, color='C0', alpha=0.2)
+        plt.title(f'Cell {cell_id:04d}')
+        plt.xlabel('Time')
+        plt.xticks(ticks=ts_ticks)
+        plt.ylabel(r'Ca${}^{2+}$ response (AU)')
+        plt.yticks(ticks=[np.amin(y_cell), np.amax(y_cell)])
+        plt.tight_layout()
+        figure_path = os.path.join(rk_bdf_dir,
+                                   f'cell_{cell_id:04d}_rk_trajs.pdf')
+        plt.savefig(figure_path)
+        plt.close()
+
+        # plot trajectories simulated by BDF
+        plt.figure(figsize=(3, 2), dpi=300)
+        plt.plot(ts_all, y_cell, 'ko', fillstyle='none')
+        plt.plot(ts_all, y_bdf.T, color='C0', alpha=0.2)
+        plt.title(f'Cell {cell_id:04d}')
+        plt.xlabel('Time')
+        plt.xticks(ticks=ts_ticks)
+        plt.ylabel(r'Ca${}^{2+}$ response (AU)')
+        plt.yticks(ticks=[np.amin(y_cell), np.amax(y_cell)])
+        plt.tight_layout()
+        figure_path = os.path.join(rk_bdf_dir,
+                                   f'cell_{cell_id:04d}_bdf_trajs.pdf')
+        plt.savefig(figure_path)
+        plt.close()
+
+# %%
+print(f'Average time for RK: {np.mean(rk_time):.2f} ± {np.std(rk_time, ddof=1):.2f}')
+print(f'Average time for BDF: {np.mean(bdf_time):.2f} ± {np.std(bdf_time, ddof=1):.2f}')
+
+# %%
+# plot legend for fitted trajectories
+from matplotlib.lines import Line2D
+
+plt.figure(figsize=(4, 0.5), dpi=300)
+plt.axis('off')
+legend_placeholders = [
+    Line2D([], [], color='#000000', marker='o', markerfacecolor='#000000',
+           fillstyle='none', linewidth=0),
+    Line2D([], [], color='C0', marker='o', markerfacecolor='C0', linewidth=0)
+]
+plt.legend(
+    legend_placeholders, ['Data', 'Fitted trajectory'], loc='center',
+    frameon=False, bbox_to_anchor=(0.5, 0.5), ncol=2
+)
+plt.tight_layout()
+figure_path = os.path.join(rk_bdf_dir, 'simulated_trajs_legend.pdf')
+plt.savefig(figure_path)
+plt.close()
+
+# %%
+# plot fitting error from dopri5 and BDF
+matplotlib.rcParams['font.size'] = 12
+plt.figure(figsize=(3, 2), dpi=300)
+plt.violinplot([rk_dists, bdf_dists])
+plt.xticks(ticks=[1, 2], labels=['RK', 'BDF'])
+plt.ylabel('Mean error\nfrom data')
+plt.tight_layout()
+figure_basename = os.path.join(rk_bdf_dir, 'rk_vs_bdf_mean_error_violin')
+plt.savefig(figure_basename + '.pdf')
+plt.savefig(figure_basename + '.png')
+plt.close()
+
+# %%
+# plot difference between dopri5 and BDF - violin
+matplotlib.rcParams['font.size'] = 12
+plt.figure(figsize=(3, 2), dpi=300)
+plt.violinplot(rk_bdf_msd)
+plt.xticks(ticks=[])
+plt.ylabel('Mean Euclidean distance\nbetween RK and BDF')
+plt.tight_layout()
+figure_basename = os.path.join(rk_bdf_dir, 'rk_vs_bdf_mean_dist_violin')
+plt.savefig(figure_basename + '.pdf')
+plt.savefig(figure_basename + '.png')
+plt.close()
+
+# %%
+# plot difference between dopri5 and BDF - histogram
+matplotlib.rcParams['font.size'] = 12
+plt.figure(figsize=(3, 2), dpi=300)
+hist_data = plt.hist([msd for msd in rk_bdf_msd if msd <= 0.0002], bins=10)
+# plt.xlim((1e-5, 1e-4))
+plt.xticks(ticks=[3e-5, 1e-4], labels=[r'$3 \times 10^{-5}$', r'$10^{-4}$'])
+plt.xlabel('Mean Euclidean distance\nbetween RK and BDF')
+plt.ylabel('Number of cells')
+plt.tight_layout()
+figure_basename = os.path.join(rk_bdf_dir, 'rk_vs_bdf_mean_dist_hist')
+plt.savefig(figure_basename + '.pdf')
+plt.savefig(figure_basename + '.png')
+plt.close()

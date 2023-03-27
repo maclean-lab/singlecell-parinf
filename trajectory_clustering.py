@@ -22,8 +22,9 @@ from stan_helpers import load_trajectories
 # stan_runs = ['const-Be-eta1-random-1']
 # stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
 stan_runs = ['const-Be-eta1-signaling-similarity']
-# list_ranges = [(1, 500)]
-list_ranges = [(1, 100)]
+list_ranges = [(1, 500)]
+# list_ranges = [(1, 250)]
+# list_ranges = [(1, 100)]
 # list_ranges = [(1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
 # list_ranges = [(1, 372)]
 # list_ranges = [(1, 571), (1, 372), (1, 359), (1, 341), (1, 335), (1, 370)]
@@ -92,7 +93,10 @@ kmeans = TimeSeriesKMeans(n_clusters=num_clusters, metric='euclidean',
 adata.obs[cluster_key] = pd.Series(kmeans.fit_predict(y_sessions),
                                    index=adata.obs_names, dtype='category')
 if cluster_key == 'k_means_3':
-    adata.rename_categories(cluster_key, ['Low', 'High', 'Medium'])
+    if 'const-Be-eta1' in stan_runs or 'const-Be-eta1-signaling-similarity' in stan_runs:
+        adata.rename_categories(cluster_key, ['Low', 'High', 'Medium'])
+    else:
+        adata.rename_categories(cluster_key, ['C1', 'C2', 'C3'])
 cluster_names = adata.obs[cluster_key].cat.categories
 adata.uns[f'{cluster_key}_colors'] = [f'C{i + 3}' for i in range(num_clusters)]
 
@@ -130,9 +134,10 @@ for i, c in enumerate(cluster_names):
     sns.kdeplot(data=peaks, fill=True, alpha=0.2, label=c,
                 color=adata.uns[f'{cluster_key}_colors'][i])
 plt.xlim((0, 10))
+plt.xlabel(r'Peak Ca${}^{2+}$ response (AU)')
 plt.yticks(ticks=[])
 plt.legend()
-plt.title(r'Ca${}^{2+}$ response clustering')
+# plt.title(r'Ca${}^{2+}$ response clustering')
 plt.tight_layout()
 figure_path = os.path.join(output_dir, f'{cluster_key}_traj_peaks.pdf')
 plt.savefig(figure_path)
@@ -146,8 +151,8 @@ t_plot_max = 100
 num_plot_points = np.sum(ts <= t_plot_max)
 ts_plot = ts[:num_plot_points]
 
-fig, axs = plt.subplots(nrows=1, ncols=num_clusters, sharex=True,
-                        figsize=(3 * num_clusters, 1.5), dpi=300)
+fig, axs = plt.subplots(nrows=num_clusters, ncols=1, sharex=True,
+                        figsize=(3, num_clusters + 1), dpi=300)
 for i, cluster in enumerate(cluster_names):
     cluster_cells = [int(c) for c in session_list
                      if adata.obs.loc[c, cluster_key] == cluster]

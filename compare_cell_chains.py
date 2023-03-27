@@ -120,7 +120,7 @@ for d in analyzer_dirs:
         run_data.loc[:, [str(c) for c in range(4)]].sum(axis=1))
 
 # %%
-# report stats
+# get stats for each cell chain
 stats = pd.DataFrame()
 def add_stats(data, data_name, axis=None):
     data_mean = []
@@ -139,6 +139,8 @@ add_stats(num_mixed_chains, 'Mixed chains')
 add_stats(trajectory_distances, 'Trajectory distance')
 stats.index = pub_names
 
+# %%
+# report stats
 print(stats)
 stats.to_csv(os.path.join(output_dir, 'stats.csv'))
 
@@ -306,11 +308,12 @@ plt.close()
 
 # %%
 # make KDE plot for sampling time
-plt.figure(figsize=(4, 5), dpi=dpi)
+matplotlib.rcParams['font.size'] = 14
+plt.figure(figsize=(4, 3), dpi=dpi)
 figure_path = os.path.join(output_dir, 'sampling_time_kde.pdf')
 kde_ax = sns.kdeplot(data=[np.mean(t.values, axis=1) for t in sampling_time],
                      fill=True, legend=True)
-plt.xlabel('Time (minutes)')
+plt.xlabel('Sampling time (minutes)')
 plt.ylabel('Density')
 kde_legend = kde_ax.get_legend()
 for t, pn in zip(kde_legend.get_texts(), pub_names):

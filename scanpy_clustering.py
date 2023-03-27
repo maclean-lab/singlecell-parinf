@@ -114,6 +114,8 @@ p_val_max = 1.1
 
 num_top_genes = 10 if num_clusters < 5 else 5
 
+mpl.rcParams['font.size'] = 18
+
 for test in marker_gene_tests:
     marker_gene_key = f'{cluster_key}_{test}'
     sc.tl.rank_genes_groups(adata, cluster_key, n_genes=num_top_genes,

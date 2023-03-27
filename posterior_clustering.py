@@ -27,17 +27,17 @@ import calcium_models
 # %%
 # initialize computation of distances between posterior samples
 # stan_runs = ['3']
-stan_runs = ['const-Be-eta1']
+# stan_runs = ['const-Be-eta1']
 # stan_runs = ['const-Be-eta1-signaling-similarity']
 # stan_runs = ['const-Be-eta1-mixed-1']
 # stan_runs = [f'const-Be-eta1-mixed-{i}' for i in range(5)]
 # stan_runs = ['const-Be-eta1-random-1']
-# stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
-list_ranges = [(1, 500)]
-# list_ranges = [(1, 100)]
+stan_runs = [f'const-Be-eta1-random-{i}' for i in range(1, 7)]
+# list_ranges = [(1, 500)]
+# list_ranges = [(1, 250)]
 # list_ranges = [(1, 100), (1, 100), (1, 100), (1, 100), (1, 100)]
 # list_ranges = [(1, 359)]
-# list_ranges = [(1, 571), (1, 372), (1, 359), (1, 341), (1, 335), (1, 370)]
+list_ranges = [(1, 571), (1, 372), (1, 359), (1, 341), (1, 335), (1, 370)]
 log_transform_samples = False
 scale_samples = False
 max_num_clusters = 3
@@ -388,6 +388,8 @@ if 'const-Be-eta1' in stan_runs:
     figure_title += ', similar'
 elif 'const-Be-eta1-random-1' in stan_runs:
     figure_title += ', random'
+else:
+    figure_title = None
 
 def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
     cluster_key = f'{stat_type}_{cluster_method}'
@@ -429,7 +431,6 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
                         xticklabels=False, yticklabels=reordered_labels)
         plt.xlabel('Time')
         plt.ylabel('Ca2+ response')
-        plt.title(figure_title)
         plt.tight_layout()
         figure_path = os.path.join(result_dir, 'clustered_trajectories.pdf')
         plt.savefig(figure_path)
@@ -442,7 +443,6 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
                         yticklabels=reordered_labels)
         plt.ylabel('Cells')
         plt.xticks(fontsize=10)
-        plt.title(figure_title)
         plt.tight_layout()
         figure_path = os.path.join(result_dir, 'clustered_posterior_means.pdf')
         plt.savefig(figure_path)
@@ -455,7 +455,6 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
                         yticklabels=reordered_labels)
         plt.ylabel('Cells')
         plt.xticks(fontsize=10)
-        plt.title(figure_title)
         plt.tight_layout()
         figure_path = os.path.join(result_dir, 'clustered_posterior_modes.pdf')
         plt.savefig(figure_path)
@@ -471,7 +470,6 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
                            figsize=(4, 6), cbar_pos=None)
         g.ax_heatmap.set_xlabel('Cells')
         g.ax_heatmap.set_ylabel('Ca2+ response')
-        plt.title(figure_title)
         plt.tight_layout()
         figure_path = os.path.join(result_dir, 'clustered_trajectories.pdf')
         plt.savefig(figure_path)
@@ -487,7 +485,6 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
         g.ax_heatmap.set_ylabel('Cells')
         g.cax.xaxis.set_label_position('top')
         plt.xticks(fontsize=10)
-        # plt.title(figure_title)
         plt.tight_layout()
         figure_path = os.path.join(result_dir, 'clustered_posterior_means.pdf')
         g.savefig(figure_path, dpi=300)
@@ -500,7 +497,6 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
                            cbar_pos=None)
         g.ax_heatmap.set_ylabel('Cells')
         plt.xticks(fontsize=10)
-        plt.title(figure_title)
         plt.tight_layout()
         figure_path = os.path.join(result_dir, 'clustered_posterior_modes.pdf')
         g.savefig(figure_path, dpi=300)
@@ -519,6 +515,8 @@ def cluster_by_sample_stats(stat_type, cluster_method, plot=False):
 # cluster by posterior means or posterior modes
 cluster_methods = ['ward']#, 'kmeans']
 stat_types = ['mean']#, 'mode']
+mpl.rcParams['font.size'] = 12
+
 for st, method in itertools.product(stat_types, cluster_methods):
     if method != 'kmeans':
         print(f'Clustering posterior {st} using {method} linkage...')
@@ -542,7 +540,7 @@ for st, method in itertools.product(stat_types, cluster_methods):
     elif 'const-Be-eta1-signaling-similarity' in stan_runs and st == 'mean' \
             and method == 'ward':
         cluster_key = 'mean_ward'
-        cluster_names = ['Medium', 'High', 'Low']
+        cluster_names = ['C1', 'C2', 'C3']
         adata.rename_categories(cluster_key, cluster_names)
         cluster_colors = ['C6', 'C7', 'C8']
     else:
@@ -553,6 +551,7 @@ for st, method in itertools.product(stat_types, cluster_methods):
 marker_gene_tests = ['t-test', 'wilcoxon', 't-test_overestim_var']
 num_top_genes = 100
 marker_gene_max_pval = 1.01
+mpl.rcParams['font.size'] = 18
 
 for cluster_key, test in itertools.product(computed_cluster_keys,
                                            marker_gene_tests):
@@ -688,6 +687,7 @@ cluster_traj_stats = ['PeakMean', 'PeakStd', 'PeakTimeMean', 'PeakTimeStd',
                       'SteadyMean', 'SteadyStd']
 cluster_traj_stat_table = {}
 num_steady_pts = ts.size // 5
+mpl.rcParams['font.size'] = 12
 
 for cluster_key in computed_cluster_keys:
     metric, method = cluster_key.split('_')
@@ -742,7 +742,8 @@ for cluster_key in computed_cluster_keys:
         else:
             plt.hist(values, bins=10, density=True, label=cluster_names)
         plt.legend()
-        plt.title(figure_title)
+        if figure_title:
+            plt.title(figure_title)
 
         plt.tight_layout()
 
@@ -1119,7 +1120,6 @@ for cluster_key in computed_cluster_keys:
             cluster_sample_stats.loc[cluster, f'{param}_std'] = \
                 cluster_samples[cluster][param].std()
 
-# %%
     output_path = os.path.join(result_dir, 'sample_stats.csv')
     cluster_sample_stats.to_csv(output_path)
 
